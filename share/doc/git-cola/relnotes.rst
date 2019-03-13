@@ -5,7 +5,7 @@ Releases
 Latest Release
 ==============
 
-:ref:`v3.2 <v3.2>` is the latest stable release.
+:ref:`v3.3 <v3.3>` is the latest stable release.
 
 Development version
 ===================
@@ -14,13 +14,69 @@ Clone the git-cola repo to get the latest development version:
 
 ``git clone git://github.com/git-cola/git-cola.git``
 
-.. _v3.3:
+.. _v3.4:
 
-git-cola v3.3 (unreleased)
-==========================
+git-cola v3.4
+=============
 
 Usability, bells and whistles
 -----------------------------
+* Updated German translation.
+  (`#936 <https://github.com/git-cola/git-cola/pull/936>`_)
+
+* The `Status` widget learned to optionally display file counts in its
+  category headers, and indent the files displayed in each category.
+  (`#931 <https://github.com/git-cola/git-cola/pull/931>`_)
+
+* The `Branches` widget can now sort branches by their most recent commit.
+  (`#930 <https://github.com/git-cola/git-cola/pull/930>`_)
+
+* `git cola` now includes configurable GUI themes that can be used to style
+  the user interface.  Enable the new themes by configuring `cola.theme`
+  in the preferences window.  See the
+  `cola.theme documentation <https://git-cola.readthedocs.io/en/latest/git-cola.html#cola-theme>`_
+  for more details.  (`#924 <https://github.com/git-cola/git-cola/pull/924>`_)
+
+* `git cola` now has built-in support for HiDPI displays by enabling
+  Qt's 5.6's `QT_AUTO_SCREEN_SCALE_FACTOR` feature.
+  (`#938 <https://github.com/git-cola/git-cola/issues/938>`_)
+
+* `git cola` now uses HiDPI pixmaps when rendering icons, and the builtin
+  icons have been updated to look sharp when displayed in HiDPI.
+  (`#932 <https://github.com/git-cola/git-cola/pull/932>`_)
+
+Fixes
+-----
+* `git cola` has been updated to work with newer versions of `gnome-terminal`
+  and no longer shell-quotes its arguments when launching `gnome-terminal`.
+  The `cola.terminalshellquote` configuration variable can be set to `true` to
+  get the old behavior, or to handle other terminals that take the command to run
+  as a single string instead of as arguments to `execv()`.
+  (`#935 <https://github.com/git-cola/git-cola/pull/935>`_)
+
+Development
+-----------
+* The contribution guidelines for contributors has been updated to mention
+  how to regenerate the `*.mo` message files.
+  (`#934 <https://github.com/git-cola/git-cola/pull/934>`_)
+
+.. _v3.3:
+
+git-cola v3.3
+=============
+
+Usability, bells and whistles
+-----------------------------
+* `git dag` improved how it renders parent commits.
+  (`#921 <https://github.com/git-cola/git-cola/pull/921>`_)
+
+* The `Branches` widget now checks out branches when double-clicked.
+  (`#920 <https://github.com/git-cola/git-cola/pull/920>`_)
+
+* The new `Submodules` widget makes it easy to interact with submodules.
+  Additionally, submodules can now be updated using the `Status` widget.
+  (`#916 <https://github.com/git-cola/git-cola/pull/916>`_)
+
 * Updated Japanese translation.
   (`#914 <https://github.com/git-cola/git-cola/pull/914>`_)
 
@@ -59,6 +115,9 @@ Usability, bells and whistles
 
 Fixes
 -----
+* Launching external programs has been improved on Windows.
+  (`#925 <https://github.com/git-cola/git-cola/pull/925>`_)
+
 * Improve compatibility when using PySide2.
   (`#912 <https://github.com/git-cola/git-cola/pull/912>`_)
 
@@ -89,6 +148,8 @@ Development
 
 Packaging
 ---------
+* The vendored `qtpy` library was updated to `v1.6`.
+
 * The Windows installer's wrapper scripts were missing an import.
   (`#878 <https://github.com/git-cola/git-cola/issues/878>`_)
 
@@ -1683,7 +1744,8 @@ Fixes
   (`#213 <https://github.com/git-cola/git-cola/issues/213>`_)
 
 * Fix "known incorrect sRGB profile" in `staged-item.png`.
-  (`Thread <http://comments.gmane.org/gmane.linux.gentoo.devel/85066>`_)
+  (`gentoo-devel message #85066
+  <http://comments.gmane.org/gmane.linux.gentoo.devel/85066>`_)
 
 .. _v1.9.2:
 
@@ -1768,7 +1830,8 @@ Usability, bells and whistles
 
 * Display of untracked files can be disabled from the Preferences dialog
   or by setting the `gui.displayuntracked` configuration variable to `false`.
-  (`Thread <https://public-inbox.org/git/20130821032913.GA6092@wheezy.local/>`_)
+  (`Git Mailing List on 2013-08-21
+  <https://public-inbox.org/git/20130821032913.GA6092@wheezy.local/>`_)
 
 Fixes
 -----

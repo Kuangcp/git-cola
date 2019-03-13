@@ -216,9 +216,9 @@ def branch_list(context, remote=False):
     return for_each_ref_basename(context, 'refs/heads')
 
 
-def _version_sort(context):
+def _version_sort(context, key='version:refname'):
     if version.check_git(context, 'version-sort'):
-        sort = 'version:refname'
+        sort = key
     else:
         sort = False
     return sort
@@ -240,7 +240,7 @@ def _triple(x, y):
     return (x, len(x) + 1, y)
 
 
-def all_refs(context, split=False):
+def all_refs(context, split=False, sort_key='version:refname'):
     """Return a tuple of (local branches, remote branches, tags)."""
     git = context.git
     local_branches = []
@@ -250,7 +250,7 @@ def all_refs(context, split=False):
     query = (triple('refs/tags', tags),
              triple('refs/heads', local_branches),
              triple('refs/remotes', remote_branches))
-    sort = _version_sort(context)
+    sort = _version_sort(context, key=sort_key)
     _, out, _ = git.for_each_ref(format='%(refname)',
                                  sort=sort, _readonly=True)
     for ref in out.splitlines():
@@ -656,6 +656,27 @@ def diff_upstream(context, head):
         return []
     base = merge_base(context, head, tracked)
     return diff_filenames(context, base, tracked)
+
+
+def list_submodule(context):
+    """Return submodules in the format(state, sha1, path, describe)"""
+    git = context.git
+    status, data, _ = git.submodule('status')
+    ret = []
+    if status == 0 and data:
+        data = data.splitlines()
+        # see git submodule status
+        # TODO better separation
+        for line in data:
+            state = line[0].strip()
+            sha1 = line[1:OID_LENGTH+1]
+            left_bracket = line.find('(', OID_LENGTH + 3)
+            if left_bracket == -1:
+                left_bracket = len(line) + 1
+            path = line[OID_LENGTH+2:left_bracket-1]
+            describe = line[left_bracket+1:-1]
+            ret.append((state, sha1, path, describe))
+    return ret
 
 
 def merge_base(context, head, ref):

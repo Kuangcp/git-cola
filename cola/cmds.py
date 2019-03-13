@@ -18,6 +18,7 @@ from . import icons
 from . import resources
 from . import textwrap
 from . import utils
+from . import version
 from .cmd import ContextCommand
 from .diffparse import DiffParser
 from .git import STDOUT
@@ -583,6 +584,12 @@ class Commit(ResetMode):
             msg += '\n'
 
         return msg
+
+
+class CycleReferenceSort(ContextCommand):
+    """Choose the next reference sort type"""
+    def do(self):
+        self.model.cycle_ref_sort()
 
 
 class Ignore(ContextCommand):
@@ -1247,13 +1254,21 @@ class LaunchDifftool(ContextCommand):
                 cfg = self.cfg
                 cmd = cfg.terminal()
                 argv = utils.shell_split(cmd)
+
+                terminal = os.path.basename(argv[0])
+                shellquote_terms = set(['xfce4-terminal'])
+                shellquote_default = terminal in shellquote_terms
+
                 mergetool = ['git', 'mergetool', '--no-prompt', '--']
                 mergetool.extend(paths)
-                needs_shellquote = set(['gnome-terminal', 'xfce4-terminal'])
-                if os.path.basename(argv[0]) in needs_shellquote:
+                needs_shellquote = cfg.get(
+                    'cola.terminalshellquote', shellquote_default)
+
+                if needs_shellquote:
                     argv.append(core.list2cmdline(mergetool))
                 else:
                     argv.extend(mergetool)
+
                 core.fork(argv)
         else:
             difftool_run(self.context)
@@ -1516,6 +1531,20 @@ class OpenRepo(EditModel):
             super(OpenRepo, self).do()
         else:
             self.model.set_worktree(old_repo)
+
+
+class OpenParentRepo(OpenRepo):
+
+    def __init__(self, context):
+        path = ''
+        if version.check_git(context, 'show-superproject-working-tree'):
+            status, out, _ = context.git.rev_parse(
+                show_superproject_working_tree=True)
+            if status == 0:
+                path = out
+        if not path:
+            path = os.path.dirname(core.getcwd())
+        super(OpenParentRepo, self).__init__(context, path)
 
 
 class Clone(ContextCommand):

@@ -14,8 +14,10 @@ Thanks
 * anderben
 * Andreas Schnederle-Wagner
 * Andreas Sommer
-* Andrew Chen
 * Andrej Kvasnica
+* Andrew Chen
+* Andrew Hemming
+* Arthur Coelho
 * Audrius Karabanovas
 * balping
 * Barış ÇELİK
@@ -86,6 +88,7 @@ Thanks
 * jfessard
 * JiCiT
 * Jimmy M. Coleman
+* Joachim Lusiardi
 * Johannes Löhnert
 * Johann Schmitz
 * Jordan Bedwell

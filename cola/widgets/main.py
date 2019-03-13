@@ -33,6 +33,7 @@ from . import action
 from . import archive
 from . import bookmarks
 from . import branch
+from . import submodules
 from . import browse
 from . import cfgactions
 from . import clone
@@ -119,6 +120,13 @@ class MainView(standard.MainWindow):
         self.branchwidget = self.branchdock.widget()
         titlebar = self.branchdock.titleBarWidget()
         titlebar.add_corner_widget(self.branchwidget.filter_button)
+        titlebar.add_corner_widget(self.branchwidget.sort_order_button)
+
+        # "Submodule" widgets
+        self.submodulesdock = create_dock(
+            N_('Submodules'), self,
+            fn=partial(submodules.SubmodulesWidget, context))
+        self.submoduleswidget = self.submodulesdock.widget()
 
         # "Commit Message Editor" widget
         self.position_label = QtWidgets.QLabel()
@@ -572,9 +580,17 @@ class MainView(standard.MainWindow):
         if self.browser_dockable:
             self.addDockWidget(top, self.browserdock)
             self.tabifyDockWidget(self.browserdock, self.commitdock)
-        self.addDockWidget(top, self.bookmarksdock)
+
         self.addDockWidget(top, self.branchdock)
+        self.addDockWidget(top, self.submodulesdock)
+        self.addDockWidget(top, self.bookmarksdock)
         self.addDockWidget(top, self.recentdock)
+
+        self.tabifyDockWidget(self.branchdock, self.submodulesdock)
+        self.tabifyDockWidget(self.submodulesdock, self.bookmarksdock)
+        self.tabifyDockWidget(self.bookmarksdock, self.recentdock)
+        self.branchdock.raise_()
+
         self.addDockWidget(bottom, self.diffdock)
         self.addDockWidget(bottom, self.actionsdock)
         self.addDockWidget(bottom, self.logdock)
@@ -684,7 +700,8 @@ class MainView(standard.MainWindow):
             self.actionsdock,
             self.bookmarksdock,
             self.recentdock,
-            self.branchdock
+            self.branchdock,
+            self.submodulesdock
         ]
         if self.browser_dockable:
             dockwidgets.append(self.browserdock)
@@ -867,6 +884,7 @@ class MainView(standard.MainWindow):
         show_status_filter = self.statuswidget.filter_widget.isVisible()
         state['show_status_filter'] = show_status_filter
         state['toolbars'] = self.toolbar_state.export_state()
+        state['ref_sort'] = self.model.ref_sort
         self.diffviewer.export_state(state)
 
         return state
@@ -882,6 +900,9 @@ class MainView(standard.MainWindow):
 
         toolbars = state.get('toolbars', [])
         self.toolbar_state.apply_state(toolbars)
+
+        sort_key = state.get('ref_sort', 0)
+        self.model.set_ref_sort(sort_key)
 
         diff_ok = self.diffviewer.apply_state(state)
         return base_ok and diff_ok
@@ -900,7 +921,8 @@ class MainView(standard.MainWindow):
             (optkey + '+4', self.actionsdock),
             (optkey + '+5', self.bookmarksdock),
             (optkey + '+6', self.recentdock),
-            (optkey + '+7', self.branchdock)
+            (optkey + '+7', self.branchdock),
+            (optkey + '+8', self.submodulesdock)
         )
         for shortcut, dockwidget in dockwidgets:
             # Associate the action with the shortcut
