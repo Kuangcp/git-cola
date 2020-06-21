@@ -548,7 +548,7 @@ def create_tree_entries(names):
         cur_entries = entries
         tree = root
         children = root.children
-        for part in item.split('/'):
+        for part in item.split('_'):
             if cur_names[part]:
                 # This has children
                 try:
@@ -578,9 +578,12 @@ def create_name_dict(names):
     # Phase 1: build a nested dictionary representing the intermediate
     # names in the branches.  e.g. {'xxx': {'abc': {}, 'def': {}}}
     tree_names = {}
+    # print("name", names)
     for item in names:
+        # print("item:",item)
         part_names = tree_names
-        for part in item.split('/'):
+        for part in item.split('_'):
+            # print("branch: ", part)
             # Descend into the inner names dict.
             part_names = part_names.setdefault(part, {})
     return tree_names
