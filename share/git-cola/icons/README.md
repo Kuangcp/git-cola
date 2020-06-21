@@ -37,11 +37,17 @@ License: MIT
 
 ### Git Logo
 
-Git Logo by Jason Long is licensed under the
-Creative Commons Attribution 3.0 Unported License.
-http://git-scm.com/downloads/logos
+Git Logo by [Jason Long](https://twitter.com/jasonlong) is licensed under the
+[Creative Commons Attribution 3.0 Unported License](https://creativecommons.org/licenses/by/3.0/).
 
-git-cola.svg is based on the original Git Logo.
+This license lets others distribute, remix, tweak, and build upon your work,
+even commercially, as long as they credit you for the original creation. This
+is the most accommodating of the CC licenses offered. Recommended for maximum
+dissemination and use of licensed materials.
+
+https://git-scm.com/downloads/logos
+
+git-cola.svg is based on the Git Logo.
 
 
 ### Octicons
@@ -96,7 +102,7 @@ The following files are from the Gnome project's
 document-save-symbolic.svg
 
 Copyright (C) The Gnome Project
-License: [LGPL](https://github.com/GNOME/adwaita-icon-theme/blob/master/COPYING_LGPL)
+License: [LGPL](https://github.com/GNOME/adwaita-icon-theme/blob/mainline/COPYING_LGPL)
 
 ### Gnome High Contrast Icons
 

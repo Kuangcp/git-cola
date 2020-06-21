@@ -9,11 +9,13 @@ srcdir = os.path.dirname(os.path.dirname(docdir))
 extrasdir = os.path.join(srcdir, 'extras')
 sys.path.insert(1, extrasdir)
 
-extensions = ['sphinx.ext.autodoc',
-              'sphinx.ext.doctest',
-              'sphinx.ext.todo',
-              'sphinx.ext.coverage',
-              'sphinxtogithub']
+extensions = [
+    'sphinx.ext.autodoc',
+    'sphinx.ext.doctest',
+    'sphinx.ext.todo',
+    'sphinx.ext.coverage',
+    'sphinxtogithub',
+]
 
 templates_path = ['_templates']
 source_suffix = '.rst'
@@ -27,7 +29,7 @@ authors = 'David Aguilar and contributors'
 versionfile = os.path.join(srcdir, 'cola', '_version.py')
 scope = {}
 with open(versionfile) as f:
-    exec(f.read(), scope)
+    exec (f.read(), scope)
 
 # The short X.Y version.
 version = scope['VERSION']
@@ -44,13 +46,16 @@ html_show_sourcelink = True
 htmlhelp_basename = 'git-cola-doc'
 
 man_pages = [
-  ('git-cola', 'git-cola', 'The highly caffeinated Git GUI',
-   authors, '1'),
-  ('git-dag', 'git-dag', 'The sleek and powerful Git history browser',
-   authors, '1'),
+    ('git-cola', 'git-cola', 'The highly caffeinated Git GUI', authors, '1'),
+    ('git-dag', 'git-dag', 'The sleek and powerful Git history browser', authors, '1'),
 ]
 
 latex_documents = [
-  ('index', 'git-cola.tex', 'git-cola Documentation',
-   'David Aguilar and contributors', 'manual'),
+    (
+        'index',
+        'git-cola.tex',
+        'git-cola Documentation',
+        'David Aguilar and contributors',
+        'manual',
+    ),
 ]

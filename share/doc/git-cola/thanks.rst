@@ -6,7 +6,10 @@ Thanks
 * Aaron Wolf
 * Adam Lesperance
 * Adrien be
+* Adil
 * AJ Bagwell
+* akontsevich
+* Aleksey Kontsevich
 * Alex Chernetz
 * Alex Gulyás
 * Alexander Kozienko
@@ -17,8 +20,10 @@ Thanks
 * Andrej Kvasnica
 * Andrew Chen
 * Andrew Hemming
+* armandg
 * Arthur Coelho
 * Audrius Karabanovas
+* Balázs Meskó
 * balping
 * Barış ÇELİK
 * Barry Roberts
@@ -26,9 +31,11 @@ Thanks
 * Ben Boeckel
 * Ben Cole
 * Benedict Lee
+* Benjamin Somers
 * Benoît Nouyrigat
 * Bert Jacobs
 * Birger Skogeng Pedersen
+* Björn Ketelaars
 * 林博仁 (Buo-ren Lin)
 * cclaus
 * Charles 101
@@ -42,6 +49,7 @@ Thanks
 * Daniel King
 * Dave Thomas
 * David Aguilar
+* David Fernandez
 * David LeGare
 * David Martínez Martí
 * Dawid Drozd
@@ -56,6 +64,7 @@ Thanks
 * Erop @EgZvor
 * Erwan Bousse
 * Fabio Coatti
+* Felipe Morales
 * Filip Danilović
 * fu7mu4
 * Garoe Dorta
@@ -66,6 +75,7 @@ Thanks
 * Glen Mailer
 * Guillaume de Bure
 * Guo Yunhe
+* Gyuris Gellért
 * Harro Verton
 * Hannes @kannes
 * Igor Galarraga
@@ -82,12 +92,14 @@ Thanks
 * Jakub Szymański
 * Jakub Wilk
 * James Geiger
+* Jason Newton
 * Javier Rodriguez Cuevas
 * Jeff Dagenais
 * Jérôme Carretero
 * jfessard
 * JiCiT
 * Jimmy M. Coleman
+* Joachim Jablon
 * Joachim Lusiardi
 * Johannes Löhnert
 * Johann Schmitz
@@ -112,6 +124,7 @@ Thanks
 * Luca Ottaviano
 * Łukasz Wojniłowicz
 * Luke Bakken
+* Luke Horwell
 * Maarten Nieber
 * Maaaks
 * Maciej Filipiak
@@ -130,10 +143,13 @@ Thanks
 * Michael Geddes
 * Michael Homer
 * Mickael Albertus
+* Miguel Boekhold
 * Mike Hanson
 * MikHulk
+* Mikołaj Milej
 * Minarto Margoliono
 * Mosaab Alzoubi
+* Muhammad Bashir Al-Noimi
 * Myz
 * Naraesk
 * Niel Buys
@@ -163,19 +179,28 @@ Thanks
 * Radek Novacek
 * Radek Postołowicz
 * Rafael Nascimento
+* Rafael Reuber
 * Raghavendra Karunanidhi
 * Rainer Müller
+* RealTehreal
+* Ricardo J. Barberis
 * Robbert Korving
+* Robert Pollak
 * Rolando Espinoza La fuente
 * Rustam Safin
+* Sabri Ünal
 * Samsul Ma'arif
 * Sebastian Brass
+* Sebastian Oliva
 * Sergey Leschina
+* Shun Sakai
+* Simon Peeters
 * Srinivasa Nallapati
 * Stan Angeloff
 * Stanisław Halik
 * Stefan Naewe
 * Steffen Prohaska
+* Stéphane Cerveau
 * Stephen Groat
 * Sven Claussner
 * Szymon Judasz
@@ -184,6 +209,8 @@ Thanks
 * Thomas Kiley
 * Thomas Kluyver
 * Thomas Thorne
+* Tom Dobbelaere
+* Tim Brown
 * Tim Schumacher
 * Trevor Alexander
 * Ugo Riboni
@@ -192,13 +219,18 @@ Thanks
 * Ｖ字龍 (Vdragon)
 * Vaibhav Sagar
 * Vaiz
+* vanderkoort
 * Ved Vyas
+* Victor Gambier
+* Victor Nepveu
 * Victorhck
 * Ville Skyttä
 * Virgil Dupras
 * Vitor Lobo
 * v.paritskiy
+* waterzch
 * Wolfgang Ocker
+* wm4
 * wsdfhjxc
 * Xie Hua Liang (xieofxie)
 * Yi EungJun

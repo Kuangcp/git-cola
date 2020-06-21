@@ -45,15 +45,21 @@ def is_git_dir(git_dir):
     if git_dir:
         headref = join(git_dir, 'HEAD')
 
-        if (core.isdir(git_dir) and
-                (core.isdir(join(git_dir, 'objects')) and
-                 core.isdir(join(git_dir, 'refs'))) or
-                (core.isfile(join(git_dir, 'gitdir')) and
-                 core.isfile(join(git_dir, 'commondir')))):
+        if (
+            core.isdir(git_dir)
+            and (
+                core.isdir(join(git_dir, 'objects'))
+                and core.isdir(join(git_dir, 'refs'))
+            )
+            or (
+                core.isfile(join(git_dir, 'gitdir'))
+                and core.isfile(join(git_dir, 'commondir'))
+            )
+        ):
 
-            result = (core.isfile(headref) or
-                      (core.islink(headref) and
-                       core.readlink(headref).startswith('refs/')))
+            result = core.isfile(headref) or (
+                core.islink(headref) and core.readlink(headref).startswith('refs/')
+            )
         else:
             result = is_git_file(git_dir)
 
@@ -83,7 +89,7 @@ def read_git_file(path):
         header = 'gitdir: '
         data = core.read(path).strip()
         if data.startswith(header):
-            result = data[len(header):]
+            result = data[len(header) :]
             if result and not os.path.isabs(result):
                 path_folder = os.path.dirname(path)
                 repo_relative = join(path_folder, result)
@@ -94,79 +100,92 @@ def read_git_file(path):
 class Paths(object):
     """Git repository paths of interest"""
 
-    def __init__(self, git_dir=None, git_file=None,
-                 worktree=None, common_dir=None):
+    def __init__(self, git_dir=None, git_file=None, worktree=None, common_dir=None):
+        if git_dir and not is_git_dir(git_dir):
+            git_dir = None
         self.git_dir = git_dir
         self.git_file = git_file
         self.worktree = worktree
         self.common_dir = common_dir
 
+    def get(self, path):
+        ceiling_dirs = set()
+        ceiling = core.getenv('GIT_CEILING_DIRECTORIES')
+        if ceiling:
+            ceiling_dirs.update([x for x in ceiling.split(':') if x])
 
-def find_git_directory(curpath):
+        if path:
+            path = core.abspath(path)
+
+        if not self.git_dir or not self.worktree:
+            # Search for a .git directory
+            while path:
+                if path in ceiling_dirs:
+                    break
+                if is_git_dir(path):
+                    if not self.git_dir:
+                        self.git_dir = path
+                    basename = os.path.basename(path)
+                    if not self.worktree and basename == '.git':
+                        self.worktree = os.path.dirname(path)
+                # We are either in a bare repository, or someone set GIT_DIR
+                # but did not set GIT_WORK_TREE.
+                if self.git_dir:
+                    if not self.worktree:
+                        basename = os.path.basename(self.git_dir)
+                        if basename == '.git':
+                            self.worktree = os.path.dirname(self.git_dir)
+                        elif path and not is_git_dir(path):
+                            self.worktree = path
+                    break
+                gitpath = join(path, '.git')
+                if is_git_dir(gitpath):
+                    if not self.git_dir:
+                        self.git_dir = gitpath
+                    if not self.worktree:
+                        self.worktree = path
+                    break
+                path, dummy = os.path.split(path)
+                if not dummy:
+                    break
+
+        if self.git_dir:
+            git_dir_path = read_git_file(self.git_dir)
+            if git_dir_path:
+                self.git_file = self.git_dir
+                self.git_dir = git_dir_path
+
+                commondir_file = join(git_dir_path, 'commondir')
+                if core.exists(commondir_file):
+                    common_path = core.read(commondir_file).strip()
+                    if common_path:
+                        if os.path.isabs(common_path):
+                            common_dir = common_path
+                        else:
+                            common_dir = join(git_dir_path, common_path)
+                            common_dir = os.path.normpath(common_dir)
+                        self.common_dir = common_dir
+        # usage: Paths().get()
+        return self
+
+
+def find_git_directory(path):
     """Perform Git repository discovery
 
     """
-    paths = Paths(git_dir=core.getenv('GIT_DIR'),
-                  worktree=core.getenv('GIT_WORK_TREE'),
-                  git_file=None)
-    return find_git_paths(curpath, paths)
-
-
-def find_git_paths(curpath, paths):
-    ceiling_dirs = set()
-    ceiling = core.getenv('GIT_CEILING_DIRECTORIES')
-    if ceiling:
-        ceiling_dirs.update([x for x in ceiling.split(':') if x])
-
-    if not paths.git_dir or not paths.worktree:
-        if curpath:
-            curpath = core.abspath(curpath)
-
-        # Search for a .git directory
-        while curpath:
-            if curpath in ceiling_dirs:
-                break
-            if is_git_dir(curpath):
-                paths.git_dir = curpath
-                if os.path.basename(curpath) == '.git':
-                    paths.worktree = os.path.dirname(curpath)
-                break
-            gitpath = join(curpath, '.git')
-            if is_git_dir(gitpath):
-                paths.git_dir = gitpath
-                paths.worktree = curpath
-                break
-            curpath, dummy = os.path.split(curpath)
-            if not dummy:
-                break
-
-        git_dir_path = read_git_file(paths.git_dir)
-        if git_dir_path:
-            paths.git_file = paths.git_dir
-            paths.git_dir = git_dir_path
-
-            commondir_file = join(git_dir_path, 'commondir')
-            if core.exists(commondir_file):
-                common_path = core.read(commondir_file).strip()
-                if common_path:
-                    if os.path.isabs(common_path):
-                        common_dir = common_path
-                    else:
-                        common_dir = join(git_dir_path, common_path)
-                        common_dir = os.path.normpath(common_dir)
-                    paths.common_dir = common_dir
-
-    return paths
+    return Paths(
+        git_dir=core.getenv('GIT_DIR'), worktree=core.getenv('GIT_WORK_TREE')
+    ).get(path)
 
 
 class Git(object):
     """
     The Git class manages communication with the Git binary
     """
+
     def __init__(self):
         self.paths = Paths()
 
-        self._git_cwd = None  #: The working directory used by execute()
         self._valid = {}  #: Store the result of is_git_dir() for performance
         self.set_worktree(core.getcwd())
 
@@ -175,27 +194,18 @@ class Git(object):
         return is_git_repository(path)
 
     def getcwd(self):
-        return self._git_cwd
-
-    def _find_git_directory(self, path):
-        self._git_cwd = None
-        self.paths = find_git_directory(path)
-
-        # Update the current directory for executing commands
-        if self.paths.worktree:
-            self._git_cwd = self.paths.worktree
-        elif self.paths.git_dir:
-            self._git_cwd = self.paths.git_dir
+        """Return the working directory used by git()"""
+        return self.paths.worktree or self.paths.git_dir
 
     def set_worktree(self, path):
         path = core.decode(path)
-        self._find_git_directory(path)
+        self.paths = find_git_directory(path)
         return self.paths.worktree
 
     def worktree(self):
         if not self.paths.worktree:
             path = core.abspath(core.getcwd())
-            self._find_git_directory(path)
+            self.paths = find_git_directory(path)
         return self.paths.worktree
 
     def is_valid(self):
@@ -225,7 +235,7 @@ class Git(object):
     def git_dir(self):
         if not self.paths.git_dir:
             path = core.abspath(core.getcwd())
-            self._find_git_directory(path)
+            self.paths = find_git_directory(path)
         return self.paths.git_dir
 
     def __getattr__(self, name):
@@ -234,16 +244,18 @@ class Git(object):
         return git_cmd
 
     @staticmethod
-    def execute(command,
-                _cwd=None,
-                _decode=True,
-                _encoding=None,
-                _raw=False,
-                _stdin=None,
-                _stderr=subprocess.PIPE,
-                _stdout=subprocess.PIPE,
-                _readonly=False,
-                _no_win32_startupinfo=False):
+    def execute(
+        command,
+        _cwd=None,
+        _decode=True,
+        _encoding=None,
+        _raw=False,
+        _stdin=None,
+        _stderr=subprocess.PIPE,
+        _stdout=subprocess.PIPE,
+        _readonly=False,
+        _no_win32_startupinfo=False,
+    ):
         """
         Execute a command and returns its output
 
@@ -275,9 +287,15 @@ class Git(object):
             _index_lock.acquire()
         try:
             status, out, err = core.run_command(
-                command, cwd=_cwd, encoding=_encoding,
-                stdin=_stdin, stdout=_stdout, stderr=_stderr,
-                no_win32_startupinfo=_no_win32_startupinfo, **extra)
+                command,
+                cwd=_cwd,
+                encoding=_encoding,
+                stdin=_stdin,
+                stdout=_stdout,
+                stderr=_stderr,
+                no_win32_startupinfo=_no_win32_startupinfo,
+                **extra
+            )
         finally:
             # Let the next thread in
             if not _readonly:
@@ -293,8 +311,8 @@ class Git(object):
         elif cola_trace == 'full':
             if out or err:
                 core.print_stderr(
-                    "%s -> %d: '%s' '%s'"
-                    % (' '.join(command), status, out, err))
+                    "%s -> %d: '%s' '%s'" % (' '.join(command), status, out, err)
+                )
             else:
                 core.print_stderr("%s -> %d" % (' '.join(command), status))
         elif cola_trace:
@@ -306,7 +324,7 @@ class Git(object):
     def git(self, cmd, *args, **kwargs):
         # Handle optional arguments prior to calling transform_kwargs
         # otherwise they'll end up in args, which is bad.
-        _kwargs = dict(_cwd=self._git_cwd)
+        _kwargs = dict(_cwd=self.getcwd())
         execute_kwargs = (
             '_cwd',
             '_decode',
@@ -326,8 +344,10 @@ class Git(object):
         # Prepare the argument list
         git_args = [
             GIT,
-            '-c', 'diff.suppressBlankEmpty=false',
-            '-c', 'log.showSignature=false',
+            '-c',
+            'diff.suppressBlankEmpty=false',
+            '-c',
+            'log.showSignature=false',
             dashify(cmd),
         ]
         opt_args = transform_kwargs(**kwargs)
@@ -407,7 +427,8 @@ def win32_git_error_hint():
         'and git-cola will add the specified location to your $PATH\n'
         'automatically when starting cola:\n'
         '\n'
-        r'C:\Tools\Git\bin')
+        r'C:\Tools\Git\bin'
+    )
 
 
 @memoize

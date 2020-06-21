@@ -11,10 +11,10 @@ msgstr ""
 "PO-Revision-Date: 2018-07-01 07:25+0200\n"
 "Last-Translator: Pavel Rehak <pavel-rehak@email.cz>\n"
 "Language-Team: \n"
-"Language: cs\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Language: cs\n"
 "X-Generator: Poedit 2.0.4\n"
 "Plural-Forms: nplurals=3; plural=(n==1) ? 0 : (n>=2 && n<=4) ? 1 : 2;\n"
 
@@ -438,6 +438,12 @@ msgstr "Přidat do Git Annex"
 msgid "Add to Git LFS"
 msgstr "Přidat do Git LFS"
 
+msgid "Add to exclusions"
+msgstr ""
+
+msgid "Add to local .git/info/exclude"
+msgstr ""
+
 msgid "Additions"
 msgstr "Přidáno"
 
@@ -494,9 +500,6 @@ msgstr ""
 msgid "Appearance"
 msgstr ""
 
-msgid "Appearance settings require an application restart"
-msgstr ""
-
 msgid "Apply"
 msgstr "Aplikovat"
 
@@ -530,10 +533,19 @@ msgstr ""
 msgid "Auto-Wrap Lines"
 msgstr "Automaticky zalamovat řádky"
 
+msgid "Autocomplete Paths"
+msgstr ""
+
+msgid "Automatically Load Commit Message Template"
+msgstr ""
+
 msgid "Basic Regexp"
 msgstr "Základní regul. výraz"
 
 msgid "Blame Viewer"
+msgstr ""
+
+msgid "Blame selected paths"
 msgstr ""
 
 msgid "Blame..."
@@ -632,11 +644,17 @@ msgstr "Nelze spustit \"%s\": prosím nakonfigurujte editor"
 msgid "Changed Upstream"
 msgstr "Změněno v upstreamu"
 
+msgid "Check Published Commits when Amending"
+msgstr ""
+
 msgid "Check Spelling"
 msgstr "Kontrolovat pravopis"
 
 msgid "Check spelling"
 msgstr "Kontrolovat pravopis"
+
+msgid "Check whether a commit has been published when amending"
+msgstr ""
 
 msgid "Checkout"
 msgstr "Přepnout"
@@ -828,6 +846,9 @@ msgstr "Český překlad"
 msgid "DAG..."
 msgstr "DAG…"
 
+msgid "Dark Theme"
+msgstr ""
+
 msgid "Date, Time"
 msgstr "Datum, čas"
 
@@ -868,6 +889,10 @@ msgstr "Smazat vzdálenou větev"
 msgid "Delete Remote Branch..."
 msgstr "Smazat vzdálenou větev…"
 
+#, python-format
+msgid "Delete branch \"%s\"?"
+msgstr ""
+
 msgid "Delete remote"
 msgstr "Odstranit vzdálený"
 
@@ -877,9 +902,6 @@ msgstr "Odstranit vzdálený „%s“"
 
 msgid "Delete remote?"
 msgstr "Odstranit vzdálený?"
-
-msgid "Delete selected branch?"
-msgstr "Smazat vybranou větev?"
 
 msgid "Delete toolbar"
 msgstr "Odstranit nástrojovou lištu"
@@ -933,6 +955,9 @@ msgstr ""
 msgid "Directory Exists"
 msgstr "Složka existuje"
 
+msgid "Disable"
+msgstr ""
+
 msgid "Display Untracked Files"
 msgstr "Zobrazit nesledované soubory"
 
@@ -985,6 +1010,9 @@ msgstr "E-mailová adresa"
 msgid "Email contributor"
 msgstr "Napsat přispěvateli e-mail"
 
+msgid "Enable path autocompletion in tools"
+msgstr ""
+
 msgid "Enabled"
 msgstr "Povoleno"
 
@@ -1029,6 +1057,10 @@ msgid "Error creating stash"
 msgstr "Chyba při vytváření stash"
 
 #, python-format
+msgid "Error deleting branch \"%s\""
+msgstr ""
+
+#, python-format
 msgid "Error deleting remote \"%s\""
 msgstr "Chyba při odstraňování vzdálené \"%s\""
 
@@ -1039,13 +1071,12 @@ msgstr "Chyba při přejmenovávání „%(name)s“ na „%(new_name)s“"
 msgid "Error running prepare-commitmsg hook"
 msgstr "Chyba spouštění háčku prepare-commitmsg"
 
-#, fuzzy, python-format
+#, python-format
 msgid "Error updating submodule %s"
-msgstr "Chyba při vytváření vzdálené \"%s\""
+msgstr ""
 
-#, fuzzy
 msgid "Error updating submodules"
-msgstr "Chyba při úpravě souboru"
+msgstr ""
 
 msgid "Error: Cannot find commit template"
 msgstr "Chyba: nedaří se nalézt šablonu nahrání"
@@ -1264,11 +1295,8 @@ msgstr "Nápověda – uživatelské akce kopírování"
 msgid "Help - Find Files"
 msgstr "Nápověda – najít soubory"
 
-msgid "Help - git-xbase"
-msgstr "Nápověda – git-xbase"
-
-msgid "Hide Details.."
-msgstr "Skrýt podrobnosti…"
+msgid "Help - git-cola-sequence-editor"
+msgstr "Nápověda – git-cola-sequence-editor"
 
 msgid "High DPI"
 msgstr ""
@@ -1278,6 +1306,9 @@ msgstr "Prohlížeč historie"
 
 msgid "Hungarian translation"
 msgstr "Maďarský překlad"
+
+msgid "Icon theme"
+msgstr ""
 
 msgid "Ignore all whitespace"
 msgstr "Ignorovat všechny mezery"
@@ -1296,6 +1327,9 @@ msgstr "Ignorovat přesný název souboru"
 
 msgid "Ignore filename or pattern"
 msgstr "Ignorovat název souboru nebo šablonu"
+
+msgid "Ignore..."
+msgstr ""
 
 msgid "Include tags "
 msgstr "Zahrnout značky "
@@ -1323,6 +1357,9 @@ msgstr "Interaktivní přeskládání"
 
 msgid "Invalid Revision"
 msgstr "Neplatná revize"
+
+msgid "Japanese translation"
+msgstr ""
 
 msgid "Keep *.orig Merge Backups"
 msgstr "Ponechat *.orig zálohy začlenění"
@@ -1360,6 +1397,9 @@ msgstr "Spustit git-difftool proti předchozím verzím"
 
 msgid "Launch git-difftool on the current path"
 msgstr "Spustit git-difftool na stávajícím umístění"
+
+msgid "Light Theme"
+msgstr ""
 
 msgid "Load Commit Message"
 msgstr "Nahrát zprávu zápisu"
@@ -1523,9 +1563,8 @@ msgstr "Otevřít"
 msgid "Open Git Repository..."
 msgstr "Otevřít Git repozitář…"
 
-#, fuzzy
 msgid "Open Parent"
-msgstr "Otevřít nedávné"
+msgstr ""
 
 msgid "Open Parent Directory"
 msgstr "Otevřít nadřazenou složku"
@@ -1788,6 +1827,9 @@ msgstr "Resetovat větev?"
 msgid "Reset Hard"
 msgstr "Tvrdý reset"
 
+msgid "Reset Layout"
+msgstr ""
+
 msgid "Reset Merge"
 msgstr "Resetovat sloučení"
 
@@ -1812,6 +1854,9 @@ msgstr "Resetovat pracovní strom?"
 #, python-format
 msgid "Resetting \"%(branch)s\" to \"%(revision)s\" will lose commits."
 msgstr "Resetováním „%(branch)s“ do „%(revision)s“ se ztratí zápisy."
+
+msgid "Restart the application after changing appearance settings."
+msgstr ""
 
 msgid "Revert"
 msgstr "Vrátit"
@@ -2053,9 +2098,6 @@ msgstr "Posunout nahoru"
 
 msgid "Shortcuts"
 msgstr "Klávesové zkratky"
-
-msgid "Show Details..."
-msgstr "Zobrazit podrobnosti…"
 
 msgid "Show Diffstat After Merge"
 msgstr "Zobrazit Diffstat po sloučení"
@@ -2422,21 +2464,17 @@ msgstr ""
 msgid "Update Submodule..."
 msgstr ""
 
-#, fuzzy
 msgid "Update Submodules"
-msgstr "Inicializovat dílčí moduly"
+msgstr ""
 
-#, fuzzy
 msgid "Update all submodules?"
-msgstr "Inicializovat dílčí moduly"
+msgstr ""
 
-#, fuzzy
 msgid "Update submodules..."
-msgstr "Inicializovat dílčí moduly"
+msgstr ""
 
-#, fuzzy
 msgid "Update this submodule"
-msgstr "Inicializovat dílčí moduly"
+msgstr ""
 
 msgid "Update this submodule?"
 msgstr ""
@@ -2535,6 +2573,9 @@ msgstr "výsledek z grep…"
 msgid "hotkeys.html"
 msgstr "hotkeys.html"
 
+msgid "title"
+msgstr ""
+
 msgid "unknown"
 msgstr "neznámé"
 
@@ -2553,6 +2594,12 @@ msgstr ""
 msgid "yyyy-MM-dd"
 msgstr "rrrr-mm-dd"
 
+#~ msgid "Delete selected branch?"
+#~ msgstr "Smazat vybranou větev?"
+
+#~ msgid "Hide Details.."
+#~ msgstr "Skrýt podrobnosti…"
+
 #~ msgid "PATCH %(current)d/%(count)d"
 #~ msgstr "PATCH %(current)d/%(count)d"
 
@@ -2561,6 +2608,9 @@ msgstr "rrrr-mm-dd"
 
 #~ msgid "Select File"
 #~ msgstr "Vybrat soubor"
+
+#~ msgid "Show Details..."
+#~ msgstr "Zobrazit podrobnosti…"
 
 #~ msgid "Summary:"
 #~ msgstr "Shrnutí:"

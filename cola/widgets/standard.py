@@ -34,8 +34,8 @@ class WidgetMixin(object):
             return
         left = parent.x()
         width = parent.width()
-        center_x = left + width//2
-        x = center_x - self.width()//2
+        center_x = left + width // 2
+        x = center_x - self.width() // 2
         y = parent.y()
 
         self.move(x, y)
@@ -50,7 +50,8 @@ class WidgetMixin(object):
             shown = self.isVisible()
             # earlier show() fools Windows focus stealing prevention. the main
             # window is blocked for the duration of "git rebase" and we don't
-            # want to present a blocked window with git-xbase hidden somewhere.
+            # want to present a blocked window with git-cola-sequence-editor
+            # hidden somewhere.
             self.show()
             self.setWindowState(Qt.WindowMaximized)
             if not shown:
@@ -144,7 +145,6 @@ class WidgetMixin(object):
 
 
 class MainWindowMixin(WidgetMixin):
-
     def __init__(self):
         WidgetMixin.__init__(self)
         # Dockwidget options
@@ -152,6 +152,12 @@ class MainWindowMixin(WidgetMixin):
         self.lock_layout = False
         self.widget_version = 0
         qtcompat.set_common_dock_options(self)
+        self.default_state = None
+
+    def init_state(self, settings, callback, *args, **kwargs):
+        """Save the initial state before calling the parent initializer"""
+        self.default_state = self.saveState(self.widget_version)
+        super(MainWindowMixin, self).init_state(settings, callback, *args, **kwargs)
 
     def export_state(self):
         """Exports data for save/restore"""
@@ -171,14 +177,17 @@ class MainWindowMixin(WidgetMixin):
 
     def apply_state(self, state):
         result = WidgetMixin.apply_state(self, state)
-        windowstate = state.get('windowstate', None)
-        if windowstate is None:
-            result = False
-        else:
+        windowstate = state.get('windowstate', '')
+        if windowstate:
             from_base64 = QtCore.QByteArray.fromBase64
-            result = self.restoreState(
-                from_base64(core.encode(windowstate)),
-                self.widget_version) and result
+            result = (
+                self.restoreState(
+                    from_base64(core.encode(windowstate)), self.widget_version
+                )
+                and result
+            )
+        else:
+            result = False
 
         self.lock_layout = state.get('lock_layout', self.lock_layout)
         self.update_dockwidget_lock_state()
@@ -186,18 +195,22 @@ class MainWindowMixin(WidgetMixin):
 
         return result
 
+    def reset_layout(self):
+        self.restoreState(self.default_state, self.widget_version)
+
     def set_lock_layout(self, lock_layout):
         self.lock_layout = lock_layout
         self.update_dockwidget_lock_state()
 
     def update_dockwidget_lock_state(self):
         if self.lock_layout:
-            features = (QDockWidget.DockWidgetClosable |
-                        QDockWidget.DockWidgetFloatable)
+            features = QDockWidget.DockWidgetClosable | QDockWidget.DockWidgetFloatable
         else:
-            features = (QDockWidget.DockWidgetClosable |
-                        QDockWidget.DockWidgetFloatable |
-                        QDockWidget.DockWidgetMovable)
+            features = (
+                QDockWidget.DockWidgetClosable
+                | QDockWidget.DockWidgetFloatable
+                | QDockWidget.DockWidgetMovable
+            )
         for widget in self.dockwidgets:
             widget.titleBarWidget().update_tooltips()
             widget.setFeatures(features)
@@ -207,6 +220,7 @@ class MainWindowMixin(WidgetMixin):
             widget.titleBarWidget().update_tooltips()
 
 
+# pylint: disable=too-many-ancestors
 class ListWidget(QtWidgets.QListWidget):
     """QListWidget with vim j/k navigation hotkeys"""
 
@@ -214,12 +228,20 @@ class ListWidget(QtWidgets.QListWidget):
         super(ListWidget, self).__init__(parent)
 
         self.up_action = qtutils.add_action(
-            self, N_('Move Up'), self.move_up,
-            hotkeys.MOVE_UP, hotkeys.MOVE_UP_SECONDARY)
+            self,
+            N_('Move Up'),
+            self.move_up,
+            hotkeys.MOVE_UP,
+            hotkeys.MOVE_UP_SECONDARY,
+        )
 
         self.down_action = qtutils.add_action(
-            self, N_('Move Down'), self.move_down,
-            hotkeys.MOVE_DOWN, hotkeys.MOVE_DOWN_SECONDARY)
+            self,
+            N_('Move Down'),
+            self.move_down,
+            hotkeys.MOVE_DOWN,
+            hotkeys.MOVE_DOWN_SECONDARY,
+        )
 
     def selected_item(self):
         return self.currentItem()
@@ -247,7 +269,6 @@ class ListWidget(QtWidgets.QListWidget):
 
 
 class TreeMixin(object):
-
     def __init__(self, widget, Base):
         self.widget = widget
         self.Base = Base
@@ -283,24 +304,16 @@ class TreeMixin(object):
 
         # Remap 'H' to 'Left'
         if key == Qt.Key_H:
-            event = QtGui.QKeyEvent(event.type(),
-                                    Qt.Key_Left,
-                                    event.modifiers())
+            event = QtGui.QKeyEvent(event.type(), Qt.Key_Left, event.modifiers())
         # Remap 'J' to 'Down'
         elif key == Qt.Key_J:
-            event = QtGui.QKeyEvent(event.type(),
-                                    Qt.Key_Down,
-                                    event.modifiers())
+            event = QtGui.QKeyEvent(event.type(), Qt.Key_Down, event.modifiers())
         # Remap 'K' to 'Up'
         elif key == Qt.Key_K:
-            event = QtGui.QKeyEvent(event.type(),
-                                    Qt.Key_Up,
-                                    event.modifiers())
+            event = QtGui.QKeyEvent(event.type(), Qt.Key_Up, event.modifiers())
         # Remap 'L' to 'Right'
         elif key == Qt.Key_L:
-            event = QtGui.QKeyEvent(event.type(),
-                                    Qt.Key_Right,
-                                    event.modifiers())
+            event = QtGui.QKeyEvent(event.type(), Qt.Key_Right, event.modifiers())
 
         # Re-read the event key to take the remappings into account
         key = event.key()
@@ -323,8 +336,7 @@ class TreeMixin(object):
         widget.index_about_to_change.emit()
 
         # Automatically select the first entry when expanding a directory
-        if (key == Qt.Key_Right and was_collapsed and
-                widget.isExpanded(index)):
+        if key == Qt.Key_Right and was_collapsed and widget.isExpanded(index):
             index = widget.moveCursor(widget.MoveDown, event.modifiers())
             widget.setCurrentIndex(index)
 
@@ -333,8 +345,10 @@ class TreeMixin(object):
 
             # File entries have rowCount() == 0
             model = widget.model()
-            if (hasattr(model, 'itemFromIndex')
-                    and model.itemFromIndex(index).rowCount() == 0):
+            if (
+                hasattr(model, 'itemFromIndex')
+                and model.itemFromIndex(index).rowCount() == 0
+            ):
                 widget.setCurrentIndex(index.parent())
 
             # Otherwise, do this for collapsed directories only
@@ -419,6 +433,7 @@ class DraggableTreeMixin(TreeMixin):
     Expects that the widget provides an `items_moved` signal.
 
     """
+
     def __init__(self, widget, Base):
         super(DraggableTreeMixin, self).__init__(widget, Base)
 
@@ -498,18 +513,27 @@ class Dialog(WidgetMixin, QtWidgets.QDialog):
 
     def accept(self):
         self.save_settings()
+        self.dispose()
         return self.Base.accept(self)
 
     def reject(self):
         self.save_settings()
+        self.dispose()
         return self.Base.reject(self)
+
+    # pylint: disable=no-self-use
+    def dispose(self):
+        """Extension method for model deregistration in sub-classes"""
+        return
 
     def close(self):
         """save_settings() is handled by accept() and reject()"""
+        self.dispose()
         self.Base.close(self)
 
     def closeEvent(self, event):
         """save_settings() is handled by accept() and reject()"""
+        self.dispose()
         self.Base.closeEvent(self, event)
 
 
@@ -521,6 +545,7 @@ class MainWindow(MainWindowMixin, QtWidgets.QMainWindow):
         MainWindowMixin.__init__(self)
 
 
+# pylint: disable=too-many-ancestors
 class TreeView(QtWidgets.QTreeView):
     Mixin = TreeMixin
 
@@ -554,6 +579,7 @@ class TreeView(QtWidgets.QTreeView):
         return self._mixin.set_column_widths(widths)
 
 
+# pylint: disable=too-many-ancestors
 class TreeWidget(QtWidgets.QTreeWidget):
     Mixin = TreeMixin
 
@@ -587,6 +613,7 @@ class TreeWidget(QtWidgets.QTreeWidget):
         return self._mixin.set_column_widths(widths)
 
 
+# pylint: disable=too-many-ancestors
 class DraggableTreeWidget(TreeWidget):
     Mixin = DraggableTreeMixin
     items_moved = Signal(object)
@@ -613,6 +640,7 @@ class ProgressDialog(QtWidgets.QProgressDialog):
     A thread is spawned to animate the progress label text.
 
     """
+
     def __init__(self, title, label, parent):
         QtWidgets.QProgressDialog.__init__(self, parent)
         if parent is not None:
@@ -655,6 +683,7 @@ class ProgressAnimationThread(QtCore.QThread):
     """Emits a pseudo-animated text stream for progress bars
 
     """
+
     updated = Signal(object)
 
     def __init__(self, txt, parent, timeout=0.1):
@@ -689,9 +718,9 @@ class ProgressAnimationThread(QtCore.QThread):
 
 
 class SpinBox(QtWidgets.QSpinBox):
-
-    def __init__(self, parent=None, value=None,
-                 mini=1, maxi=99999, step=0, prefix='', suffix=''):
+    def __init__(
+        self, parent=None, value=None, mini=1, maxi=99999, step=0, prefix='', suffix=''
+    ):
         QtWidgets.QSpinBox.__init__(self, parent)
         self.setPrefix(prefix)
         self.setSuffix(suffix)
@@ -740,9 +769,21 @@ class MessageBox(Dialog):
     to workaround, so we use a simple custom dialog instead.
 
     """
-    def __init__(self, parent=None, title='', text='',
-                 info='', details='', logo=None, default=False,
-                 ok_icon=None, ok_text='', cancel_text=None, cancel_icon=None):
+
+    def __init__(
+        self,
+        parent=None,
+        title='',
+        text='',
+        info='',
+        details='',
+        logo=None,
+        default=False,
+        ok_icon=None,
+        ok_text='',
+        cancel_text=None,
+        cancel_icon=None,
+    ):
 
         Dialog.__init__(self, parent=parent)
 
@@ -771,16 +812,54 @@ class MessageBox(Dialog):
         ok_icon = icons.mkicon(ok_icon, icons.ok)
         self.button_ok = qtutils.create_button(text=ok_text, icon=ok_icon)
 
-        self.button_toggle_details = qtutils.create_button(
-            text=N_('Show Details...'))
-
-        self.button_close = qtutils.close_button(
-            text=cancel_text, icon=cancel_icon)
+        self.button_close = qtutils.close_button(text=cancel_text, icon=cancel_icon)
 
         if ok_text:
             self.button_ok.setText(ok_text)
         else:
             self.button_ok.hide()
+
+        self.details_text = QtWidgets.QPlainTextEdit()
+        self.details_text.setReadOnly(True)
+        if details:
+            self.details_text.setFont(qtutils.default_monospace_font())
+            self.details_text.setPlainText(details)
+        else:
+            self.details_text.hide()
+
+        self.info_layout = qtutils.vbox(
+            defs.large_margin,
+            defs.button_spacing,
+            self.text_label,
+            self.info_label,
+            qtutils.STRETCH,
+        )
+
+        self.top_layout = qtutils.hbox(
+            defs.large_margin,
+            defs.button_spacing,
+            self.logo_label,
+            self.info_layout,
+            qtutils.STRETCH,
+        )
+
+        self.buttons_layout = qtutils.hbox(
+            defs.no_margin,
+            defs.button_spacing,
+            qtutils.STRETCH,
+            self.button_close,
+            self.button_ok,
+        )
+
+        self.main_layout = qtutils.vbox(
+            defs.margin,
+            defs.button_spacing,
+            self.top_layout,
+            self.buttons_layout,
+            self.details_text,
+        )
+        self.main_layout.setStretchFactor(self.details_text, 2)
+        self.setLayout(self.main_layout)
 
         if default:
             self.button_ok.setDefault(True)
@@ -789,60 +868,14 @@ class MessageBox(Dialog):
             self.button_close.setDefault(True)
             self.button_close.setFocus()
 
-        self.details_text = QtWidgets.QPlainTextEdit()
-        self.details_text.setReadOnly(True)
-        self.details_text.hide()
-        if details:
-            self.details_text.setFont(qtutils.default_monospace_font())
-            self.details_text.setPlainText(details)
-        else:
-            self.button_toggle_details.hide()
-
-        self.info_layout = qtutils.vbox(
-            defs.large_margin, defs.button_spacing,
-            self.text_label, self.info_label, qtutils.STRETCH)
-
-        self.top_layout = qtutils.hbox(
-            defs.large_margin, defs.button_spacing,
-            self.logo_label, self.info_layout, qtutils.STRETCH)
-
-        self.buttons_layout = qtutils.hbox(
-            defs.no_margin, defs.button_spacing, qtutils.STRETCH,
-            self.button_toggle_details, self.button_close, self.button_ok)
-
-        self.main_layout = qtutils.vbox(
-            defs.margin, defs.button_spacing,
-            self.top_layout,
-            self.buttons_layout,
-            self.details_text)
-        self.main_layout.setStretchFactor(self.details_text, 2)
-        self.setLayout(self.main_layout)
-
         qtutils.connect_button(self.button_ok, self.accept)
         qtutils.connect_button(self.button_close, self.reject)
-        qtutils.connect_button(self.button_toggle_details, self.toggle_details)
         self.init_state(None, self.set_initial_size)
 
     def set_initial_size(self):
         width = defs.dialog_w
         height = defs.msgbox_h
         self.resize(width, height)
-
-    def toggle_details(self):
-        if self.details_text.isVisible():
-            text = N_('Show Details...')
-            self.details_text.hide()
-            QtCore.QTimer.singleShot(
-                0, lambda: self.resize(self.width(), defs.msgbox_h))
-        else:
-            text = N_('Hide Details..')
-            self.details_text.show()
-            new_height = defs.msgbox_h * 4
-            if self.height() < new_height:
-                QtCore.QTimer.singleShot(
-                    0, lambda: self.resize(self.width(), new_height))
-
-        self.button_toggle_details.setText(text)
 
     def keyPressEvent(self, event):
         """Handle Y/N hotkeys"""
@@ -851,25 +884,47 @@ class MessageBox(Dialog):
             QtCore.QTimer.singleShot(0, self.accept)
         elif key in (Qt.Key_N, Qt.Key_Q):
             QtCore.QTimer.singleShot(0, self.reject)
-        return Dialog.keyPressEvent(self, event)
+        elif key == Qt.Key_Tab:
+            if self.button_ok.isVisible():
+                event.accept()
+                if self.focusWidget() == self.button_close:
+                    self.button_ok.setFocus()
+                else:
+                    self.button_close.setFocus()
+                return
+        Dialog.keyPressEvent(self, event)
 
     def run(self):
         self.show()
         return self.exec_()
 
 
-def confirm(title, text, informative_text, ok_text,
-            icon=None, default=True,
-            cancel_text=None, cancel_icon=None):
+def confirm(
+    title,
+    text,
+    informative_text,
+    ok_text,
+    icon=None,
+    default=True,
+    cancel_text=None,
+    cancel_icon=None,
+):
     """Confirm that an action should take place"""
     cancel_text = cancel_text or N_('Cancel')
     logo = icons.from_style(QtWidgets.QStyle.SP_MessageBoxQuestion)
 
     mbox = MessageBox(
-        parent=qtutils.active_window(), title=title, text=text,
-        info=informative_text, ok_text=ok_text, ok_icon=icon,
-        cancel_text=cancel_text, cancel_icon=cancel_icon,
-        logo=logo, default=default)
+        parent=qtutils.active_window(),
+        title=title,
+        text=text,
+        info=informative_text,
+        ok_text=ok_text,
+        ok_icon=icon,
+        cancel_text=cancel_text,
+        cancel_icon=cancel_icon,
+        logo=logo,
+        default=default,
+    )
 
     return mbox.run() == mbox.Accepted
 
@@ -880,8 +935,12 @@ def critical(title, message=None, details=None):
         message = title
     logo = icons.from_style(QtWidgets.QStyle.SP_MessageBoxCritical)
     mbox = MessageBox(
-        parent=qtutils.active_window(), title=title, text=message,
-        details=details, logo=logo)
+        parent=qtutils.active_window(),
+        title=title,
+        text=message,
+        details=details,
+        logo=logo,
+    )
     mbox.run()
 
 
@@ -897,9 +956,19 @@ def information(title, message=None, details=None, informative_text=None):
     if message is None:
         message = title
     mbox = MessageBox(
-        parent=qtutils.active_window(), title=title, text=message,
-        info=informative_text, details=details, logo=icons.cola())
+        parent=qtutils.active_window(),
+        title=title,
+        text=message,
+        info=informative_text,
+        details=details,
+        logo=icons.cola(),
+    )
     mbox.run()
+
+
+def progress(title, text, parent):
+    """Create a new ProgressDialog"""
+    return ProgressDialog(title, text, parent)
 
 
 def question(title, text, default=True):
@@ -908,8 +977,14 @@ def question(title, text, default=True):
     parent = qtutils.active_window()
     logo = icons.from_style(QtWidgets.QStyle.SP_MessageBoxQuestion)
     msgbox = MessageBox(
-        parent=parent, title=title, text=text, default=default, logo=logo,
-        ok_text=N_('Yes'), cancel_text=N_('No'))
+        parent=parent,
+        title=title,
+        text=text,
+        default=default,
+        logo=logo,
+        ok_text=N_('Yes'),
+        cancel_text=N_('No'),
+    )
     return msgbox.run() == msgbox.Accepted
 
 

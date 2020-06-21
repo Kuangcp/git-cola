@@ -7,6 +7,7 @@ from qtpy import QtWidgets
 from qtpy.QtCore import Qt
 from qtpy.QtCore import Signal
 
+from ..models import prefs
 from .. import core
 from .. import gitcmds
 from .. import icons
@@ -17,7 +18,6 @@ from .text import HintedLineEdit
 
 
 class ValidateRegex(object):
-
     def __init__(self, regex):
         self.regex = re.compile(regex)  # regex to scrub
 
@@ -26,7 +26,7 @@ class ValidateRegex(object):
         state = QtGui.QValidator.Acceptable
         if self.regex.search(string):
             string = self.regex.sub('', string)  # scrub matching bits
-            idx = min(idx-1, len(string))
+            idx = min(idx - 1, len(string))
         return (state, string, idx)
 
 
@@ -109,10 +109,12 @@ class CompletionLineEdit(HintedLineEdit):
         self._delegate = HighlightDelegate(self)
         completer.popup().setItemDelegate(self._delegate)
 
+        # pylint: disable=no-member
         self.textChanged.connect(self._text_changed)
         self._completer.activated.connect(self.choose_completion)
-        self._completion_model.updated.connect(self._completions_updated,
-                                               type=Qt.QueuedConnection)
+        self._completion_model.updated.connect(
+            self._completions_updated, type=Qt.QueuedConnection
+        )
         self.destroyed.connect(self.dispose)
 
     def __del__(self):
@@ -243,9 +245,11 @@ class CompletionLineEdit(HintedLineEdit):
         """Override QWidget::event() for tab completion"""
         event_type = event.type()
 
-        if (event_type == QtCore.QEvent.KeyPress
-                and event.key() == Qt.Key_Tab
-                and self.select_completion()):
+        if (
+            event_type == QtCore.QEvent.KeyPress
+            and event.key() == Qt.Key_Tab
+            and self.select_completion()
+        ):
             return True
 
         # Make sure the popup goes away during teardown
@@ -335,16 +339,18 @@ class HighlightDelegate(QtWidgets.QStyledItemDelegate):
             return
         text = index.data()
         if self.case_sensitive:
-            html = text.replace(self.highlight_text,
-                                '<strong>%s</strong>' % self.highlight_text)
+            html = text.replace(
+                self.highlight_text, '<strong>%s</strong>' % self.highlight_text
+            )
         else:
-            match = re.match(r'(.*)(%s)(.*)' % re.escape(self.highlight_text),
-                             text, re.IGNORECASE)
+            match = re.match(
+                r'(.*)(%s)(.*)' % re.escape(self.highlight_text), text, re.IGNORECASE
+            )
             if match:
                 start = match.group(1) or ''
                 middle = match.group(2) or ''
                 end = match.group(3) or ''
-                html = (start + ('<strong>%s</strong>' % middle) + end)
+                html = start + ('<strong>%s</strong>' % middle) + end
             else:
                 html = text
         self.doc.setHtml(html)
@@ -360,8 +366,9 @@ class HighlightDelegate(QtWidgets.QStyledItemDelegate):
 
         # Highlighting text if item is selected
         if params.state & QtWidgets.QStyle.State_Selected:
-            color = params.palette.color(QtGui.QPalette.Active,
-                                         QtGui.QPalette.HighlightedText)
+            color = params.palette.color(
+                QtGui.QPalette.Active, QtGui.QPalette.HighlightedText
+            )
             ctx.palette.setColor(QtGui.QPalette.Text, color)
 
         # translate the painter to where the text is drawn
@@ -398,8 +405,9 @@ class CompletionModel(QtGui.QStandardItemModel):
         self.case_sensitive = False
 
         self.update_thread = GatherCompletionsThread(self)
-        self.update_thread.items_gathered.connect(self.apply_matches,
-                                                  type=Qt.QueuedConnection)
+        self.update_thread.items_gathered.connect(
+            self.apply_matches, type=Qt.QueuedConnection
+        )
 
     def update(self):
         case_sensitive = self.update_thread.case_sensitive
@@ -463,8 +471,7 @@ def _lower(x):
     return x.lower()
 
 
-def filter_matches(match_text, candidates, case_sensitive,
-                   sort_key=lambda x: x):
+def filter_matches(match_text, candidates, case_sensitive, sort_key=lambda x: x):
     """Filter candidates and return the matches"""
 
     if case_sensitive:
@@ -494,7 +501,6 @@ def filter_path_matches(match_text, file_list, case_sensitive):
 
 
 class Completer(QtWidgets.QCompleter):
-
     def __init__(self, model, parent):
         QtWidgets.QCompleter.__init__(self, parent)
         self._model = model
@@ -515,16 +521,18 @@ class Completer(QtWidgets.QCompleter):
 
 
 class GitCompletionModel(CompletionModel):
-
     def __init__(self, context, parent):
         CompletionModel.__init__(self, context, parent)
-        self.main_model = model = context.model
-        msg = model.message_updated
-        model.add_observer(msg, self.emit_model_updated)
+        self.context = context
+        model = context.model
+        model.add_observer(model.message_updated, self.emit_model_updated)
+        # pylint: disable=no-member
+        self.destroyed.connect(self.dispose)
 
     def gather_matches(self, case_sensitive):
-        refs = filter_matches(self.match_text, self.matches(), case_sensitive,
-                              sort_key=ref_sort_key)
+        refs = filter_matches(
+            self.match_text, self.matches(), case_sensitive, sort_key=ref_sort_key
+        )
         return (refs, (), set())
 
     def emit_model_updated(self):
@@ -539,7 +547,7 @@ class GitCompletionModel(CompletionModel):
 
     def dispose(self):
         super(GitCompletionModel, self).dispose()
-        self.main_model.remove_observer(self.emit_model_updated)
+        self.context.model.remove_observer(self.emit_model_updated)
 
 
 class GitRefCompletionModel(GitCompletionModel):
@@ -547,9 +555,11 @@ class GitRefCompletionModel(GitCompletionModel):
 
     def __init__(self, context, parent):
         GitCompletionModel.__init__(self, context, parent)
+        model = context.model
+        model.add_observer(model.message_refs_updated, self.emit_model_updated)
 
     def matches(self):
-        model = self.main_model
+        model = self.context.model
         return model.local_branches + model.remote_branches + model.tags
 
 
@@ -577,23 +587,23 @@ class GitCreateBranchCompletionModel(GitCompletionModel):
     """Completer for naming new branches"""
 
     def matches(self):
-        model = self.main_model
+        model = self.context.model
         potential_branches = find_potential_branches(model)
-        return (model.local_branches +
-                potential_branches +
-                model.tags)
+        return model.local_branches + potential_branches + model.tags
 
 
 class GitCheckoutBranchCompletionModel(GitCompletionModel):
     """Completer for git checkout <branch>"""
 
     def matches(self):
-        model = self.main_model
+        model = self.context.model
         potential_branches = find_potential_branches(model)
-        return (model.local_branches +
-                potential_branches +
-                model.remote_branches +
-                model.tags)
+        return (
+            model.local_branches
+            + potential_branches
+            + model.remote_branches
+            + model.tags
+        )
 
 
 class GitBranchCompletionModel(GitCompletionModel):
@@ -603,7 +613,7 @@ class GitBranchCompletionModel(GitCompletionModel):
         GitCompletionModel.__init__(self, context, parent)
 
     def matches(self):
-        model = self.main_model
+        model = self.context.model
         return model.local_branches
 
 
@@ -614,7 +624,7 @@ class GitRemoteBranchCompletionModel(GitCompletionModel):
         GitCompletionModel.__init__(self, context, parent)
 
     def matches(self):
-        model = self.main_model
+        model = self.context.model
         return model.remote_branches
 
 
@@ -629,9 +639,9 @@ class GitPathCompletionModel(GitCompletionModel):
         return []
 
     def gather_matches(self, case_sensitive):
-        paths, dirs = filter_path_matches(self.match_text,
-                                          self.candidate_paths(),
-                                          case_sensitive)
+        paths, dirs = filter_path_matches(
+            self.match_text, self.candidate_paths(), case_sensitive
+        )
         return ((), paths, dirs)
 
 
@@ -642,9 +652,8 @@ class GitStatusFilterCompletionModel(GitPathCompletionModel):
         GitPathCompletionModel.__init__(self, context, parent)
 
     def candidate_paths(self):
-        model = self.main_model
-        return (model.staged + model.unmerged +
-                model.modified + model.untracked)
+        model = self.context.model
+        return model.staged + model.unmerged + model.modified + model.untracked
 
 
 class GitTrackedCompletionModel(GitPathCompletionModel):
@@ -664,8 +673,7 @@ class GitTrackedCompletionModel(GitPathCompletionModel):
             self.gather_paths()
 
         refs = []
-        paths, dirs = filter_path_matches(self.match_text, self._paths,
-                                          case_sensitive)
+        paths, dirs = filter_path_matches(self.match_text, self._paths, case_sensitive)
         return (refs, paths, dirs)
 
 
@@ -676,21 +684,27 @@ class GitLogCompletionModel(GitRefCompletionModel):
         GitRefCompletionModel.__init__(self, context, parent)
         self.model_updated.connect(self.gather_paths, type=Qt.QueuedConnection)
         self._paths = []
+        self._model = context.model
 
     def gather_paths(self):
+        if not self._model.cfg.get(prefs.AUTOCOMPLETE_PATHS, True):
+            self._paths = []
+            return
         context = self.context
         self._paths = gitcmds.tracked_files(context)
 
     def gather_matches(self, case_sensitive):
         if not self._paths:
             self.gather_paths()
-        refs = filter_matches(self.match_text, self.matches(), case_sensitive,
-                              sort_key=ref_sort_key)
-        paths, dirs = filter_path_matches(self.match_text, self._paths,
-                                          case_sensitive)
-        has_doubledash = (self.match_text == '--' or
-                          self.full_text.startswith('-- ') or
-                          ' -- ' in self.full_text)
+        refs = filter_matches(
+            self.match_text, self.matches(), case_sensitive, sort_key=ref_sort_key
+        )
+        paths, dirs = filter_path_matches(self.match_text, self._paths, case_sensitive)
+        has_doubledash = (
+            self.match_text == '--'
+            or self.full_text.startswith('-- ')
+            or ' -- ' in self.full_text
+        )
         if has_doubledash:
             refs = []
         elif refs and paths:
@@ -703,10 +717,8 @@ def bind_lineedit(model, hint=''):
     """Create a line edit bound against a specific model"""
 
     class BoundLineEdit(CompletionLineEdit):
-
         def __init__(self, context, hint=hint, parent=None):
-            CompletionLineEdit.__init__(self, context, model,
-                                        hint=hint, parent=parent)
+            CompletionLineEdit.__init__(self, context, model, hint=hint, parent=parent)
             self.context = context
 
     return BoundLineEdit
@@ -715,20 +727,19 @@ def bind_lineedit(model, hint=''):
 # Concrete classes
 GitLogLineEdit = bind_lineedit(GitLogCompletionModel, hint='<ref>')
 GitRefLineEdit = bind_lineedit(GitRefCompletionModel, hint='<ref>')
-GitCheckoutBranchLineEdit = bind_lineedit(GitCheckoutBranchCompletionModel,
-                                          hint='<branch>')
-GitCreateBranchLineEdit = bind_lineedit(GitCreateBranchCompletionModel,
-                                        hint='<branch>')
+GitCheckoutBranchLineEdit = bind_lineedit(
+    GitCheckoutBranchCompletionModel, hint='<branch>'
+)
+GitCreateBranchLineEdit = bind_lineedit(GitCreateBranchCompletionModel, hint='<branch>')
 GitBranchLineEdit = bind_lineedit(GitBranchCompletionModel, hint='<branch>')
-GitRemoteBranchLineEdit = bind_lineedit(GitRemoteBranchCompletionModel,
-                                        hint='<remote-branch>')
-GitStatusFilterLineEdit = bind_lineedit(GitStatusFilterCompletionModel,
-                                        hint='<path>')
+GitRemoteBranchLineEdit = bind_lineedit(
+    GitRemoteBranchCompletionModel, hint='<remote-branch>'
+)
+GitStatusFilterLineEdit = bind_lineedit(GitStatusFilterCompletionModel, hint='<path>')
 GitTrackedLineEdit = bind_lineedit(GitTrackedCompletionModel, hint='<path>')
 
 
 class GitDialog(QtWidgets.QDialog):
-
     def __init__(self, lineedit, context, title, text, parent, icon=None):
         QtWidgets.QDialog.__init__(self, parent)
         self.context = context
@@ -742,13 +753,17 @@ class GitDialog(QtWidgets.QDialog):
         self.ok_button = qtutils.ok_button(text, icon=icon, enabled=False)
         self.close_button = qtutils.close_button()
 
-        self.button_layout = qtutils.hbox(defs.no_margin, defs.button_spacing,
-                                          qtutils.STRETCH,
-                                          self.ok_button, self.close_button)
+        self.button_layout = qtutils.hbox(
+            defs.no_margin,
+            defs.button_spacing,
+            qtutils.STRETCH,
+            self.ok_button,
+            self.close_button,
+        )
 
-        self.main_layout = qtutils.vbox(defs.margin, defs.spacing,
-                                        self.label, self.lineedit,
-                                        self.button_layout)
+        self.main_layout = qtutils.vbox(
+            defs.margin, defs.spacing, self.label, self.lineedit, self.button_layout
+        )
         self.setLayout(self.main_layout)
 
         self.lineedit.textChanged.connect(self.text_changed)
@@ -794,28 +809,28 @@ class GitDialog(QtWidgets.QDialog):
 
 
 class GitRefDialog(GitDialog):
-
     def __init__(self, context, title, text, parent, icon=None):
         GitDialog.__init__(
-            self, GitRefLineEdit, context, title, text, parent, icon=icon)
+            self, GitRefLineEdit, context, title, text, parent, icon=icon
+        )
 
 
 class GitCheckoutBranchDialog(GitDialog):
-
     def __init__(self, context, title, text, parent, icon=None):
-        GitDialog.__init__(self, GitCheckoutBranchLineEdit,
-                           context, title, text, parent, icon=icon)
+        GitDialog.__init__(
+            self, GitCheckoutBranchLineEdit, context, title, text, parent, icon=icon
+        )
 
 
 class GitBranchDialog(GitDialog):
-
     def __init__(self, context, title, text, parent, icon=None):
         GitDialog.__init__(
-            self, GitBranchLineEdit, context, title, text, parent, icon=icon)
+            self, GitBranchLineEdit, context, title, text, parent, icon=icon
+        )
 
 
 class GitRemoteBranchDialog(GitDialog):
-
     def __init__(self, context, title, text, parent, icon=None):
-        GitDialog.__init__(self, GitRemoteBranchLineEdit,
-                           context, title, text, parent, icon=icon)
+        GitDialog.__init__(
+            self, GitRemoteBranchLineEdit, context, title, text, parent, icon=icon
+        )

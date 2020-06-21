@@ -7,6 +7,7 @@ import os
 
 from .. import core
 from .. import gitcmds
+from .. import version
 from ..git import STDOUT
 from ..observable import Observable
 from . import prefs
@@ -17,8 +18,10 @@ def create(context):
     return MainModel(context)
 
 
+# pylint: disable=too-many-public-methods
 class MainModel(Observable):
     """Repository status model"""
+
     # TODO this class can probably be split apart into a DiffModel,
     # CommitMessageModel, StatusModel, and an AppStatusStateMachine.
 
@@ -27,14 +30,18 @@ class MainModel(Observable):
     message_commit_message_changed = 'commit_message_changed'
     message_diff_text_changed = 'diff_text_changed'
     message_diff_text_updated = 'diff_text_updated'
+    # "diff_type" {text,image} represents the diff viewer mode.
     message_diff_type_changed = 'diff_type_changed'
+    # "file_type" {text,image} represents the selected file type.
+    message_file_type_changed = 'file_type_changed'
     message_filename_changed = 'filename_changed'
     message_images_changed = 'images_changed'
     message_mode_about_to_change = 'mode_about_to_change'
     message_mode_changed = 'mode_changed'
-    message_ref_sort_changed = 'ref_sort_changed'
     message_submodules_changed = 'message_submodules_changed'
+    message_refs_updated = 'message_refs_updated'
     message_updated = 'updated'
+    message_worktree_changed = 'message_worktree_changed'
 
     # States
     mode_none = 'none'  # Default: nothing's happened, do nothing
@@ -53,8 +60,7 @@ class MainModel(Observable):
     # Modes where we can partially unstage files
     modes_unstageable = set((mode_amend, mode_index))
 
-    unstaged = property(
-        lambda self: self.modified + self.unmerged + self.untracked)
+    unstaged = property(lambda self: self.modified + self.unmerged + self.untracked)
     """An aggregate of the modified, unmerged, and untracked file lists."""
 
     def __init__(self, context, cwd=None):
@@ -71,7 +77,8 @@ class MainModel(Observable):
         self.lfs = False
         self.head = 'HEAD'
         self.diff_text = ''
-        self.diff_type = 'text'  # text, image
+        self.diff_type = Types.TEXT
+        self.file_type = Types.TEXT
         self.mode = self.mode_none
         self.filename = None
         self.is_merging = False
@@ -130,6 +137,7 @@ class MainModel(Observable):
             self.set_directory(cwd)
             core.chdir(cwd)
             self.update_config(reset=True)
+            self.notify_observers(self.message_worktree_changed)
         return is_valid
 
     def is_git_lfs_enabled(self):
@@ -143,9 +151,13 @@ class MainModel(Observable):
         lfs_filter = self.cfg.get('filter.lfs.clean', default=False)
         lfs_dir = lfs_filter and self.git.git_path('lfs')
         lfs_hook = lfs_filter and self.git.git_path('hooks', 'post-merge')
-        return (lfs_filter
-                and lfs_dir and core.exists(lfs_dir)
-                and lfs_hook and core.exists(lfs_hook))
+        return (
+            lfs_filter
+            and lfs_dir
+            and core.exists(lfs_dir)
+            and lfs_hook
+            and core.exists(lfs_hook)
+        )
 
     def set_commitmsg(self, msg, notify=True):
         self.commitmsg = msg
@@ -174,8 +186,17 @@ class MainModel(Observable):
 
     def set_diff_type(self, diff_type):  # text, image
         """Set the diff type to either text or image"""
+        changed = diff_type != self.diff_type
         self.diff_type = diff_type
-        self.notify_observers(self.message_diff_type_changed, diff_type)
+        if changed:
+            self.notify_observers(self.message_diff_type_changed, diff_type)
+
+    def set_file_type(self, file_type):  # text, image
+        """Set the file type to either text or image"""
+        changed = file_type != self.file_type
+        self.file_type = file_type
+        if changed:
+            self.notify_observers(self.message_file_type_changed, file_type)
 
     def set_images(self, images):
         """Update the images shown in the preview pane"""
@@ -226,7 +247,6 @@ class MainModel(Observable):
         self._update_files(update_index=update_index)
         self._update_remotes()
         self._update_branches_and_tags()
-        self._update_branch_heads()
         self._update_commitmsg()
         self.update_config()
         self.update_submodules_list()
@@ -249,8 +269,12 @@ class MainModel(Observable):
         context = self.context
         display_untracked = prefs.display_untracked(context)
         state = gitcmds.worktree_state(
-            context, head=self.head, update_index=update_index,
-            display_untracked=display_untracked, paths=self.filter_paths)
+            context,
+            head=self.head,
+            update_index=update_index,
+            display_untracked=display_untracked,
+            paths=self.filter_paths,
+        )
         self.staged = state.get('staged', [])
         self.modified = state.get('modified', [])
         self.unmerged = state.get('unmerged', [])
@@ -269,18 +293,15 @@ class MainModel(Observable):
             self.set_diff_text('')
 
     def is_empty(self):
-        return not(bool(self.staged or self.modified or
-                        self.unmerged or self.untracked))
+        return not (
+            bool(self.staged or self.modified or self.unmerged or self.untracked)
+        )
 
     def is_empty_repository(self):
         return not self.local_branches
 
     def _update_remotes(self):
         self.remotes = self.git.remote()[STDOUT].splitlines()
-
-    def _update_branch_heads(self):
-        # Set these early since they are used to calculate 'upstream_changed'.
-        self.currentbranch = gitcmds.current_branch(self.context)
 
     def _update_branches_and_tags(self):
         context = self.context
@@ -290,10 +311,14 @@ class MainModel(Observable):
         )
         sort_key = sort_types[self.ref_sort]
         local_branches, remote_branches, tags = gitcmds.all_refs(
-            context, split=True, sort_key=sort_key)
+            context, split=True, sort_key=sort_key
+        )
         self.local_branches = local_branches
         self.remote_branches = remote_branches
         self.tags = tags
+        # Set these early since they are used to calculate 'upstream_changed'.
+        self.currentbranch = gitcmds.current_branch(self.context)
+        self.notify_observers(self.message_refs_updated)
 
     def _update_merge_rebase_status(self):
         merge_head = self.git.git_path('MERGE_HEAD')
@@ -331,36 +356,50 @@ class MainModel(Observable):
 
     def update_remotes(self):
         self._update_remotes()
+        self.update_refs()
+
+    def update_refs(self):
+        """Update tag and branch names"""
+        self.emit_about_to_update()
         self._update_branches_and_tags()
+        self.emit_updated()
 
     def delete_branch(self, branch):
         status, out, err = self.git.branch(branch, D=True)
-        self._update_branches_and_tags()
+        self.update_refs()
         return status, out, err
 
     def rename_branch(self, branch, new_branch):
         status, out, err = self.git.branch(branch, new_branch, M=True)
-        self.emit_about_to_update()
-        self._update_branches_and_tags()
-        self._update_branch_heads()
-        self.emit_updated()
+        self.update_refs()
         return status, out, err
 
     def remote_url(self, name, action):
-        push = action == 'push'
+        push = action == 'PUSH'
         return gitcmds.remote_url(self.context, name, push=push)
 
     def fetch(self, remote, **opts):
-        return run_remote_action(self.git.fetch, remote, **opts)
+        result = run_remote_action(self.context, self.git.fetch, remote, **opts)
+        self.update_refs()
+        return result
 
     def push(self, remote, remote_branch='', local_branch='', **opts):
         # Swap the branches in push mode (reverse of fetch)
-        opts.update(dict(local_branch=remote_branch,
-                         remote_branch=local_branch))
-        return run_remote_action(self.git.push, remote, push=True, **opts)
+        opts.update(dict(local_branch=remote_branch, remote_branch=local_branch))
+        result = run_remote_action(
+            self.context, self.git.push, remote, push=True, **opts
+        )
+        self.update_refs()
+        return result
 
     def pull(self, remote, **opts):
-        return run_remote_action(self.git.pull, remote, pull=True, **opts)
+        result = run_remote_action(
+            self.context, self.git.pull, remote, pull=True, **opts
+        )
+        # Pull can result in merge conflicts
+        self.update_refs()
+        self.update_files(update_index=False, emit=True)
+        return result
 
     def create_branch(self, name, base, track=False, force=False):
         """Create a branch named 'name' from revision 'base'
@@ -409,23 +448,33 @@ class MainModel(Observable):
         if value == self.ref_sort:
             return
         self.ref_sort = value
-        self._update_branches_and_tags()
-        self.notify_observers(self.message_ref_sort_changed)
+        self.update_refs()
+
+
+class Types(object):
+    """File types (used for image diff modes)"""
+
+    IMAGE = 'image'
+    TEXT = 'text'
 
 
 # Helpers
-def remote_args(remote,
-                local_branch='',
-                remote_branch='',
-                ff_only=False,
-                force=False,
-                no_ff=False,
-                tags=False,
-                rebase=False,
-                pull=False,
-                push=False,
-                set_upstream=False,
-                prune=False):
+# pylint: disable=too-many-arguments
+def remote_args(
+    context,
+    remote,
+    local_branch='',
+    remote_branch='',
+    ff_only=False,
+    force=False,
+    no_ff=False,
+    tags=False,
+    rebase=False,
+    pull=False,
+    push=False,
+    set_upstream=False,
+    prune=False,
+):
     """Return arguments for git fetch/push/pull"""
 
     args = [remote]
@@ -444,7 +493,11 @@ def remote_args(remote,
         elif no_ff:
             kwargs['no_ff'] = True
     elif force:
-        kwargs['force'] = True
+        # pylint: disable=simplifiable-if-statement
+        if push and version.check_git(context, 'force-with-lease'):
+            kwargs['force_with_lease'] = True
+        else:
+            kwargs['force'] = True
 
     if push and set_upstream:
         kwargs['set_upstream'] = True
@@ -473,6 +526,6 @@ def refspec_arg(local_branch, remote_branch, pull, push):
     return what
 
 
-def run_remote_action(action, remote, **kwargs):
-    args, kwargs = remote_args(remote, **kwargs)
+def run_remote_action(context, action, remote, **kwargs):
+    args, kwargs = remote_args(context, remote, **kwargs)
     return action(*args, **kwargs)

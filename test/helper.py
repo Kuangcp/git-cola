@@ -41,7 +41,6 @@ def remove_readonly(func, path, _exc_info):
 
 
 class TmpPathTestCase(unittest.TestCase):
-
     def setUp(self):
         self._testdir = tempfile.mkdtemp('_cola_test')
         os.chdir(self._testdir)
@@ -94,6 +93,7 @@ class GitRepositoryTestCase(TmpPathTestCase):
 
     def initialize_repo(self):
         self.run_git('init')
+        self.run_git('symbolic-ref', 'HEAD', 'refs/heads/main')
         self.run_git('config', '--local', 'user.name', 'Your Name')
         self.run_git('config', '--local', 'user.email', 'you@example.com')
         self.touch('A', 'B')

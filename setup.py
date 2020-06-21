@@ -28,9 +28,18 @@ try:
 except ValueError:
     use_env_python = False
 if use_env_python:
-    build_scripts.first_line_re = re.compile('^should not match$')
+    build_scripts.first_line_re = re.compile(r'^should not match$')
 
-# Disable vendoring of qtpy and friends by passing --no-vendor-libs
+# Disable installation of the private cola package by passing --no-private-libs or
+# by setting GIT_COLA_NO_PRIVATE_LIBS=1 in th environment.
+try:
+    sys.argv.remove('--no-private-libs')
+    private_libs = False
+except ValueError:
+    private_libs = not os.getenv('GIT_COLA_NO_PRIVATE_LIBS', '')
+
+# Disable vendoring of qtpy and friends by passing --no-vendor-libs to setup.py or
+# by setting GIT_COLA_NO_VENDOR_LIBS=1 in the environment.
 try:
     sys.argv.remove('--no-vendor-libs')
     vendor_libs = False
@@ -48,24 +57,30 @@ def main():
     """Runs distutils.setup()"""
     scripts = [
         'bin/git-cola',
+        'bin/git-cola-sequence-editor',
         'bin/git-dag',
     ]
 
     if sys.platform == 'win32':
         scripts.append('contrib/win32/cola')
 
-    setup(name='git-cola',
-          version=version,
-          description='The highly caffeinated git GUI',
-          long_description='A sleek and powerful git GUI',
-          license='GPLv2',
-          author='David Aguilar',
-          author_email='davvid@gmail.com',
-          url='https://git-cola.github.io/',
-          scripts=scripts,
-          cmdclass=cmdclass,
-          platforms='any',
-          data_files=_data_files())
+    packages = [str('cola'), str('cola.models'), str('cola.widgets')]
+
+    setup(
+        name='git-cola',
+        version=version,
+        description='The highly caffeinated git GUI',
+        long_description='A sleek and powerful git GUI',
+        license='GPLv2',
+        author='David Aguilar',
+        author_email='davvid@gmail.com',
+        url='https://git-cola.github.io/',
+        scripts=scripts,
+        cmdclass=cmdclass,
+        packages=packages,
+        platforms='any',
+        data_files=_data_files(),
+    )
 
 
 def _data_files():
@@ -80,19 +95,22 @@ def _data_files():
         _app_path('share/applications', '*.desktop'),
         _app_path('share/doc/git-cola', '*.rst'),
         _app_path('share/doc/git-cola', '*.html'),
-        _package('cola'),
-        _package('cola.models'),
-        _package('cola.widgets'),
     ]
 
-    if vendor_libs:
-        data.extend([
-            _package('qtpy'),
-            _package('qtpy._patch'),
-        ])
+    if private_libs:
+        data.extend(
+            [_package('cola'), _package('cola.models'), _package('cola.widgets')]
+        )
 
-    data.extend([_app_path(localedir, 'git-cola.mo')
-                 for localedir in glob('share/locale/*/LC_MESSAGES')])
+    if vendor_libs:
+        data.extend([_package('qtpy'), _package('qtpy._patch')])
+
+    data.extend(
+        [
+            _app_path(localedir, 'git-cola.mo')
+            for localedir in glob('share/locale/*/LC_MESSAGES')
+        ]
+    )
     return data
 
 

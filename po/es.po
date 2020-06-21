@@ -14,10 +14,10 @@ msgstr ""
 "PO-Revision-Date: 2018-08-04 18:02+0100\n"
 "Last-Translator: victorhck <victorhck@mailbox.org>\n"
 "Language-Team: Spanish <>\n"
-"Language: es_ES\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Language: es_ES\n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 "X-Generator: Lokalize 2.0\n"
 
@@ -491,6 +491,12 @@ msgstr "Añadir a Git Annex"
 msgid "Add to Git LFS"
 msgstr "Añadir a Git LFS"
 
+msgid "Add to exclusions"
+msgstr ""
+
+msgid "Add to local .git/info/exclude"
+msgstr ""
+
 msgid "Additions"
 msgstr "Adiciones"
 
@@ -547,9 +553,6 @@ msgstr ""
 msgid "Appearance"
 msgstr ""
 
-msgid "Appearance settings require an application restart"
-msgstr ""
-
 msgid "Apply"
 msgstr "Aplicar"
 
@@ -583,15 +586,23 @@ msgstr ""
 msgid "Auto-Wrap Lines"
 msgstr "Salto de línea automático"
 
+msgid "Autocomplete Paths"
+msgstr ""
+
+msgid "Automatically Load Commit Message Template"
+msgstr ""
+
 msgid "Basic Regexp"
 msgstr "Regexp básico"
 
 msgid "Blame Viewer"
 msgstr ""
 
-#, fuzzy
+msgid "Blame selected paths"
+msgstr ""
+
 msgid "Blame..."
-msgstr "Cerrar..."
+msgstr ""
 
 msgid "Bold on dark headers instead of italic"
 msgstr "Fuente en negrita con fondo negro en vez de cabeceras en cursiva"
@@ -671,9 +682,9 @@ msgstr ""
 msgid "Cannot Amend"
 msgstr "No se puede corregir"
 
-#, fuzzy, python-format
+#, python-format
 msgid "Cannot exec \"%s\": please configure a blame viewer"
-msgstr "No se pudo ejecutar \"%s\": por favor, configure su editor"
+msgstr ""
 
 #, python-format
 msgid "Cannot exec \"%s\": please configure a history browser"
@@ -686,11 +697,17 @@ msgstr "No se pudo ejecutar \"%s\": por favor, configure su editor"
 msgid "Changed Upstream"
 msgstr "Cambiado aguas arriba (upstream)"
 
+msgid "Check Published Commits when Amending"
+msgstr ""
+
 msgid "Check Spelling"
 msgstr "Comprobar ortografía"
 
 msgid "Check spelling"
 msgstr "Comprobar ortografía"
+
+msgid "Check whether a commit has been published when amending"
+msgstr ""
 
 msgid "Checkout"
 msgstr "Checkout"
@@ -882,6 +899,9 @@ msgstr "Traducción al Checo"
 msgid "DAG..."
 msgstr "DAG..."
 
+msgid "Dark Theme"
+msgstr ""
+
 msgid "Date, Time"
 msgstr "Fecha, hora"
 
@@ -922,6 +942,10 @@ msgstr "Eliminar rama remota"
 msgid "Delete Remote Branch..."
 msgstr "Eliminar rama remota..."
 
+#, python-format
+msgid "Delete branch \"%s\"?"
+msgstr ""
+
 msgid "Delete remote"
 msgstr "Eliminar repositorio remoto"
 
@@ -931,9 +955,6 @@ msgstr "Eliminar repositorio remoto \"%s\""
 
 msgid "Delete remote?"
 msgstr "¿Desea eliminar el repositorio remoto?"
-
-msgid "Delete selected branch?"
-msgstr "¿Desea eliminar la rama seleccionada?"
 
 msgid "Delete toolbar"
 msgstr "Eliminar barra de herramientas"
@@ -987,6 +1008,9 @@ msgstr "Herramienta Diff"
 msgid "Directory Exists"
 msgstr "La carpeta ya existe"
 
+msgid "Disable"
+msgstr ""
+
 msgid "Display Untracked Files"
 msgstr "Mostrar ficheros sin seguimiento"
 
@@ -1009,7 +1033,6 @@ msgstr "¿Abandonar el Stash \"%s\"?"
 msgid "Drop the selected stash"
 msgstr "Abandonar el Stash seleccionado"
 
-#, fuzzy
 msgid "Edit"
 msgstr "Editar"
 
@@ -1039,6 +1062,9 @@ msgstr "Dirección de correo electrónico"
 
 msgid "Email contributor"
 msgstr "Dirección de correo electrónico del colaborador"
+
+msgid "Enable path autocompletion in tools"
+msgstr ""
 
 msgid "Enabled"
 msgstr "Habilitado"
@@ -1084,6 +1110,10 @@ msgid "Error creating stash"
 msgstr "Error al Crear Stash"
 
 #, python-format
+msgid "Error deleting branch \"%s\""
+msgstr ""
+
+#, python-format
 msgid "Error deleting remote \"%s\""
 msgstr "Error al eliminar el repositorio remoto \"%s\""
 
@@ -1094,13 +1124,12 @@ msgstr "Error al renombrar \"%(name)s\" a \"%(new_name)s\""
 msgid "Error running prepare-commitmsg hook"
 msgstr ""
 
-#, fuzzy, python-format
+#, python-format
 msgid "Error updating submodule %s"
-msgstr "Error al crear el repositorio remoto \"%s\""
+msgstr "Error al crear el archivo %s"
 
-#, fuzzy
 msgid "Error updating submodules"
-msgstr "Error al editar el archivo"
+msgstr ""
 
 msgid "Error: Cannot find commit template"
 msgstr "Error: No se pudo encontrar la plantilla para el commit"
@@ -1322,11 +1351,8 @@ msgstr "Ayuda - Acciones de copiado personalizadas"
 msgid "Help - Find Files"
 msgstr "Ayuda - Encontrar archivos"
 
-msgid "Help - git-xbase"
-msgstr "Ayuda - git-xbase"
-
-msgid "Hide Details.."
-msgstr "Ocultar detalles..."
+msgid "Help - git-cola-sequence-editor"
+msgstr "Ayuda - git-cola-sequence-editor"
 
 msgid "High DPI"
 msgstr ""
@@ -1336,6 +1362,9 @@ msgstr "Navegador de historial"
 
 msgid "Hungarian translation"
 msgstr "Traducción al Húngaro"
+
+msgid "Icon theme"
+msgstr ""
 
 msgid "Ignore all whitespace"
 msgstr "Ignorar todos los espacios en blanco"
@@ -1354,6 +1383,9 @@ msgstr "Ignorar el nombre de archivo exacto"
 
 msgid "Ignore filename or pattern"
 msgstr "Ignorar nombre de archivo o patrón"
+
+msgid "Ignore..."
+msgstr ""
 
 msgid "Include tags "
 msgstr "Incluir etiquetas "
@@ -1381,6 +1413,9 @@ msgstr "Rebase interactivo"
 
 msgid "Invalid Revision"
 msgstr "Revisión inválida"
+
+msgid "Japanese translation"
+msgstr ""
 
 msgid "Keep *.orig Merge Backups"
 msgstr "Conservar Merge Backups *.orig"
@@ -1418,6 +1453,9 @@ msgstr "Ejecutar git-difftool en versiones previas"
 
 msgid "Launch git-difftool on the current path"
 msgstr "Ejecutar git-difftool en la ruta actual"
+
+msgid "Light Theme"
+msgstr ""
 
 msgid "Load Commit Message"
 msgstr "Cargar el mensaje del Commit"
@@ -1581,9 +1619,8 @@ msgstr "Abrir"
 msgid "Open Git Repository..."
 msgstr "Abrir Repositorio Git..."
 
-#, fuzzy
 msgid "Open Parent"
-msgstr "Abrir recientes"
+msgstr ""
 
 msgid "Open Parent Directory"
 msgstr "Abrir carpeta padre"
@@ -1853,6 +1890,9 @@ msgstr "¿Reiniciar rama?"
 msgid "Reset Hard"
 msgstr "Reinicio duro (hard)"
 
+msgid "Reset Layout"
+msgstr ""
+
 msgid "Reset Merge"
 msgstr "Reiniciar \"merge\""
 
@@ -1877,6 +1917,9 @@ msgstr "¿Reiniciar el árbol de trabajo de trabajo?"
 #, python-format
 msgid "Resetting \"%(branch)s\" to \"%(revision)s\" will lose commits."
 msgstr "Reiniciar \"%(branch)s\" a \"%(revision)s\" hara que se pierdan los \"commits\"."
+
+msgid "Restart the application after changing appearance settings."
+msgstr ""
 
 msgid "Revert"
 msgstr "Revertir"
@@ -2118,9 +2161,6 @@ msgstr "Desplazar hacia arriba"
 
 msgid "Shortcuts"
 msgstr "Atajos"
-
-msgid "Show Details..."
-msgstr "Mostrar detalles..."
 
 msgid "Show Diffstat After Merge"
 msgstr "Mostrar \"Diffstat\" tras hacer \"merge\""
@@ -2492,21 +2532,17 @@ msgstr ""
 msgid "Update Submodule..."
 msgstr ""
 
-#, fuzzy
 msgid "Update Submodules"
-msgstr "Inicializar submódulos"
+msgstr ""
 
-#, fuzzy
 msgid "Update all submodules?"
-msgstr "Inicializar submódulos"
+msgstr ""
 
-#, fuzzy
 msgid "Update submodules..."
-msgstr "Inicializar submódulos"
+msgstr ""
 
-#, fuzzy
 msgid "Update this submodule"
-msgstr "Inicializar submódulos"
+msgstr ""
 
 msgid "Update this submodule?"
 msgstr ""
@@ -2605,6 +2641,9 @@ msgstr "resultados de grep..."
 msgid "hotkeys.html"
 msgstr "hotkeys.html"
 
+msgid "title"
+msgstr ""
+
 msgid "unknown"
 msgstr "desconocido"
 
@@ -2623,82 +2662,11 @@ msgstr ""
 msgid "yyyy-MM-dd"
 msgstr "aaaa-MM-dd"
 
-#~ msgid "Bookmarks"
-#~ msgstr "Favoritos"
+#~ msgid "Delete selected branch?"
+#~ msgstr "¿Desea eliminar la rama seleccionada?"
 
-#~ msgid "Bookmarks..."
-#~ msgstr "Favoritos..."
+#~ msgid "Hide Details.."
+#~ msgstr "Ocultar detalles..."
 
-#, fuzzy
-#~ msgid "Error %s"
-#~ msgstr "Errores: %s"
-
-#~ msgid "Errors: %s"
-#~ msgstr "Errores: %s"
-
-#, fuzzy
-#~ msgid "Local Branches"
-#~ msgstr "Rama Local"
-
-#, fuzzy
-#~ msgid "On Debian-based systems try: sudo apt-get install python-pyinotify"
-#~ msgstr "En sistemas Debian intente: sudo apt-get install python-pyinotify"
-
-#~ msgid "Options"
-#~ msgstr "Opciones"
-
-#~ msgid ""
-#~ "Output:\n"
-#~ "%s"
-#~ msgstr ""
-#~ "Resultado:\n"
-#~ "%s"
-
-#~ msgid "Output: %s"
-#~ msgstr "Resultado: %s"
-
-#~ msgid "PATCH %(current)d/%(count)d"
-#~ msgstr "PATCH %(current)d/%(count)d"
-
-#, fuzzy
-#~ msgid "Remote Branches"
-#~ msgstr "Rama Remota"
-
-#~ msgid "Rename remote?"
-#~ msgstr "Desea renombrar el repositorio remoto?"
-
-#~ msgid "Select File"
-#~ msgstr "Seleccionar Archivo"
-
-#~ msgid "Select file from \"%s\""
-#~ msgstr "Seleccionar archivo de \"%s\""
-
-#~ msgid "Summary:"
-#~ msgstr "Resumen:"
-
-#~ msgid ""
-#~ "This PyQt4 does not include QtWebKit.\n"
-#~ "The keyboard shortcuts feature is unavailable."
-#~ msgstr ""
-#~ "Este PyQt4 no incluye QtWebKit.\n"
-#~ "Los atajos de teclado no están disponibles."
-
-#~ msgid "Updating..."
-#~ msgstr "Actualizando..."
-
-#~ msgid ""
-#~ "file notification: disabled\n"
-#~ "Note: install pywin32 to enable.\n"
-#~ msgstr ""
-#~ "Notificación de archivo: desactivada\n"
-#~ "Nota: instale pywin32 para activarla.\n"
-
-#~ msgid "inotify enabled."
-#~ msgstr "inotify activado."
-
-#~ msgid ""
-#~ "inotify: disabled\n"
-#~ "Note: install python-pyinotify to enable inotify.\n"
-#~ msgstr ""
-#~ "inotify: desactivado\n"
-#~ "Nota: instale python-pyinotify para activarlo.\n"
+#~ msgid "Show Details..."
+#~ msgstr "Mostrar detalles..."

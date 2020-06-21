@@ -348,6 +348,12 @@ msgstr ""
 msgid "Add to Git LFS"
 msgstr ""
 
+msgid "Add to exclusions"
+msgstr ""
+
+msgid "Add to local .git/info/exclude"
+msgstr ""
+
 msgid "Additions"
 msgstr ""
 
@@ -400,9 +406,6 @@ msgstr ""
 msgid "Appearance"
 msgstr ""
 
-msgid "Appearance settings require an application restart"
-msgstr ""
-
 msgid "Apply"
 msgstr ""
 
@@ -436,10 +439,19 @@ msgstr ""
 msgid "Auto-Wrap Lines"
 msgstr ""
 
+msgid "Autocomplete Paths"
+msgstr ""
+
+msgid "Automatically Load Commit Message Template"
+msgstr ""
+
 msgid "Basic Regexp"
 msgstr ""
 
 msgid "Blame Viewer"
+msgstr ""
+
+msgid "Blame selected paths"
 msgstr ""
 
 msgid "Blame..."
@@ -534,10 +546,16 @@ msgstr ""
 msgid "Changed Upstream"
 msgstr ""
 
+msgid "Check Published Commits when Amending"
+msgstr ""
+
 msgid "Check Spelling"
 msgstr ""
 
 msgid "Check spelling"
+msgstr ""
+
+msgid "Check whether a commit has been published when amending"
 msgstr ""
 
 msgid "Checkout"
@@ -728,6 +746,9 @@ msgstr ""
 msgid "DAG..."
 msgstr ""
 
+msgid "Dark Theme"
+msgstr ""
+
 msgid "Date, Time"
 msgstr ""
 
@@ -768,6 +789,10 @@ msgstr ""
 msgid "Delete Remote Branch..."
 msgstr ""
 
+#, python-format
+msgid "Delete branch \"%s\"?"
+msgstr ""
+
 msgid "Delete remote"
 msgstr ""
 
@@ -776,9 +801,6 @@ msgid "Delete remote \"%s\""
 msgstr ""
 
 msgid "Delete remote?"
-msgstr ""
-
-msgid "Delete selected branch?"
 msgstr ""
 
 msgid "Delete toolbar"
@@ -833,6 +855,9 @@ msgstr ""
 msgid "Directory Exists"
 msgstr ""
 
+msgid "Disable"
+msgstr ""
+
 msgid "Display Untracked Files"
 msgstr ""
 
@@ -885,6 +910,9 @@ msgstr ""
 msgid "Email contributor"
 msgstr ""
 
+msgid "Enable path autocompletion in tools"
+msgstr ""
+
 msgid "Enabled"
 msgstr ""
 
@@ -926,6 +954,10 @@ msgid "Error creating remote \"%s\""
 msgstr ""
 
 msgid "Error creating stash"
+msgstr ""
+
+#, python-format
+msgid "Error deleting branch \"%s\""
 msgstr ""
 
 #, python-format
@@ -1163,10 +1195,7 @@ msgstr ""
 msgid "Help - Find Files"
 msgstr ""
 
-msgid "Help - git-xbase"
-msgstr ""
-
-msgid "Hide Details.."
+msgid "Help - git-cola-sequence-editor"
 msgstr ""
 
 msgid "High DPI"
@@ -1176,6 +1205,9 @@ msgid "History Browser"
 msgstr ""
 
 msgid "Hungarian translation"
+msgstr ""
+
+msgid "Icon theme"
 msgstr ""
 
 msgid "Ignore all whitespace"
@@ -1194,6 +1226,9 @@ msgid "Ignore exact filename"
 msgstr ""
 
 msgid "Ignore filename or pattern"
+msgstr ""
+
+msgid "Ignore..."
 msgstr ""
 
 msgid "Include tags "
@@ -1221,6 +1256,9 @@ msgid "Interactive Rebase"
 msgstr ""
 
 msgid "Invalid Revision"
+msgstr ""
+
+msgid "Japanese translation"
 msgstr ""
 
 msgid "Keep *.orig Merge Backups"
@@ -1256,6 +1294,9 @@ msgid "Launch git-difftool against previous versions"
 msgstr ""
 
 msgid "Launch git-difftool on the current path"
+msgstr ""
+
+msgid "Light Theme"
 msgstr ""
 
 msgid "Load Commit Message"
@@ -1677,6 +1718,9 @@ msgstr ""
 msgid "Reset Hard"
 msgstr ""
 
+msgid "Reset Layout"
+msgstr ""
+
 msgid "Reset Merge"
 msgstr ""
 
@@ -1700,6 +1744,9 @@ msgstr ""
 
 #, python-format
 msgid "Resetting \"%(branch)s\" to \"%(revision)s\" will lose commits."
+msgstr ""
+
+msgid "Restart the application after changing appearance settings."
 msgstr ""
 
 msgid "Revert"
@@ -1941,9 +1988,6 @@ msgid "Shift Up"
 msgstr ""
 
 msgid "Shortcuts"
-msgstr ""
-
-msgid "Show Details..."
 msgstr ""
 
 msgid "Show Diffstat After Merge"
@@ -2405,6 +2449,9 @@ msgid "grep result..."
 msgstr ""
 
 msgid "hotkeys.html"
+msgstr ""
+
+msgid "title"
 msgstr ""
 
 msgid "unknown"

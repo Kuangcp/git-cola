@@ -128,8 +128,15 @@ def box(cls, margin, spacing, *items):
     for i in items:
         if isinstance(i, QtWidgets.QWidget):
             layout.addWidget(i)
-        elif isinstance(i, (QtWidgets.QHBoxLayout, QtWidgets.QVBoxLayout,
-                            QtWidgets.QFormLayout, QtWidgets.QLayout)):
+        elif isinstance(
+            i,
+            (
+                QtWidgets.QHBoxLayout,
+                QtWidgets.QVBoxLayout,
+                QtWidgets.QFormLayout,
+                QtWidgets.QLayout,
+            ),
+        ):
             layout.addLayout(i)
         elif i is stretch:
             layout.addStretch()
@@ -224,7 +231,7 @@ class ComboBox(QtWidgets.QComboBox):
             self.item_data.extend(items)
 
     def set_index(self, idx):
-        idx = utils.clamp(idx, 0, self.count()-1)
+        idx = utils.clamp(idx, 0, self.count() - 1)
         self.setCurrentIndex(idx)
 
     def add_item(self, text, data):
@@ -281,7 +288,8 @@ def prompt(msg, title=None, text='', parent=None):
     if parent is None:
         parent = active_window()
     result = QtWidgets.QInputDialog.getText(
-        parent, title, msg, QtWidgets.QLineEdit.Normal, text)
+        parent, title, msg, QtWidgets.QLineEdit.Normal, text
+    )
     return (result[0], result[1])
 
 
@@ -313,18 +321,16 @@ def prompt_n(msg, inputs):
     for name, value in inputs:
         lineedit = QtWidgets.QLineEdit()
         # Enable the OK button only when all fields have been populated
-        lineedit.textChanged.connect(
-            lambda x: ok_b.setEnabled(all(get_values())))
+        # pylint: disable=no-member
+        lineedit.textChanged.connect(lambda x: ok_b.setEnabled(all(get_values())))
         if value:
             lineedit.setText(value)
         form_widgets.append((name, lineedit))
 
     # layouts
     form_layout = form(defs.no_margin, defs.button_spacing, *form_widgets)
-    button_layout = hbox(defs.no_margin, defs.button_spacing,
-                         STRETCH, close_b, ok_b)
-    main_layout = vbox(defs.margin, defs.button_spacing,
-                       form_layout, button_layout)
+    button_layout = hbox(defs.no_margin, defs.button_spacing, STRETCH, close_b, ok_b)
+    main_layout = vbox(defs.margin, defs.button_spacing, form_layout, button_layout)
     dialog.setLayout(main_layout)
 
     # connections
@@ -352,9 +358,7 @@ class TreeWidgetItem(QtWidgets.QTreeWidgetItem):
         return self.TYPE
 
 
-def paths_from_indexes(model, indexes,
-                       item_type=TreeWidgetItem.TYPE,
-                       item_filter=None):
+def paths_from_indexes(model, indexes, item_type=TreeWidgetItem.TYPE, item_filter=None):
     """Return paths from a list of QStandardItemModel indexes"""
     items = [model.itemFromIndex(i) for i in indexes]
     return paths_from_items(items, item_type=item_type, item_filter=item_filter)
@@ -364,14 +368,11 @@ def _true_filter(_x):
     return True
 
 
-def paths_from_items(items,
-                     item_type=TreeWidgetItem.TYPE,
-                     item_filter=None):
+def paths_from_items(items, item_type=TreeWidgetItem.TYPE, item_filter=None):
     """Return a list of paths from a list of items"""
     if item_filter is None:
         item_filter = _true_filter
-    return [i.path for i in items
-            if i.type() == item_type and item_filter(i)]
+    return [i.path for i in items if i.type() == item_type and item_filter(i)]
 
 
 def tree_selection(tree_item, items):
@@ -426,37 +427,36 @@ def selected_items(list_widget, items):
 
 def open_file(title, directory=None):
     """Creates an Open File dialog and returns a filename."""
-    result = compat.getopenfilename(parent=active_window(),
-                                    caption=title,
-                                    basedir=directory)
+    result = compat.getopenfilename(
+        parent=active_window(), caption=title, basedir=directory
+    )
     return result[0]
 
 
 def open_files(title, directory=None, filters=''):
     """Creates an Open File dialog and returns a list of filenames."""
-    result = compat.getopenfilenames(parent=active_window(),
-                                     caption=title,
-                                     basedir=directory,
-                                     filters=filters)
+    result = compat.getopenfilenames(
+        parent=active_window(), caption=title, basedir=directory, filters=filters
+    )
     return result[0]
 
 
 def opendir_dialog(caption, path):
     """Prompts for a directory path"""
 
-    options = (QtWidgets.QFileDialog.ShowDirsOnly |
-               QtWidgets.QFileDialog.DontResolveSymlinks)
-    return compat.getexistingdirectory(parent=active_window(),
-                                       caption=caption,
-                                       basedir=path,
-                                       options=options)
+    options = (
+        QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks
+    )
+    return compat.getexistingdirectory(
+        parent=active_window(), caption=caption, basedir=path, options=options
+    )
 
 
 def save_as(filename, title='Save As...'):
     """Creates a Save File dialog and returns a filename."""
-    result = compat.getsavefilename(parent=active_window(),
-                                    caption=title,
-                                    basedir=filename)
+    result = compat.getsavefilename(
+        parent=active_window(), caption=title, basedir=filename
+    )
     return result[0]
 
 
@@ -498,8 +498,7 @@ def persist_clipboard():
 
 def add_action_bool(widget, text, fn, checked, *shortcuts):
     tip = text
-    action = _add_action(widget, text, tip, fn,
-                         connect_action_bool, *shortcuts)
+    action = _add_action(widget, text, tip, fn, connect_action_bool, *shortcuts)
     action.setCheckable(True)
     action.setChecked(checked)
     return action
@@ -559,14 +558,13 @@ def create_treeitem(filename, staged=False, deleted=False, untracked=False):
 
     """
     icon_name = icons.status(filename, deleted, staged, untracked)
-    return TreeWidgetItem(filename, icons.name_from_basename(icon_name),
-                          deleted=deleted)
+    icon = icons.name_from_basename(icon_name)
+    return TreeWidgetItem(filename, icon, deleted=deleted)
 
 
 def add_close_action(widget):
     """Adds close action and shortcuts to a widget."""
-    return add_action(widget, N_('Close...'),
-                      widget.close, hotkeys.CLOSE, hotkeys.QUIT)
+    return add_action(widget, N_('Close...'), widget.close, hotkeys.CLOSE, hotkeys.QUIT)
 
 
 def app():
@@ -590,7 +588,7 @@ def center_on_screen(widget):
     width, height = desktop_size()
     cx = width // 2
     cy = height // 2
-    widget.move(cx - widget.width()//2, cy - widget.height()//2)
+    widget.move(cx - widget.width() // 2, cy - widget.height() // 2)
 
 
 def default_size(parent, width, height, use_parent_height=True):
@@ -630,8 +628,9 @@ def font(string):
     return qfont
 
 
-def create_button(text='', layout=None, tooltip=None, icon=None,
-                  enabled=True, default=False):
+def create_button(
+    text='', layout=None, tooltip=None, icon=None, enabled=True, default=False
+):
     """Create a button, set its title, and add it to the parent."""
     button = QtWidgets.QPushButton()
     button.setCursor(Qt.PointingHandCursor)
@@ -658,17 +657,28 @@ def tool_button():
     button.setPopupMode(QtWidgets.QToolButton.InstantPopup)
     button.setCursor(Qt.PointingHandCursor)
     button.setFocusPolicy(Qt.NoFocus)
-    button.setStyleSheet("""
+    # Highlight colors
+    palette = QtGui.QPalette()
+    highlight = palette.color(QtGui.QPalette.Highlight)
+    highlight_rgb = rgb_css(highlight)
+
+    button.setStyleSheet(
+        """
         /* No borders */
         QToolButton {
-            border: 0;
-            border-style: none;
+            border: none;
+            background-color: none;
         }
         /* Hide the menu indicator */
         QToolButton::menu-indicator {
             image: none;
         }
-    """)
+        QToolButton:hover {
+            border: %(border)spx solid %(highlight_rgb)s;
+        }
+    """
+        % dict(border=defs.border, highlight_rgb=highlight_rgb)
+    )
     return button
 
 
@@ -696,13 +706,15 @@ def close_button(text=None, icon=None):
 
 
 def edit_button(enabled=True, default=False):
-    return create_button(text=N_('Edit'), icon=icons.edit(),
-                         enabled=enabled, default=default)
+    return create_button(
+        text=N_('Edit'), icon=icons.edit(), enabled=enabled, default=default
+    )
 
 
 def refresh_button(enabled=True, default=False):
-    return create_button(text=N_('Refresh'), icon=icons.sync(),
-                         enabled=enabled, default=default)
+    return create_button(
+        text=N_('Refresh'), icon=icons.sync(), enabled=enabled, default=default
+    )
 
 
 def checkbox(text='', tooltip='', checked=None):
@@ -728,7 +740,6 @@ def _checkbox(cls, text, tooltip, checked):
 
 
 class DockTitleBarWidget(QtWidgets.QFrame):
-
     def __init__(self, parent, title, stretch=True):
         QtWidgets.QFrame.__init__(self, parent)
         self.setAutoFillBackground(True)
@@ -739,10 +750,12 @@ class DockTitleBarWidget(QtWidgets.QFrame):
         qlabel.setCursor(Qt.OpenHandCursor)
 
         self.close_button = create_action_button(
-            tooltip=N_('Close'), icon=icons.close())
+            tooltip=N_('Close'), icon=icons.close()
+        )
 
         self.toggle_button = create_action_button(
-            tooltip=N_('Detach'), icon=icons.external())
+            tooltip=N_('Detach'), icon=icons.external()
+        )
 
         self.corner_layout = hbox(defs.no_margin, defs.spacing)
 
@@ -751,9 +764,15 @@ class DockTitleBarWidget(QtWidgets.QFrame):
         else:
             separator = SKIPPED
 
-        self.main_layout = hbox(defs.small_margin, defs.spacing,
-                                qlabel, separator, self.corner_layout,
-                                self.toggle_button, self.close_button)
+        self.main_layout = hbox(
+            defs.small_margin,
+            defs.titlebar_spacing,
+            qlabel,
+            separator,
+            self.corner_layout,
+            self.toggle_button,
+            self.close_button,
+        )
         self.setLayout(self.main_layout)
 
         connect_button(self.toggle_button, self.toggle_floating)
@@ -792,8 +811,7 @@ def create_dock(title, parent, stretch=True, widget=None, fn=None):
         parent.dockwidgets.append(dock)
     if fn:
         widget = fn(dock)
-        assert isinstance(widget, QtWidgets.QFrame),\
-            "Docked widget has to be a QFrame"
+        assert isinstance(widget, QtWidgets.QFrame), "Docked widget has to be a QFrame"
     if widget:
         dock.setWidget(widget)
     return dock
@@ -842,7 +860,7 @@ def create_toolbutton(text=None, layout=None, tooltip=None, icon=None):
     button = tool_button()
     if icon is not None:
         button.setIcon(icon)
-        button.setIconSize(QtCore.QSize(defs.small_icon, defs.small_icon))
+        button.setIconSize(QtCore.QSize(defs.default_icon, defs.default_icon))
     if text is not None:
         button.setText(' ' + text)
         button.setToolButtonStyle(Qt.ToolButtonTextBesideIcon)
@@ -995,6 +1013,7 @@ class RunTask(QtCore.QObject):
 
 # Syntax highlighting
 
+
 def rgb(r, g, b):
     color = QtGui.QColor()
     color.setRgb(r, g, b)
@@ -1021,16 +1040,14 @@ def rgb_hex(color):
     return '%02x%02x%02x' % (color.red(), color.green(), color.blue())
 
 
-def hsl(h, s, l):
+def hsl(h, s, light):
     return QtGui.QColor.fromHslF(
-        utils.clamp(h, 0.0, 1.0),
-        utils.clamp(s, 0.0, 1.0),
-        utils.clamp(l, 0.0, 1.0)
+        utils.clamp(h, 0.0, 1.0), utils.clamp(s, 0.0, 1.0), utils.clamp(light, 0.0, 1.0)
     )
 
 
-def hsl_css(h, s, l):
-    return rgb_css(hsl(h, s, l))
+def hsl_css(h, s, light):
+    return rgb_css(hsl(h, s, light))
 
 
 def make_format(fg=None, bg=None, bold=False):
@@ -1045,7 +1062,6 @@ def make_format(fg=None, bg=None, bold=False):
 
 
 class ImageFormats(object):
-
     def __init__(self):
         # returns a list of QByteArray objects
         formats_qba = QtGui.QImageReader.supportedImageFormats()

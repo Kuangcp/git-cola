@@ -1,16 +1,15 @@
 """The only file where icon filenames are mentioned"""
-
 from __future__ import absolute_import, division, unicode_literals
-import mimetypes
 import os
 
 from qtpy import QtGui
 from qtpy import QtWidgets
 
+from . import core
 from . import qtcompat
 from . import resources
 from .compat import ustr
-from .decorators import memoize
+from .i18n import N_
 
 
 KNOWN_FILE_MIME_TYPES = [
@@ -43,10 +42,18 @@ KNOWN_FILE_EXTENSIONS = {
 }
 
 
-def install(icon_themes):
-    for theme in icon_themes:
+def install(themes):
+    for theme in themes:
         icon_dir = resources.icon_dir(theme)
         qtcompat.add_search_path('icons', icon_dir)
+
+
+def icon_themes():
+    return (
+        (N_('Default'), 'default'),
+        (N_('Dark Theme'), 'dark'),
+        (N_('Light Theme'), 'light'),
+    )
 
 
 def name_from_basename(basename):
@@ -58,7 +65,6 @@ def name_from_basename(basename):
     return 'icons:' + basename
 
 
-@memoize
 def from_name(name):
     """Return a QIcon from an absolute filename or "icons:basename.svg" name"""
     return QtGui.QIcon(name)
@@ -69,7 +75,6 @@ def icon(basename):
     return from_name(name_from_basename(basename))
 
 
-@memoize
 def from_theme(name, fallback=None):
     """Grab an icon from the current theme with a fallback
 
@@ -89,7 +94,7 @@ def from_theme(name, fallback=None):
 
 def basename_from_filename(filename):
     """Returns an icon name based on the filename"""
-    mimetype = mimetypes.guess_type(filename)[0]
+    mimetype = core.guess_mimetype(filename)
     if mimetype is not None:
         mimetype = mimetype.lower()
         for filetype, icon_name in KNOWN_FILE_MIME_TYPES:
@@ -132,6 +137,7 @@ def status(filename, deleted, is_staged, untracked):
 
 # Icons creators and SVG file references
 
+
 def add():
     return from_theme('list-add', fallback='plus.svg')
 
@@ -165,7 +171,7 @@ def compare():
 
 
 def configure():
-    return from_theme('configure', fallback='gear.svg')
+    return icon('gear.svg')
 
 
 def copy():
@@ -191,6 +197,7 @@ def discard():
 # folder vs directory: directory is opaque, folder is just an outline
 # directory is used for the File Browser, where more contrast with the file
 # icons are needed.
+
 
 def folder():
     return icon('folder.svg')

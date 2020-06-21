@@ -4,8 +4,8 @@ from qtpy.QtGui import QKeySequence
 from qtpy.QtCore import Qt
 
 
-def hotkey(seq):
-    return QKeySequence(seq)
+def hotkey(*seq):
+    return QKeySequence(*seq)
 
 
 # A-G
@@ -19,12 +19,15 @@ COPY_SHA1 = hotkey(Qt.CTRL + Qt.ALT + Qt.Key_C)
 DIFFSTAT = hotkey(Qt.ALT + Qt.Key_D)
 DIFF = hotkey(Qt.CTRL + Qt.Key_D)
 DIFF_SECONDARY = hotkey(Qt.CTRL + Qt.SHIFT + Qt.Key_D)
+EDIT_SHORT = hotkey(Qt.Key_E)
 EDIT = hotkey(Qt.CTRL + Qt.Key_E)
 EDIT_SECONDARY = hotkey(Qt.CTRL + Qt.SHIFT + Qt.Key_E)
 EXPORT = hotkey(Qt.ALT + Qt.SHIFT + Qt.Key_E)
 FIT = hotkey(Qt.Key_F)
 FETCH = hotkey(Qt.CTRL + Qt.Key_F)
 FILTER = hotkey(Qt.CTRL + Qt.SHIFT + Qt.Key_F)
+GOTO_END = hotkey(Qt.SHIFT + Qt.Key_G)
+GOTO_START = hotkey(Qt.Key_G, Qt.Key_G)  # gg
 GREP = hotkey(Qt.CTRL + Qt.Key_G)
 # H-P
 MOVE_LEFT = hotkey(Qt.Key_H)
@@ -84,7 +87,7 @@ ZOOM_IN_SECONDARY = hotkey(Qt.Key_Equal)
 QUESTION = hotkey(Qt.Key_Question)
 RETURN = hotkey(Qt.Key_Return)
 ACCEPT = (ENTER, RETURN)
-COMMIT = hotkey(Qt.CTRL + Qt.Key_Return)
+APPLY = hotkey(Qt.CTRL + Qt.Key_Return)
 PREPARE_COMMIT_MESSAGE = hotkey(Qt.CTRL + Qt.SHIFT + Qt.Key_Return)
 PRIMARY_ACTION = hotkey(hotkey(Qt.Key_Space))
 SECONDARY_ACTION = hotkey(Qt.SHIFT + Qt.Key_Space)
@@ -114,3 +117,11 @@ DELETE = QKeySequence.Delete
 NEW = QKeySequence.New
 OPEN = QKeySequence.Open
 SELECT_ALL = QKeySequence.SelectAll
+
+# Text navigation
+DOWN = hotkey(Qt.Key_D)
+UP = hotkey(Qt.Key_U)
+SELECT_FORWARD = hotkey(Qt.SHIFT + Qt.Key_F)
+SELECT_BACK = hotkey(Qt.SHIFT + Qt.Key_B)
+SELECT_DOWN = hotkey(Qt.SHIFT + Qt.Key_D)
+SELECT_UP = hotkey(Qt.SHIFT + Qt.Key_U)

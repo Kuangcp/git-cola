@@ -8,14 +8,12 @@ from qtpy.QtCore import Qt
 
 from ..i18n import N_
 from ..interaction import Interaction
-from ..models import main
 from ..qtutils import connect_button
 from ..qtutils import get
 from .. import gitcmds
 from .. import icons
 from .. import qtutils
 from .. import utils
-from .standard import ProgressDialog
 from . import defs
 from . import standard
 
@@ -43,15 +41,8 @@ def pull(context):
 def run(context, RemoteDialog):
     """Launches fetch/push/pull dialogs."""
     # Copy global stuff over to speedup startup
-    model = main.MainModel(context)
-    global_model = context.model
-    model.currentbranch = global_model.currentbranch
-    model.local_branches = global_model.local_branches
-    model.remote_branches = global_model.remote_branches
-    model.tags = global_model.tags
-    model.remotes = global_model.remotes
     parent = qtutils.active_window()
-    view = RemoteDialog(context, model, parent=parent)
+    view = RemoteDialog(context, parent=parent)
     view.show()
     return view
 
@@ -67,9 +58,11 @@ def combine(result, prev):
     if isinstance(prev, (tuple, list)):
         if len(prev) != 3:
             raise AssertionError('combine() with length %d' % len(prev))
-        combined = (max(prev[0], result[0]),
-                    combine(prev[1], result[1]),
-                    combine(prev[2], result[2]))
+        combined = (
+            max(prev[0], result[0]),
+            combine(prev[1], result[1]),
+            combine(prev[2], result[2]),
+        )
     elif prev and result:
         combined = prev + '\n\n' + result
     elif prev:
@@ -90,7 +83,7 @@ def uncheck(value, *checkboxes):
 def strip_remotes(remote_branches):
     """Strip the <remote>/ prefixes from branches
 
-    e.g. "origin/master" becomes "master".
+    e.g. "origin/main" becomes "main".
 
     """
     branches = [utils.strip_one(branch) for branch in remote_branches]
@@ -114,37 +107,37 @@ class ActionTask(qtutils.Task):
 class RemoteActionDialog(standard.Dialog):
     """Interface for performing remote operations"""
 
-    def __init__(self, context, model, action, title, parent=None, icon=None):
+    def __init__(self, context, action, title, parent=None, icon=None):
         """Customize the dialog based on the remote action"""
         standard.Dialog.__init__(self, parent=parent)
-
-        self.context = context
-        self.model = model
-        self.action = action
-        self.filtered_remote_branches = []
-        self.selected_remotes = []
-
         self.setWindowTitle(title)
         if parent is not None:
             self.setWindowModality(Qt.WindowModal)
 
+        self.context = context
+        self.model = model = context.model
+        self.action = action
+        self.filtered_remote_branches = []
+        self.selected_remotes = []
+
         self.runtask = qtutils.RunTask(parent=self)
-        self.progress = ProgressDialog(title, N_('Updating'), self)
+        self.progress = standard.progress(title, N_('Updating'), self)
 
         self.local_label = QtWidgets.QLabel()
         self.local_label.setText(N_('Local Branch'))
 
         self.local_branch = QtWidgets.QLineEdit()
-        qtutils.add_completer(self.local_branch, self.model.local_branches)
+        qtutils.add_completer(self.local_branch, model.local_branches)
 
         self.local_branches = QtWidgets.QListWidget()
-        self.local_branches.addItems(self.model.local_branches)
+        self.local_branches.addItems(model.local_branches)
 
         self.remote_label = QtWidgets.QLabel()
         self.remote_label.setText(N_('Remote'))
 
         self.remote_name = QtWidgets.QLineEdit()
-        qtutils.add_completer(self.remote_name, self.model.remotes)
+        qtutils.add_completer(self.remote_name, model.remotes)
+        # pylint: disable=no-member
         self.remote_name.editingFinished.connect(self.remote_name_edited)
         self.remote_name.textEdited.connect(lambda x: self.remote_name_edited())
 
@@ -152,51 +145,59 @@ class RemoteActionDialog(standard.Dialog):
         if action == PUSH:
             mode = QtWidgets.QAbstractItemView.ExtendedSelection
             self.remotes.setSelectionMode(mode)
-        self.remotes.addItems(self.model.remotes)
+        self.remotes.addItems(model.remotes)
 
         self.remote_branch_label = QtWidgets.QLabel()
         self.remote_branch_label.setText(N_('Remote Branch'))
 
         self.remote_branch = QtWidgets.QLineEdit()
-        remote_branches = strip_remotes(self.model.remote_branches)
+        remote_branches = strip_remotes(model.remote_branches)
         qtutils.add_completer(self.remote_branch, remote_branches)
 
         self.remote_branches = QtWidgets.QListWidget()
-        self.remote_branches.addItems(self.model.remote_branches)
+        self.remote_branches.addItems(model.remote_branches)
 
         text = N_('Prompt on creation')
         tooltip = N_('Prompt when pushing creates new remote branches')
-        self.prompt_checkbox = qtutils.checkbox(checked=True, text=text,
-                                                tooltip=tooltip)
+        self.prompt_checkbox = qtutils.checkbox(
+            checked=True, text=text, tooltip=tooltip
+        )
 
         text = N_('Fast-forward only')
-        tooltip = N_('Refuse to merge unless the current HEAD is already up-'
-                     'to-date or the merge can be resolved as a fast-forward')
-        self.ff_only_checkbox = qtutils.checkbox(checked=True,
-                                                 text=text, tooltip=tooltip)
+        tooltip = N_(
+            'Refuse to merge unless the current HEAD is already up-'
+            'to-date or the merge can be resolved as a fast-forward'
+        )
+        self.ff_only_checkbox = qtutils.checkbox(
+            checked=True, text=text, tooltip=tooltip
+        )
 
         text = N_('No fast-forward')
-        tooltip = N_('Create a merge commit even when the merge resolves as a '
-                     'fast-forward')
-        self.no_ff_checkbox = qtutils.checkbox(checked=False,
-                                               text=text, tooltip=tooltip)
+        tooltip = N_(
+            'Create a merge commit even when the merge resolves as a ' 'fast-forward'
+        )
+        self.no_ff_checkbox = qtutils.checkbox(
+            checked=False, text=text, tooltip=tooltip
+        )
         text = N_('Force')
-        tooltip = N_('Allow non-fast-forward updates.  Using "force" can '
-                     'cause the remote repository to lose commits; '
-                     'use it with care')
-        self.force_checkbox = qtutils.checkbox(checked=False, text=text,
-                                               tooltip=tooltip)
+        tooltip = N_(
+            'Allow non-fast-forward updates.  Using "force" can '
+            'cause the remote repository to lose commits; '
+            'use it with care'
+        )
+        self.force_checkbox = qtutils.checkbox(
+            checked=False, text=text, tooltip=tooltip
+        )
 
         self.tags_checkbox = qtutils.checkbox(text=N_('Include tags '))
 
-        tooltip = N_('Remove remote-tracking branches that no longer '
-                     'exist on the remote')
-        self.prune_checkbox = qtutils.checkbox(text=N_('Prune '),
-                                               tooltip=tooltip)
+        tooltip = N_(
+            'Remove remote-tracking branches that no longer ' 'exist on the remote'
+        )
+        self.prune_checkbox = qtutils.checkbox(text=N_('Prune '), tooltip=tooltip)
 
         tooltip = N_('Rebase the current branch instead of merging')
-        self.rebase_checkbox = qtutils.checkbox(text=N_('Rebase'),
-                                                tooltip=tooltip)
+        self.rebase_checkbox = qtutils.checkbox(text=N_('Rebase'), tooltip=tooltip)
 
         text = N_('Set upstream')
         tooltip = N_('Configure the remote branch as the the new upstream')
@@ -208,25 +209,23 @@ class RemoteActionDialog(standard.Dialog):
         self.buttons = utils.Group(self.action_button, self.close_button)
 
         self.local_branch_layout = qtutils.hbox(
-            defs.small_margin,
-            defs.spacing,
-            self.local_label,
-            self.local_branch)
+            defs.small_margin, defs.spacing, self.local_label, self.local_branch
+        )
 
         self.remote_layout = qtutils.hbox(
-            defs.small_margin,
-            defs.spacing,
-            self.remote_label,
-            self.remote_name)
+            defs.small_margin, defs.spacing, self.remote_label, self.remote_name
+        )
 
         self.remote_branch_layout = qtutils.hbox(
             defs.small_margin,
             defs.spacing,
             self.remote_branch_label,
-            self.remote_branch)
+            self.remote_branch,
+        )
 
         self.options_layout = qtutils.hbox(
-            defs.no_margin, defs.button_spacing,
+            defs.no_margin,
+            defs.button_spacing,
             self.close_button,
             qtutils.STRETCH,
             self.force_checkbox,
@@ -237,49 +236,60 @@ class RemoteActionDialog(standard.Dialog):
             self.rebase_checkbox,
             self.upstream_checkbox,
             self.prompt_checkbox,
-            self.action_button)
+            self.action_button,
+        )
 
         self.remote_input_layout = qtutils.vbox(
-            defs.no_margin, defs.spacing,
-            self.remote_layout, self.remotes)
+            defs.no_margin, defs.spacing, self.remote_layout, self.remotes
+        )
 
         self.local_branch_input_layout = qtutils.vbox(
-            defs.no_margin, defs.spacing,
-            self.local_branch_layout, self.local_branches)
+            defs.no_margin, defs.spacing, self.local_branch_layout, self.local_branches
+        )
 
         self.remote_branch_input_layout = qtutils.vbox(
-            defs.no_margin, defs.spacing,
-            self.remote_branch_layout, self.remote_branches)
+            defs.no_margin,
+            defs.spacing,
+            self.remote_branch_layout,
+            self.remote_branches,
+        )
 
         if action == PUSH:
             widgets = (
                 self.remote_input_layout,
                 self.local_branch_input_layout,
-                self.remote_branch_input_layout)
+                self.remote_branch_input_layout,
+            )
         else:  # fetch and pull
             widgets = (
                 self.remote_input_layout,
                 self.remote_branch_input_layout,
-                self.local_branch_input_layout)
+                self.local_branch_input_layout,
+            )
         self.top_layout = qtutils.hbox(defs.no_margin, defs.spacing, *widgets)
 
         self.main_layout = qtutils.vbox(
-            defs.margin, defs.spacing,
-            self.top_layout, self.options_layout)
+            defs.margin, defs.spacing, self.top_layout, self.options_layout
+        )
         self.setLayout(self.main_layout)
 
-        # Select the upstream remote if configured, or "origin"
         default_remote = gitcmds.upstream_remote(context) or 'origin'
-        if self.select_remote_by_name(default_remote):
-            self.set_remote_name(default_remote)
-        elif self.select_first_remote():
-            self.set_remote_name(model.remotes[0])
+
+        remotes = model.remotes
+        if default_remote in remotes:
+            idx = remotes.index(default_remote)
+            if self.select_remote(idx):
+                self.set_remote_name(default_remote)
+        else:
+            if self.select_first_remote():
+                self.set_remote_name(remotes[0])
 
         # Trim the remote list to just the default remote
         self.update_remotes()
         self.set_field_defaults()
 
         # Setup signals and slots
+        # pylint: disable=no-member
         self.remotes.itemSelectionChanged.connect(self.update_remotes)
 
         local = self.local_branches
@@ -289,19 +299,23 @@ class RemoteActionDialog(standard.Dialog):
         remote.itemSelectionChanged.connect(self.update_remote_branches)
 
         self.no_ff_checkbox.toggled.connect(
-            lambda x: uncheck(x, self.ff_only_checkbox, self.rebase_checkbox))
+            lambda x: uncheck(x, self.ff_only_checkbox, self.rebase_checkbox)
+        )
 
         self.ff_only_checkbox.toggled.connect(
-            lambda x: uncheck(x, self.no_ff_checkbox, self.rebase_checkbox))
+            lambda x: uncheck(x, self.no_ff_checkbox, self.rebase_checkbox)
+        )
 
         self.rebase_checkbox.toggled.connect(
-            lambda x: uncheck(x, self.no_ff_checkbox, self.ff_only_checkbox))
+            lambda x: uncheck(x, self.no_ff_checkbox, self.ff_only_checkbox)
+        )
 
         connect_button(self.action_button, self.action_callback)
         connect_button(self.close_button, self.close)
 
-        qtutils.add_action(self, N_('Close'), self.close,
-                           QtGui.QKeySequence.Close, 'Esc')
+        qtutils.add_action(
+            self, N_('Close'), self.close, QtGui.QKeySequence.Close, 'Esc'
+        )
         if action != FETCH:
             self.prune_checkbox.hide()
 
@@ -331,7 +345,7 @@ class RemoteActionDialog(standard.Dialog):
 
     def set_field_defaults(self):
         """Set sensible initial defaults"""
-        # Default to "git fetch origin master"
+        # Default to "git fetch origin main"
         action = self.action
         if action in (FETCH, PULL):
             self.local_branch.setText('')
@@ -435,8 +449,7 @@ class RemoteActionDialog(standard.Dialog):
         displayed = []
         for remote_name in self.model.remotes:
             url = self.model.remote_url(remote_name, self.action)
-            display = ('%s\t(%s)'
-                       % (remote_name, N_('URL: %s') % url))
+            display = '%s\t(%s)' % (remote_name, N_('URL: %s') % url)
             displayed.append(display)
         qtutils.set_items(widget, displayed)
 
@@ -449,8 +462,7 @@ class RemoteActionDialog(standard.Dialog):
             self.selected_remotes = []
             return
         self.set_remote_name(selection)
-        self.selected_remotes = qtutils.selected_items(self.remotes,
-                                                       self.model.remotes)
+        self.selected_remotes = qtutils.selected_items(self.remotes, self.model.remotes)
         self.set_remote_to(selection, self.selected_remotes)
 
     def set_remote_to(self, _remote, selected_remotes):
@@ -513,18 +525,20 @@ class RemoteActionDialog(standard.Dialog):
         tags = get(self.tags_checkbox)
         prune = get(self.prune_checkbox)
 
-        return (remote_name,
-                {
-                    'ff_only': ff_only,
-                    'force': force,
-                    'local_branch': local_branch,
-                    'no_ff': no_ff,
-                    'rebase': rebase,
-                    'remote_branch': remote_branch,
-                    'set_upstream': set_upstream,
-                    'tags': tags,
-                    'prune': prune,
-                })
+        return (
+            remote_name,
+            {
+                'ff_only': ff_only,
+                'force': force,
+                'local_branch': local_branch,
+                'no_ff': no_ff,
+                'rebase': rebase,
+                'remote_branch': remote_branch,
+                'set_upstream': set_upstream,
+                'tags': tags,
+                'prune': prune,
+            },
+        )
 
     # Actions
 
@@ -553,8 +567,7 @@ class RemoteActionDialog(standard.Dialog):
             Interaction.log(errmsg)
             return
         remote, kwargs = self.common_args()
-        self.selected_remotes = qtutils.selected_items(self.remotes,
-                                                       self.model.remotes)
+        self.selected_remotes = qtutils.selected_items(self.remotes, self.model.remotes)
 
         # Check if we're about to create a new branch and warn.
         remote_branch = self.remote_branch.text()
@@ -568,12 +581,18 @@ class RemoteActionDialog(standard.Dialog):
             if prompt and candidate not in self.model.remote_branches:
                 title = N_('Push')
                 args = dict(branch=branch, remote=remote)
-                msg = N_('Branch "%(branch)s" does not exist in "%(remote)s".\n'
-                         'A new remote branch will be published.') % args
+                msg = (
+                    N_(
+                        'Branch "%(branch)s" does not exist in "%(remote)s".\n'
+                        'A new remote branch will be published.'
+                    )
+                    % args
+                )
                 info_txt = N_('Create a new remote branch?')
                 ok_text = N_('Create Remote Branch')
-                if not Interaction.confirm(title, msg, info_txt, ok_text,
-                                           icon=icons.cola()):
+                if not Interaction.confirm(
+                    title, msg, info_txt, ok_text, icon=icons.cola()
+                ):
                     return
 
         if get(self.force_checkbox):
@@ -584,14 +603,17 @@ class RemoteActionDialog(standard.Dialog):
                 ok_text = N_('Force Fetch')
             elif action == PUSH:
                 title = N_('Force Push?')
-                msg = N_('Non-fast-forward push overwrites published '
-                         'history!\n(Did you pull first?)')
+                msg = N_(
+                    'Non-fast-forward push overwrites published '
+                    'history!\n(Did you pull first?)'
+                )
                 info_txt = N_('Force push to %s?') % remote
                 ok_text = N_('Force Push')
             else:  # pull: shouldn't happen since the controls are hidden
                 return
-            if not Interaction.confirm(title, msg, info_txt, ok_text,
-                                       default=False, icon=icons.discard()):
+            if not Interaction.confirm(
+                title, msg, info_txt, ok_text, default=False, icon=icons.discard()
+            ):
                 return
 
         # Disable the GUI by default
@@ -599,9 +621,7 @@ class RemoteActionDialog(standard.Dialog):
 
         # Use a thread to update in the background
         task = ActionTask(self, model_action, remote, kwargs)
-        self.runtask.start(task,
-                           progress=self.progress,
-                           finish=self.action_completed)
+        self.runtask.start(task, progress=self.progress, finish=self.action_completed)
 
     def action_completed(self, task):
         """Grab the results of the action and finish up"""
@@ -625,18 +645,17 @@ class RemoteActionDialog(standard.Dialog):
             message += '\n\n'
             message += N_('Have you rebased/pulled lately?')
 
-        Interaction.critical(self.windowTitle(),
-                             message=message, details=details)
+        Interaction.critical(self.windowTitle(), message=message, details=details)
 
 
 # Use distinct classes so that each saves its own set of preferences
 class Fetch(RemoteActionDialog):
     """Fetch from remote repositories"""
 
-    def __init__(self, context, model, parent=None):
+    def __init__(self, context, parent=None):
         super(Fetch, self).__init__(
-            context, model, FETCH, N_('Fetch'),
-            parent=parent, icon=icons.repo())
+            context, FETCH, N_('Fetch'), parent=parent, icon=icons.repo()
+        )
 
     def export_state(self):
         """Export persistent settings"""
@@ -658,16 +677,15 @@ class Fetch(RemoteActionDialog):
 class Push(RemoteActionDialog):
     """Push to remote repositories"""
 
-    def __init__(self, context, model, parent=None):
+    def __init__(self, context, parent=None):
         super(Push, self).__init__(
-            context, model, PUSH, N_('Push'), parent=parent, icon=icons.push())
+            context, PUSH, N_('Push'), parent=parent, icon=icons.push()
+        )
 
     def export_state(self):
         """Export persistent settings"""
         state = RemoteActionDialog.export_state(self)
         state['prompt'] = get(self.prompt_checkbox)
-        state['remote'] = get(self.remote_name)
-        state['selection'] = self.selected_remotes
         state['tags'] = get(self.tags_checkbox)
         return state
 
@@ -679,15 +697,6 @@ class Push(RemoteActionDialog):
         prompt = bool(state.get('prompt', True))
         self.prompt_checkbox.setChecked(prompt)
 
-        # Restore the "remote" text
-        remote = state.get('remote', None)
-        if remote is not None:
-            self.set_remote_name(remote)
-
-        # Restore selected remotes
-        selection = state.get('selection', [])
-        self.set_selected_remotes(selection)
-
         # Restore the "tags" checkbox
         tags = bool(state.get('tags', False))
         self.tags_checkbox.setChecked(tags)
@@ -698,9 +707,10 @@ class Push(RemoteActionDialog):
 class Pull(RemoteActionDialog):
     """Pull from remote repositories"""
 
-    def __init__(self, context, model, parent=None):
+    def __init__(self, context, parent=None):
         super(Pull, self).__init__(
-            context, model, PULL, N_('Pull'), parent=parent, icon=icons.pull())
+            context, PULL, N_('Pull'), parent=parent, icon=icons.pull()
+        )
 
     def apply_state(self, state):
         """Apply persistent settings"""

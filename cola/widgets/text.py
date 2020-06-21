@@ -57,6 +57,7 @@ class LineEdit(QtWidgets.QLineEdit):
 class LineEditCursorPosition(object):
     """Translate cursorPositionChanged(int,int) into cursorPosition(int,int)
     """
+
     def __init__(self, widget, row):
         self._widget = widget
         self._row = row
@@ -74,7 +75,6 @@ class LineEditCursorPosition(object):
 
 
 class BaseTextEditExtension(QtCore.QObject):
-
     def __init__(self, widget, get_value, readonly):
         QtCore.QObject.__init__(self, widget)
         self.widget = widget
@@ -97,8 +97,9 @@ class BaseTextEditExtension(QtCore.QObject):
             widget.setAcceptDrops(False)
             widget.setTabChangesFocus(True)
             widget.setUndoRedoEnabled(False)
-            widget.setTextInteractionFlags(Qt.TextSelectableByKeyboard |
-                                           Qt.TextSelectableByMouse)
+            widget.setTextInteractionFlags(
+                Qt.TextSelectableByKeyboard | Qt.TextSelectableByMouse
+            )
 
     def get(self):
         """Return the raw unicode value from Qt"""
@@ -125,8 +126,7 @@ class BaseTextEditExtension(QtCore.QObject):
             idx = value.index(selection_text)
             cursor = self.widget.textCursor()
             cursor.setPosition(idx)
-            cursor.setPosition(idx + len(selection_text),
-                               QtGui.QTextCursor.KeepAnchor)
+            cursor.setPosition(idx + len(selection_text), QtGui.QTextCursor.KeepAnchor)
             self.widget.setTextCursor(cursor)
 
         elif value == old_value:
@@ -166,10 +166,8 @@ class BaseTextEditExtension(QtCore.QObject):
     def selected_line(self):
         contents = self.value()
         cursor = self.widget.textCursor()
-        offset = min(cursor.position(), len(contents)-1)
-        while (offset >= 1 and
-               contents[offset-1] and
-               contents[offset-1] != '\n'):
+        offset = min(cursor.position(), len(contents) - 1)
+        while offset >= 1 and contents[offset - 1] and contents[offset - 1] != '\n':
             offset -= 1
         data = contents[offset:]
         if '\n' in data:
@@ -218,7 +216,6 @@ class BaseTextEditExtension(QtCore.QObject):
 
 
 class PlainTextEditExtension(BaseTextEditExtension):
-
     def set_linebreak(self, brk):
         if brk:
             wrapmode = QtWidgets.QPlainTextEdit.WidgetWidth
@@ -280,7 +277,6 @@ class PlainTextEdit(QtWidgets.QPlainTextEdit):
 
 
 class TextEditExtension(BaseTextEditExtension):
-
     def init(self):
         widget = self.widget
         widget.setAcceptRichText(False)
@@ -369,7 +365,6 @@ class TextEdit(QtWidgets.QTextEdit):
 
 
 class TextEditCursorPosition(object):
-
     def __init__(self, widget, ext):
         self._widget = widget
         self._ext = ext
@@ -386,7 +381,7 @@ class TextEditCursorPosition(object):
         line = before.split('\n')[row]
         col = cursor.columnNumber()
         col += line[:col].count('\t') * (ext.tabwidth() - 1)
-        widget.cursor_changed.emit(row+1, col)
+        widget.cursor_changed.emit(row + 1, col)
 
     def reset(self):
         widget = self._widget
@@ -396,7 +391,6 @@ class TextEditCursorPosition(object):
 
 
 class MonoTextEdit(PlainTextEdit):
-
     def __init__(self, context, parent=None, readonly=False):
         PlainTextEdit.__init__(self, parent=parent, readonly=readonly)
         self.setFont(qtutils.diff_font(context))
@@ -440,25 +434,33 @@ class HintWidget(QtCore.QObject):
         error_bg_rgb = qtutils.rgb_css(error_bg_color)
         error_fg_rgb = qtutils.rgb_css(error_fg_color)
 
-        env = dict(name=widget.__class__.__name__,
-                   error_fg_rgb=error_fg_rgb,
-                   error_bg_rgb=error_bg_rgb,
-                   hint_rgb=hint_rgb)
+        env = dict(
+            name=widget.__class__.__name__,
+            error_fg_rgb=error_fg_rgb,
+            error_bg_rgb=error_bg_rgb,
+            hint_rgb=hint_rgb,
+        )
 
         self._default_style = ''
 
-        self._hint_style = """
+        self._hint_style = (
+            """
             %(name)s {
                 color: %(hint_rgb)s;
             }
-        """ % env
+        """
+            % env
+        )
 
-        self._error_style = """
+        self._error_style = (
+            """
             %(name)s {
                 color: %(error_fg_rgb)s;
                 background-color: %(error_bg_rgb)s;
             }
-        """ % env
+        """
+            % env
+        )
 
     def init(self):
         """Defered initialization"""
@@ -519,8 +521,7 @@ class HintWidget(QtCore.QObject):
             style = self._hint_style
         else:
             style = self._default_style
-        QtCore.QTimer.singleShot(
-            0, lambda: self._widget.setStyleSheet(style))
+        QtCore.QTimer.singleShot(0, lambda: self._widget.setStyleSheet(style))
 
     def eventFilter(self, _obj, event):
         """Enable/disable hint-mode when focus changes"""
@@ -549,14 +550,15 @@ class HintedPlainTextEdit(PlainTextEdit):
     """A hinted plain text edit"""
 
     def __init__(self, context, hint, parent=None, readonly=False):
-        PlainTextEdit.__init__(self, parent=parent,
-                               get_value=get_value_hinted,
-                               readonly=readonly)
+        PlainTextEdit.__init__(
+            self, parent=parent, get_value=get_value_hinted, readonly=readonly
+        )
         self.hint = HintWidget(self, hint)
         self.hint.init()
         self.setFont(qtutils.diff_font(context))
         self.set_tabwidth(prefs.tabwidth(context))
         # Refresh palettes when text changes
+        # pylint: disable=no-member
         self.textChanged.connect(self.hint.refresh)
 
     def set_value(self, value, block=False):
@@ -571,11 +573,13 @@ class HintedTextEdit(TextEdit):
     """A hinted text edit"""
 
     def __init__(self, context, hint, parent=None, readonly=False):
-        TextEdit.__init__(self, parent=parent,
-                          get_value=get_value_hinted, readonly=readonly)
+        TextEdit.__init__(
+            self, parent=parent, get_value=get_value_hinted, readonly=readonly
+        )
         self.hint = HintWidget(self, hint)
         self.hint.init()
         # Refresh palettes when text changes
+        # pylint: disable=no-member
         self.textChanged.connect(self.hint.refresh)
         self.setFont(qtutils.diff_font(context))
 
@@ -587,63 +591,93 @@ class HintedTextEdit(TextEdit):
             self.hint.enable(True)
 
 
+def anchor_mode(select):
+    """Return the QTextCursor mode to keep/discard the cursor selection"""
+    if select:
+        mode = QtGui.QTextCursor.KeepAnchor
+    else:
+        mode = QtGui.QTextCursor.MoveAnchor
+    return mode
+
+
 # The vim-like read-only text view
 
-class VimMixin(object):
 
+class VimMixin(object):
     def __init__(self, widget):
         self.widget = widget
         self.Base = widget.Base
         # Common vim/unix-ish keyboard actions
-        self.add_navigation('Up', hotkeys.MOVE_UP,
-                            shift=hotkeys.MOVE_UP_SHIFT)
-        self.add_navigation('Down', hotkeys.MOVE_DOWN,
-                            shift=hotkeys.MOVE_DOWN_SHIFT)
-        self.add_navigation('Left', hotkeys.MOVE_LEFT,
-                            shift=hotkeys.MOVE_LEFT_SHIFT)
-        self.add_navigation('Right', hotkeys.MOVE_RIGHT,
-                            shift=hotkeys.MOVE_RIGHT_SHIFT)
+        self.add_navigation('End', hotkeys.GOTO_END)
+        self.add_navigation('Up', hotkeys.MOVE_UP, shift=hotkeys.MOVE_UP_SHIFT)
+        self.add_navigation('Down', hotkeys.MOVE_DOWN, shift=hotkeys.MOVE_DOWN_SHIFT)
+        self.add_navigation('Left', hotkeys.MOVE_LEFT, shift=hotkeys.MOVE_LEFT_SHIFT)
+        self.add_navigation('Right', hotkeys.MOVE_RIGHT, shift=hotkeys.MOVE_RIGHT_SHIFT)
         self.add_navigation('WordLeft', hotkeys.WORD_LEFT)
         self.add_navigation('WordRight', hotkeys.WORD_RIGHT)
+        self.add_navigation('Start', hotkeys.GOTO_START)
         self.add_navigation('StartOfLine', hotkeys.START_OF_LINE)
         self.add_navigation('EndOfLine', hotkeys.END_OF_LINE)
 
-        qtutils.add_action(widget, 'PageUp',
-                           lambda: widget.page(-widget.height()//2),
-                           hotkeys.SECONDARY_ACTION)
-
-        qtutils.add_action(widget, 'PageDown',
-                           lambda: widget.page(widget.height()//2),
-                           hotkeys.PRIMARY_ACTION)
+        qtutils.add_action(
+            widget, 'PageUp', widget.page_up, hotkeys.SECONDARY_ACTION, hotkeys.UP
+        )
+        qtutils.add_action(
+            widget, 'PageDown', widget.page_down, hotkeys.PRIMARY_ACTION, hotkeys.DOWN
+        )
+        qtutils.add_action(
+            widget,
+            'SelectPageUp',
+            lambda: widget.page_up(select=True),
+            hotkeys.SELECT_BACK,
+            hotkeys.SELECT_UP,
+        )
+        qtutils.add_action(
+            widget,
+            'SelectPageDown',
+            lambda: widget.page_down(select=True),
+            hotkeys.SELECT_FORWARD,
+            hotkeys.SELECT_DOWN,
+        )
 
     def add_navigation(self, name, hotkey, shift=None):
         """Add a hotkey along with a shift-variant"""
         widget = self.widget
         direction = getattr(QtGui.QTextCursor, name)
-        qtutils.add_action(widget, name,
-                           lambda: self.move(direction), hotkey)
+        qtutils.add_action(widget, name, lambda: self.move(direction), hotkey)
         if shift:
-            qtutils.add_action(widget, 'Shift' + name,
-                               lambda: self.move(direction, True), shift)
+            qtutils.add_action(
+                widget, 'Shift' + name, lambda: self.move(direction, select=True), shift
+            )
 
     def move(self, direction, select=False, n=1):
         widget = self.widget
         cursor = widget.textCursor()
-        if select:
-            mode = QtGui.QTextCursor.KeepAnchor
-        else:
-            mode = QtGui.QTextCursor.MoveAnchor
-        if cursor.movePosition(direction, mode, n):
-            self.set_text_cursor(cursor)
+        mode = anchor_mode(select)
+        for _ in range(n):
+            if cursor.movePosition(direction, mode, 1):
+                self.set_text_cursor(cursor)
 
-    def page(self, offset):
+    def page(self, offset, select=False):
         widget = self.widget
         rect = widget.cursorRect()
         x = rect.x()
         y = rect.y() + offset
         new_cursor = widget.cursorForPosition(QtCore.QPoint(x, y))
         if new_cursor is not None:
-            self.set_text_cursor(new_cursor)
+            cursor = widget.textCursor()
+            mode = anchor_mode(select)
+            cursor.setPosition(new_cursor.position(), mode)
+
+            self.set_text_cursor(cursor)
+
+    def page_down(self, select=False):
+        widget = self.widget
+        widget.page(widget.height() // 2, select=select)
+
+    def page_up(self, select=False):
+        widget = self.widget
+        widget.page(-widget.height() // 2, select=select)
 
     def set_text_cursor(self, cursor):
         widget = self.widget
@@ -675,46 +709,53 @@ class VimMixin(object):
                 # The cursor is in the middle of the first line of text.
                 # We can't go up ~ jump to the beginning of the line.
                 # Select the text if shift is pressed.
-                if event.modifiers() & Qt.ShiftModifier:
-                    mode = QtGui.QTextCursor.KeepAnchor
-                else:
-                    mode = QtGui.QTextCursor.MoveAnchor
+                select = event.modifiers() & Qt.ShiftModifier
+                mode = anchor_mode(select)
                 cursor.movePosition(QtGui.QTextCursor.StartOfLine, mode)
                 widget.setTextCursor(cursor)
 
         return self.Base.keyPressEvent(widget, event)
 
 
+# pylint: disable=too-many-ancestors
 class VimHintedPlainTextEdit(HintedPlainTextEdit):
     """HintedPlainTextEdit with vim hotkeys
 
     This can only be used in read-only mode.
 
     """
+
     Base = HintedPlainTextEdit
     Mixin = VimMixin
 
     def __init__(self, context, hint, parent=None):
-        HintedPlainTextEdit.__init__(
-            self, context, hint, parent=parent, readonly=True)
+        HintedPlainTextEdit.__init__(self, context, hint, parent=parent, readonly=True)
         self._mixin = self.Mixin(self)
 
     def move(self, direction, select=False, n=1):
         return self._mixin.page(direction, select=select, n=n)
 
-    def page(self, offset):
-        return self._mixin.page(offset)
+    def page(self, offset, select=False):
+        return self._mixin.page(offset, select=select)
+
+    def page_up(self, select=False):
+        return self._mixin.page_up(select=select)
+
+    def page_down(self, select=False):
+        return self._mixin.page_down(select=select)
 
     def keyPressEvent(self, event):
         return self._mixin.keyPressEvent(event)
 
 
+# pylint: disable=too-many-ancestors
 class VimTextEdit(MonoTextEdit):
     """Text viewer with vim-like hotkeys
 
     This can only be used in read-only mode.
 
     """
+
     Base = MonoTextEdit
     Mixin = VimMixin
 
@@ -725,20 +766,26 @@ class VimTextEdit(MonoTextEdit):
     def move(self, direction, select=False, n=1):
         return self._mixin.page(direction, select=select, n=n)
 
-    def page(self, offset):
-        return self._mixin.page(offset)
+    def page(self, offset, select=False):
+        return self._mixin.page(offset, select=select)
+
+    def page_up(self, select=False):
+        return self._mixin.page_up(select=select)
+
+    def page_down(self, select=False):
+        return self._mixin.page_down(select=select)
 
     def keyPressEvent(self, event):
         return self._mixin.keyPressEvent(event)
 
 
 class HintedLineEdit(LineEdit):
-
     def __init__(self, context, hint, parent=None):
         LineEdit.__init__(self, parent=parent, get_value=get_value_hinted)
         self.hint = HintWidget(self, hint)
         self.hint.init()
         self.setFont(qtutils.diff_font(context))
+        # pylint: disable=no-member
         self.textChanged.connect(lambda text: self.hint.refresh())
 
 
@@ -763,8 +810,9 @@ def text_dialog(context, text, title):
     layout = qtutils.hbox(defs.margin, defs.spacing, scroll)
     widget.setLayout(layout)
 
-    qtutils.add_action(widget, N_('Close'), widget.accept,
-                       Qt.Key_Question, Qt.Key_Enter, Qt.Key_Return)
+    qtutils.add_action(
+        widget, N_('Close'), widget.accept, Qt.Key_Question, Qt.Key_Enter, Qt.Key_Return
+    )
     widget.show()
     return widget
 
@@ -811,8 +859,7 @@ class TextDecorator(QtWidgets.QWidget):
 
     def refresh_size(self):
         rect = self.editor.contentsRect()
-        geom = QtCore.QRect(rect.left(), rect.top(),
-                            self.width_hint(), rect.height())
+        geom = QtCore.QRect(rect.left(), rect.top(), self.width_hint(), rect.height())
         self.setGeometry(geom)
 
     def sizeHint(self):
@@ -862,16 +909,18 @@ class LineNumbers(TextDecorator):
             rect = block_geom.translated(content_offset).toRect()
             block_number = block.blockNumber()
             if block_number == self.highlight_line:
-                painter.fillRect(rect.x(), rect.y(),
-                                 width, rect.height(), highlight)
+                painter.fillRect(rect.x(), rect.y(), width, rect.height(), highlight)
                 painter.setPen(highlighted_text)
             else:
                 painter.setPen(disabled)
 
             number = '%s' % (block_number + 1)
-            painter.drawText(rect.x(), rect.y(),
-                             self.width() - defs.large_margin,
-                             rect.height(),
-                             Qt.AlignRight | Qt.AlignVCenter,
-                             number)
+            painter.drawText(
+                rect.x(),
+                rect.y(),
+                self.width() - defs.large_margin,
+                rect.height(),
+                Qt.AlignRight | Qt.AlignVCenter,
+                number,
+            )
             block = block.next()  # pylint: disable=next-method-called

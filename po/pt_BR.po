@@ -9,10 +9,10 @@ msgstr ""
 "PO-Revision-Date: 2018-06-25 12:37-0300\n"
 "Last-Translator: Rafael Nascimento <rafaeln.dev@gmail.com>\n"
 "Language-Team: Brazillian <LL@li.org>\n"
-"Language: pt_BR\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Language: pt_BR\n"
 "X-Generator: Poedit 2.0.8\n"
 
 msgid ""
@@ -64,7 +64,7 @@ msgstr ""
 "\n"
 "        <br>\n"
 "        <p>\n"
-"            A tradução é aproximada. Se você achar um erro,,\n"
+"            A tradução é aproximada. Se você achar um erro,\n"
 "            por favor nos avise abrindo um issue no Github:\n"
 "        </p>\n"
 "\n"
@@ -484,6 +484,12 @@ msgstr "Adicionar ao Git Annex"
 msgid "Add to Git LFS"
 msgstr "Adicionar ao Git LFS"
 
+msgid "Add to exclusions"
+msgstr ""
+
+msgid "Add to local .git/info/exclude"
+msgstr ""
+
 msgid "Additions"
 msgstr "Adições"
 
@@ -538,10 +544,7 @@ msgstr ""
 "Criar uma tag não assinada?"
 
 msgid "Appearance"
-msgstr ""
-
-msgid "Appearance settings require an application restart"
-msgstr ""
+msgstr "Aparência"
 
 msgid "Apply"
 msgstr "Aplicar"
@@ -576,11 +579,21 @@ msgstr ""
 msgid "Auto-Wrap Lines"
 msgstr "Auto-Quebra de Linhas"
 
+msgid "Autocomplete Paths"
+msgstr ""
+
+msgid "Automatically Load Commit Message Template"
+msgstr ""
+
 msgid "Basic Regexp"
 msgstr "Regexp Básico"
 
 msgid "Blame Viewer"
 msgstr "Visualizador de Blame"
+
+#, fuzzy
+msgid "Blame selected paths"
+msgstr "Renomear caminhos selecionados"
 
 msgid "Blame..."
 msgstr "Blame..."
@@ -678,11 +691,17 @@ msgstr "Não é possível executar \"%s\": por favor configure seu editor"
 msgid "Changed Upstream"
 msgstr "Upstream Modificado"
 
+msgid "Check Published Commits when Amending"
+msgstr ""
+
 msgid "Check Spelling"
 msgstr "Verificar Ortografia"
 
 msgid "Check spelling"
 msgstr "Verificar ortografia"
+
+msgid "Check whether a commit has been published when amending"
+msgstr ""
 
 msgid "Checkout"
 msgstr "Checkout"
@@ -875,11 +894,14 @@ msgstr ""
 msgid "DAG..."
 msgstr "Visualizar o histórico..."
 
+msgid "Dark Theme"
+msgstr ""
+
 msgid "Date, Time"
 msgstr "Data, Tempo"
 
 msgid "Default"
-msgstr ""
+msgstr "Padrão"
 
 msgid "Delete"
 msgstr "Deletar"
@@ -915,6 +937,10 @@ msgstr "Remover Branch Remoto"
 msgid "Delete Remote Branch..."
 msgstr "Remover Branch Remoto..."
 
+#, python-format
+msgid "Delete branch \"%s\"?"
+msgstr ""
+
 msgid "Delete remote"
 msgstr "Deletar Repositórios Remotos"
 
@@ -924,9 +950,6 @@ msgstr "Remover remoto \"%s\""
 
 msgid "Delete remote?"
 msgstr "Remover remoto?"
-
-msgid "Delete selected branch?"
-msgstr "Remover branch selecionada?"
 
 msgid "Delete toolbar"
 msgstr "Remover barra de ferramentas"
@@ -981,6 +1004,9 @@ msgstr "Ferramenta de Comparação"
 msgid "Directory Exists"
 msgstr "Diretório Existe"
 
+msgid "Disable"
+msgstr ""
+
 msgid "Display Untracked Files"
 msgstr "Exibir Arquivos não Controlados"
 
@@ -1034,6 +1060,9 @@ msgstr "Endereço de Email"
 msgid "Email contributor"
 msgstr "Email do Contribuidor"
 
+msgid "Enable path autocompletion in tools"
+msgstr ""
+
 msgid "Enabled"
 msgstr "Habilitado"
 
@@ -1076,6 +1105,10 @@ msgstr "Erro criando o remoto \"%s\""
 
 msgid "Error creating stash"
 msgstr "Erro ao criar o stash"
+
+#, python-format
+msgid "Error deleting branch \"%s\""
+msgstr ""
 
 #, python-format
 msgid "Error deleting remote \"%s\""
@@ -1317,11 +1350,8 @@ msgstr "Ajuda - Ações de Copia Customizadas"
 msgid "Help - Find Files"
 msgstr "Ajuda - Procurar Arquivos"
 
-msgid "Help - git-xbase"
-msgstr "Ajuda - git-xbase"
-
-msgid "Hide Details.."
-msgstr "Esconder Detalhes..."
+msgid "Help - git-cola-sequence-editor"
+msgstr "Ajuda - git-cola-sequence-editor"
 
 msgid "High DPI"
 msgstr ""
@@ -1330,6 +1360,9 @@ msgid "History Browser"
 msgstr "Navegador de Histórico"
 
 msgid "Hungarian translation"
+msgstr ""
+
+msgid "Icon theme"
 msgstr ""
 
 msgid "Ignore all whitespace"
@@ -1350,6 +1383,9 @@ msgstr "Ignorar nome exato do arquivo"
 msgid "Ignore filename or pattern"
 msgstr "Ignorar nome do arquivo ou padrão"
 
+msgid "Ignore..."
+msgstr ""
+
 msgid "Include tags "
 msgstr "Incluir tags"
 
@@ -1366,7 +1402,7 @@ msgid "Initialize Git LFS"
 msgstr "Inicializar Git LFS"
 
 msgid "Inititalize submodules"
-msgstr "Inicializar submodulos"
+msgstr "Inicializar submódulos"
 
 msgid "Insert spaces instead of tabs"
 msgstr "Inserir espaços em vez de tabs"
@@ -1376,6 +1412,9 @@ msgstr "Rebase Interativo"
 
 msgid "Invalid Revision"
 msgstr "Revisão Inválida"
+
+msgid "Japanese translation"
+msgstr ""
 
 msgid "Keep *.orig Merge Backups"
 msgstr "Manter *.orig na Mesclagem de Backups"
@@ -1413,6 +1452,9 @@ msgstr "Iniciar git-difftool contra as versões anteriores"
 
 msgid "Launch git-difftool on the current path"
 msgstr "Iniciar git-difftool no caminho atual"
+
+msgid "Light Theme"
+msgstr ""
 
 msgid "Load Commit Message"
 msgstr "Carregar a Mensagem do Commit"
@@ -1681,7 +1723,7 @@ msgid "Pop"
 msgstr ""
 
 msgid "Preferences"
-msgstr "Preferencias"
+msgstr "Preferências"
 
 msgid "Prefix"
 msgstr "Prefixo"
@@ -1853,6 +1895,9 @@ msgstr "Resetar Branch?"
 msgid "Reset Hard"
 msgstr "Resetar Hard"
 
+msgid "Reset Layout"
+msgstr ""
+
 msgid "Reset Merge"
 msgstr "Resetar Merge"
 
@@ -1877,6 +1922,9 @@ msgstr "Resetar Worktree?"
 #, python-format
 msgid "Resetting \"%(branch)s\" to \"%(revision)s\" will lose commits."
 msgstr "Resetar \"%(branch)s\" para \"%(revision)s\" irá perder commits."
+
+msgid "Restart the application after changing appearance settings."
+msgstr "A alteração de aparência necessita reiniciar a aplicação."
 
 msgid "Revert"
 msgstr "Reverter"
@@ -2123,9 +2171,6 @@ msgstr "Shift Para Cima"
 msgid "Shortcuts"
 msgstr "Atalhos"
 
-msgid "Show Details..."
-msgstr "Mostrar Detalhes..."
-
 msgid "Show Diffstat After Merge"
 msgstr "Mostrar o Status de Comparação após Mesclagem"
 
@@ -2288,7 +2333,7 @@ msgid "Stop tracking paths"
 msgstr "Parar rastreamento de caminhos"
 
 msgid "Submodules"
-msgstr ""
+msgstr "Submódulos"
 
 msgid "Summarize Merge Commits"
 msgstr "Resumir os Commits de Merge"
@@ -2502,22 +2547,22 @@ msgstr ""
 
 #, fuzzy
 msgid "Update Submodules"
-msgstr "Inicializar submodulos"
+msgstr "Inicializar Submódulos"
 
 #, fuzzy
 msgid "Update all submodules?"
-msgstr "Inicializar submodulos"
+msgstr "Inicializar submódulos"
 
 #, fuzzy
 msgid "Update submodules..."
-msgstr "Inicializar submodulos"
+msgstr "Inicializar submódulos"
 
 #, fuzzy
 msgid "Update this submodule"
-msgstr "Inicializar submodulos"
+msgstr "Inicializar submódulos"
 
 msgid "Update this submodule?"
-msgstr ""
+msgstr "Atualizar este submódulo?"
 
 msgid "Updating"
 msgstr "Atualizando"
@@ -2613,6 +2658,9 @@ msgstr "resultados do grep..."
 msgid "hotkeys.html"
 msgstr ""
 
+msgid "title"
+msgstr ""
+
 msgid "unknown"
 msgstr "desconhecido"
 
@@ -2646,6 +2694,9 @@ msgstr ""
 #~ msgid "Created commit: %s"
 #~ msgstr "Confirmação Criada: %s"
 
+#~ msgid "Delete selected branch?"
+#~ msgstr "Remover branch selecionada?"
+
 #~ msgid "Enter Git Repository"
 #~ msgstr "Entrar no Repositório Git"
 
@@ -2661,6 +2712,9 @@ msgstr ""
 
 #~ msgid "Fast Forward Only "
 #~ msgstr "Avançar Rapidamente"
+
+#~ msgid "Hide Details.."
+#~ msgstr "Esconder Detalhes..."
 
 #, fuzzy
 #~ msgid "Local Branches"
@@ -2700,6 +2754,9 @@ msgstr ""
 
 #~ msgid "Select file from \"%s\""
 #~ msgstr "Selecione um arquivo de \"%s\""
+
+#~ msgid "Show Details..."
+#~ msgstr "Mostrar Detalhes..."
 
 #~ msgid "Summary:"
 #~ msgstr "Sumário:"

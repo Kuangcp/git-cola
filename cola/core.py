@@ -5,12 +5,13 @@ e.g. when python raises an IOError or OSError with errno == EINTR.
 
 """
 from __future__ import division, absolute_import, unicode_literals
-import os
 import functools
-import sys
 import itertools
+import mimetypes
+import os
 import platform
 import subprocess
+import sys
 
 from .decorators import interruptable
 from .compat import ustr
@@ -57,17 +58,28 @@ class UStr(ustr):
     byte sequences.
 
     """
+
     def __new__(cls, string, encoding):
 
         if isinstance(string, UStr):
             if encoding != string.encoding:
-                raise ValueError('Encoding conflict: %s vs. %s'
-                                 % (string.encoding, encoding))
+                raise ValueError(
+                    'Encoding conflict: %s vs. %s' % (string.encoding, encoding)
+                )
             string = ustr(string)
 
         obj = ustr.__new__(cls, string)
         obj.encoding = encoding
         return obj
+
+
+def decode_maybe(value, encoding, errors='strict'):
+    """Decode a value when the "decode" method exists"""
+    if hasattr(value, 'decode'):
+        result = value.decode(encoding, errors=errors)
+    else:
+        result = value
+    return result
 
 
 def decode(value, encoding=None, errors='strict'):
@@ -77,6 +89,8 @@ def decode(value, encoding=None, errors='strict'):
         result = None
     elif isinstance(value, ustr):
         result = UStr(value, ENCODING)
+    elif encoding == 'bytes':
+        result = value
     else:
         result = None
         if encoding is None:
@@ -155,13 +169,17 @@ def readline(fh, encoding=None):
 
 
 @interruptable
-def start_command(cmd, cwd=None, add_env=None,
-                  universal_newlines=False,
-                  stdin=subprocess.PIPE,
-                  stdout=subprocess.PIPE,
-                  no_win32_startupinfo=False,
-                  stderr=subprocess.PIPE,
-                  **extra):
+def start_command(
+    cmd,
+    cwd=None,
+    add_env=None,
+    universal_newlines=False,
+    stdin=subprocess.PIPE,
+    stdout=subprocess.PIPE,
+    no_win32_startupinfo=False,
+    stderr=subprocess.PIPE,
+    **extra
+):
     """Start the given command, and return a subprocess object.
 
     This provides a simpler interface to the subprocess module.
@@ -207,9 +225,20 @@ def start_command(cmd, cwd=None, add_env=None,
             CREATE_NO_WINDOW = 0x08000000
             extra['creationflags'] = CREATE_NO_WINDOW
 
-    return subprocess.Popen(cmd, bufsize=1, stdin=stdin, stdout=stdout,
-                            stderr=stderr, cwd=cwd, env=env,
-                            universal_newlines=universal_newlines, **extra)
+    # Use line buffering when in text/universal_newlines mode,
+    # otherwise use the system default buffer size.
+    bufsize = 1 if universal_newlines else -1
+    return subprocess.Popen(
+        cmd,
+        bufsize=bufsize,
+        stdin=stdin,
+        stdout=stdout,
+        stderr=stderr,
+        cwd=cwd,
+        env=env,
+        universal_newlines=universal_newlines,
+        **extra
+    )
 
 
 def prep_for_subprocess(cmd, shell=False):
@@ -247,9 +276,7 @@ def run_command(cmd, *args, **kwargs):
     output = decode(output, encoding=encoding)
     errors = decode(errors, encoding=encoding)
     exit_code = process.returncode
-    return (exit_code,
-            output or UStr('', ENCODING),
-            errors or UStr('', ENCODING))
+    return (exit_code, output or UStr('', ENCODING), errors or UStr('', ENCODING))
 
 
 @interruptable
@@ -276,8 +303,9 @@ def _fork_win32(args, cwd=None, shell=False):
         argv = [encode(arg) for arg in args]
 
     DETACHED_PROCESS = 0x00000008  # Amazing!
-    return subprocess.Popen(argv, cwd=cwd, creationflags=DETACHED_PROCESS,
-                            shell=shell).pid
+    return subprocess.Popen(
+        argv, cwd=cwd, creationflags=DETACHED_PROCESS, shell=shell
+    ).pid
 
 
 def _win32_find_exe(exe):
@@ -297,8 +325,7 @@ def _win32_find_exe(exe):
     # extensions specified in PATHEXT
     if '.' not in exe:
         extensions = getenv('PATHEXT', '').split(os.pathsep)
-        candidates.extend([(exe + ext) for ext in extensions
-                           if ext.startswith('.')])
+        candidates.extend([(exe + ext) for ext in extensions if ext.startswith('.')])
     # search the current directory first
     for candidate in candidates:
         if exists(candidate):
@@ -341,14 +368,28 @@ def wrap(action, fn, decorator=None):
 
 def decorate(decorator, fn):
     """Decorate the result of `fn` with `action`"""
+
     @functools.wraps(fn)
     def decorated(*args, **kwargs):
         return decorator(fn(*args, **kwargs))
+
     return decorated
 
 
 def getenv(name, default=None):
     return decode(os.getenv(name, default))
+
+
+def guess_mimetype(filename):
+    """Robustly guess a filename's mimetype"""
+    mimetype = None
+    try:
+        mimetype = mimetypes.guess_type(filename)[0]
+    except UnicodeEncodeError:
+        mimetype = mimetypes.guess_type(encode(filename))[0]
+    except (TypeError, ValueError):
+        mimetype = mimetypes.guess_type(decode(filename))[0]
+    return mimetype
 
 
 def xopen(path, mode='r', encoding=None):

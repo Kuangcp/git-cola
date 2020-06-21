@@ -11,10 +11,10 @@ msgstr ""
 "PO-Revision-Date: 2008-03-14 07:23+0100\n"
 "Last-Translator: Peter Karlsson <peter@softwolves.pp.se>\n"
 "Language-Team: Swedish\n"
-"Language: \n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Language: \n"
 
 msgid ""
 "\n"
@@ -385,6 +385,12 @@ msgstr ""
 msgid "Add to Git LFS"
 msgstr ""
 
+msgid "Add to exclusions"
+msgstr ""
+
+msgid "Add to local .git/info/exclude"
+msgstr ""
+
 #, fuzzy
 msgid "Additions"
 msgstr "Alternativ"
@@ -440,9 +446,6 @@ msgstr ""
 msgid "Appearance"
 msgstr ""
 
-msgid "Appearance settings require an application restart"
-msgstr ""
-
 #, fuzzy
 msgid "Apply"
 msgstr "Äpple"
@@ -479,12 +482,22 @@ msgstr ""
 msgid "Auto-Wrap Lines"
 msgstr ""
 
+msgid "Autocomplete Paths"
+msgstr ""
+
+msgid "Automatically Load Commit Message Template"
+msgstr ""
+
 msgid "Basic Regexp"
 msgstr ""
 
 #, fuzzy
 msgid "Blame Viewer"
 msgstr "Filvisare"
+
+#, fuzzy
+msgid "Blame selected paths"
+msgstr "Byt namn på gren"
 
 #, fuzzy
 msgid "Blame..."
@@ -589,10 +602,16 @@ msgstr ""
 msgid "Changed Upstream"
 msgstr ""
 
+msgid "Check Published Commits when Amending"
+msgstr ""
+
 msgid "Check Spelling"
 msgstr ""
 
 msgid "Check spelling"
+msgstr ""
+
+msgid "Check whether a commit has been published when amending"
 msgstr ""
 
 msgid "Checkout"
@@ -811,6 +830,9 @@ msgstr ""
 msgid "DAG..."
 msgstr ""
 
+msgid "Dark Theme"
+msgstr ""
+
 msgid "Date, Time"
 msgstr ""
 
@@ -860,6 +882,10 @@ msgstr "Ta bort fjärrgren"
 msgid "Delete Remote Branch..."
 msgstr "Ta bort fjärrgren"
 
+#, python-format
+msgid "Delete branch \"%s\"?"
+msgstr ""
+
 #, fuzzy
 msgid "Delete remote"
 msgstr "Ta bort fjärrgren"
@@ -870,10 +896,6 @@ msgstr "Ta bort fjärrgren"
 
 #, fuzzy
 msgid "Delete remote?"
-msgstr "Ta bort fjärrgren"
-
-#, fuzzy
-msgid "Delete selected branch?"
 msgstr "Ta bort fjärrgren"
 
 #, fuzzy
@@ -934,6 +956,9 @@ msgstr "Alternativ"
 msgid "Directory Exists"
 msgstr "Katalog:"
 
+msgid "Disable"
+msgstr ""
+
 msgid "Display Untracked Files"
 msgstr ""
 
@@ -992,6 +1017,9 @@ msgstr "E-postadress"
 msgid "Email contributor"
 msgstr ""
 
+msgid "Enable path autocompletion in tools"
+msgstr ""
+
 msgid "Enabled"
 msgstr ""
 
@@ -1044,6 +1072,10 @@ msgstr ""
 #, fuzzy
 msgid "Error creating stash"
 msgstr "Skapa gren"
+
+#, python-format
+msgid "Error deleting branch \"%s\""
+msgstr ""
 
 #, python-format
 msgid "Error deleting remote \"%s\""
@@ -1297,10 +1329,7 @@ msgstr ""
 msgid "Help - Find Files"
 msgstr ""
 
-msgid "Help - git-xbase"
-msgstr ""
-
-msgid "Hide Details.."
+msgid "Help - git-cola-sequence-editor"
 msgstr ""
 
 msgid "High DPI"
@@ -1311,6 +1340,9 @@ msgid "History Browser"
 msgstr "Filbläddrare"
 
 msgid "Hungarian translation"
+msgstr ""
+
+msgid "Icon theme"
 msgstr ""
 
 msgid "Ignore all whitespace"
@@ -1329,6 +1361,9 @@ msgid "Ignore exact filename"
 msgstr ""
 
 msgid "Ignore filename or pattern"
+msgstr ""
+
+msgid "Ignore..."
 msgstr ""
 
 #, fuzzy
@@ -1361,6 +1396,9 @@ msgstr ""
 #, fuzzy
 msgid "Invalid Revision"
 msgstr "Ogiltig revision: %s"
+
+msgid "Japanese translation"
+msgstr ""
 
 msgid "Keep *.orig Merge Backups"
 msgstr ""
@@ -1395,6 +1433,9 @@ msgid "Launch git-difftool against previous versions"
 msgstr ""
 
 msgid "Launch git-difftool on the current path"
+msgstr ""
+
+msgid "Light Theme"
 msgstr ""
 
 #, fuzzy
@@ -1890,6 +1931,9 @@ msgstr "Ta bort gren"
 msgid "Reset Hard"
 msgstr "Ta bort gren"
 
+msgid "Reset Layout"
+msgstr ""
+
 #, fuzzy
 msgid "Reset Merge"
 msgstr "Revisioner att slå ihop"
@@ -1919,6 +1963,9 @@ msgstr ""
 #, fuzzy, python-format
 msgid "Resetting \"%(branch)s\" to \"%(revision)s\" will lose commits."
 msgstr "Om du återställer \"%s\" till \"%s\" går följande incheckningar förlorade:"
+
+msgid "Restart the application after changing appearance settings."
+msgstr ""
 
 msgid "Revert"
 msgstr ""
@@ -2191,10 +2238,6 @@ msgstr ""
 
 msgid "Shortcuts"
 msgstr ""
-
-#, fuzzy
-msgid "Show Details..."
-msgstr "Ta bort..."
 
 msgid "Show Diffstat After Merge"
 msgstr "Visa diffstatistik efter sammanslagning"
@@ -2697,6 +2740,9 @@ msgstr ""
 msgid "hotkeys.html"
 msgstr ""
 
+msgid "title"
+msgstr ""
+
 msgid "unknown"
 msgstr ""
 
@@ -2951,6 +2997,10 @@ msgstr ""
 
 #~ msgid "Delete Only If Merged Into"
 #~ msgstr "Ta bara bort om sammanslagen med"
+
+#, fuzzy
+#~ msgid "Delete selected branch?"
+#~ msgstr "Ta bort fjärrgren"
 
 #~ msgid "Destination Repository"
 #~ msgstr "Destinationsarkiv"
@@ -3408,6 +3458,10 @@ msgstr ""
 #~ msgid "Shared only available for local repository."
 #~ msgstr "Delat är endast tillgängligt för lokala arkiv."
 
+#, fuzzy
+#~ msgid "Show Details..."
+#~ msgstr "Ta bort..."
+
 #~ msgid "Show Less Context"
 #~ msgstr "Visa mindre sammanhang"
 
@@ -3466,8 +3520,8 @@ msgstr ""
 #~ msgid "Success"
 #~ msgstr "Lyckades"
 
-#~ msgid "The 'master' branch has not been initialized."
-#~ msgstr "Grenen \"master\" har inte initierats."
+#~ msgid "The 'main' branch has not been initialized."
+#~ msgstr "Grenen \"main\" har inte initierats."
 
 #~ msgid "The following branches are not completely merged into %s:"
 #~ msgstr "Följande grenar är inte till fullo sammanslagna med %s:"

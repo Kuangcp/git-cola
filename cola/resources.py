@@ -2,6 +2,7 @@
 from __future__ import division, absolute_import, unicode_literals
 import os
 from os.path import dirname
+import sys
 import webbrowser
 
 from . import core
@@ -10,8 +11,11 @@ from . import core
 # Default git-cola icon theme
 _default_icon_theme = 'light'
 
-_modpath = core.abspath(__file__)
-if os.path.join('share', 'git-cola', 'lib') in _modpath:
+_modpath = core.abspath(core.realpath(__file__))
+if (
+    os.path.join('share', 'git-cola', 'lib') in _modpath
+    or os.path.join('site-packages', 'cola') in _modpath
+):
     # this is the release tree
     # __file__ = '$prefix/share/git-cola/lib/cola/__file__.py'
     _lib_dir = dirname(dirname(_modpath))
@@ -31,6 +35,12 @@ def prefix(*args):
     return os.path.join(_prefix, *args)
 
 
+def command(name):
+    """Return a command sibling to the main program"""
+    bindir = os.path.dirname(sys.argv[0])
+    return os.path.join(bindir, name)
+
+
 def doc(*args):
     """Return a path relative to cola's /usr/share/doc/ directory"""
     return os.path.join(_prefix, 'share', 'doc', 'git-cola', *args)
@@ -40,8 +50,7 @@ def html_docs():
     """Return the path to the cola html documentation."""
     # html/index.html only exists after the install-docs target is run.
     # Fallback to the source tree and lastly git-cola.rst.
-    paths_to_try = (('html', 'index.html'),
-                    ('_build', 'html', 'index.html'))
+    paths_to_try = (('html', 'index.html'), ('_build', 'html', 'index.html'))
     for paths in paths_to_try:
         docdir = doc(*paths)
         if core.exists(docdir):
@@ -88,6 +97,7 @@ def icon_dir(theme):
 
 
 def config_home(*args):
-    config = core.getenv('XDG_CONFIG_HOME',
-                         os.path.join(core.expanduser('~'), '.config'))
+    config = core.getenv(
+        'XDG_CONFIG_HOME', os.path.join(core.expanduser('~'), '.config')
+    )
     return os.path.join(config, 'git-cola', *args)
