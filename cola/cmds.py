@@ -2658,6 +2658,55 @@ class VisualizeRevision(ContextCommand):
         launch_history_browser(argv)
 
 
+class SubmoduleAdd(ConfirmAction):
+    """Add specified submodules"""
+
+    def __init__(self, context, url, path, branch, depth, reference):
+        super(SubmoduleAdd, self).__init__(context)
+        self.url = url
+        self.path = path
+        self.branch = branch
+        self.depth = depth
+        self.reference = reference
+
+    def confirm(self):
+        title = N_('Add Submodule...')
+        question = N_('Add this submodule?')
+        info = N_('The submodule will be added using\n' '"%s"' % self.command())
+        ok_txt = N_('Add Submodule')
+        return Interaction.confirm(title, question, info, ok_txt, icon=icons.ok())
+
+    def action(self):
+        context = self.context
+        args = self.get_args()
+        return context.git.submodule('add', *args)
+
+    def success(self):
+        self.model.update_file_status()
+        self.model.update_submodules_list()
+
+    def error_message(self):
+        return N_('Error updating submodule %s' % self.path)
+
+    def command(self):
+        cmd = ['git', 'submodule', 'add']
+        cmd.extend(self.get_args())
+        return core.list2cmdline(cmd)
+
+    def get_args(self):
+        args = []
+        if self.branch:
+            args.extend(['--branch', self.branch])
+        if self.reference:
+            args.extend(['--reference', self.reference])
+        if self.depth:
+            args.extend(['--depth', '%d' % self.depth])
+        args.extend(['--', self.url])
+        if self.path:
+            args.append(self.path)
+        return args
+
+
 class SubmoduleUpdate(ConfirmAction):
     """Update specified submodule"""
 
@@ -2676,7 +2725,8 @@ class SubmoduleUpdate(ConfirmAction):
 
     def action(self):
         context = self.context
-        return context.git.submodule('update', '--', self.path)
+        args = self.get_args()
+        return context.git.submodule(*args)
 
     def success(self):
         self.model.update_file_status()
@@ -2685,8 +2735,16 @@ class SubmoduleUpdate(ConfirmAction):
         return N_('Error updating submodule %s' % self.path)
 
     def command(self):
-        command = 'git submodule update -- %s'
-        return command % self.path
+        cmd = ['git', 'submodule']
+        cmd.extend(self.get_args())
+        return core.list2cmdline(cmd)
+
+    def get_args(self):
+        cmd = ['update']
+        if version.check_git(self.context, 'submodule-update-recursive'):
+            cmd.append('--recursive')
+        cmd.extend(['--', self.path])
+        return cmd
 
 
 class SubmodulesUpdate(ConfirmAction):
@@ -2703,7 +2761,8 @@ class SubmodulesUpdate(ConfirmAction):
 
     def action(self):
         context = self.context
-        return context.git.submodule('update')
+        args = self.get_args()
+        return context.git.submodule(*args)
 
     def success(self):
         self.model.update_file_status()
@@ -2712,7 +2771,15 @@ class SubmodulesUpdate(ConfirmAction):
         return N_('Error updating submodules')
 
     def command(self):
-        return 'git submodule update'
+        cmd = ['git', 'submodule']
+        cmd.extend(self.get_args())
+        return core.list2cmdline(cmd)
+
+    def get_args(self):
+        cmd = ['update']
+        if version.check_git(self.context, 'submodule-update-recursive'):
+            cmd.append('--recursive')
+        return cmd
 
 
 def launch_history_browser(argv):

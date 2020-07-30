@@ -5,6 +5,10 @@ v3.8
 
 Usability, bells and whistles
 -----------------------------
+* The submodules widget can now be used to add submodules.
+  Submodules are now updated recursively.
+  (`#534 <https://github.com/git-cola/git-cola/issues/534>`_)
+
 * The image diff viewer can now be toggled between text and image modes.
   This is helpful when, for example, diffing .svg files where it can be useful
   to see diffs in both an image and text representation.
@@ -17,6 +21,9 @@ Usability, bells and whistles
 
 Translations
 ------------
+* Updated Polish translation.
+  (`#1076 <https://github.com/git-cola/git-cola/pull/1076>`_)
+
 * Updated Hungarian translation.
   (`#1067 <https://github.com/git-cola/git-cola/pull/1067>`_)
 
@@ -34,6 +41,11 @@ Packaging
   ``git-cola-sequence-editor`` and is now installed into the default
   ``bin/git-cola-sequence-editor`` executable location to enable external
   reuse of this general-purpose tool.
+
+* A workaround used by the pynsist installer preamble script was obsoleted by
+  `takluyver/pynsist#149 <https://github.com/takluyver/pynsist/pull/149>`_
+  and has now been removed.
+  (`#1073 <https://github.com/git-cola/git-cola/pull/1073>`_)
 
 .. _v3.7:
 
