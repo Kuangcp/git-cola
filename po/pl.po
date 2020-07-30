@@ -7,7 +7,7 @@ msgstr ""
 "Project-Id-Version: \n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2017-10-17 01:06-0700\n"
-"PO-Revision-Date: 2020-01-03 11:23+0100\n"
+"PO-Revision-Date: 2020-07-11 09:04+0200\n"
 "Last-Translator: Łukasz Wojniłowicz <lukasz.wojnilowicz@gmail.com>\n"
 "Language-Team: Polish <kde-i18n-doc@kde.org>\n"
 "MIME-Version: 1.0\n"
@@ -15,7 +15,7 @@ msgstr ""
 "Content-Transfer-Encoding: 8bit\n"
 "Language: pl_PL\n"
 "Plural-Forms: nplurals=3; plural=(n==1 ? 0 : n%10>=2 && n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2);\n"
-"X-Generator: Lokalize 19.07.70\n"
+"X-Generator: Lokalize 20.07.70\n"
 
 msgid ""
 "\n"
@@ -452,6 +452,12 @@ msgstr "Dodaj zdalne repozytorium"
 msgid "Add Separator"
 msgstr "Dodaj oddzielacz"
 
+msgid "Add Submodule"
+msgstr ""
+
+msgid "Add Submodule..."
+msgstr ""
+
 msgid "Add Toolbar"
 msgstr "Dodaj pasek narzędzi"
 
@@ -477,6 +483,9 @@ msgstr "Dodaj łaty (+)"
 msgid "Add remote"
 msgstr "Dodaj zdalne repozytorium"
 
+msgid "Add this submodule?"
+msgstr ""
+
 msgid "Add to .gitignore"
 msgstr "Dodaj do .gitignore"
 
@@ -487,10 +496,10 @@ msgid "Add to Git LFS"
 msgstr "Dodaj do Git LFS"
 
 msgid "Add to exclusions"
-msgstr ""
+msgstr "Dodaj do wykluczonych"
 
 msgid "Add to local .git/info/exclude"
-msgstr ""
+msgstr "Dodaj do lokalnego .git/info/exclude"
 
 msgid "Additions"
 msgstr "Dodano"
@@ -584,10 +593,10 @@ msgid "Auto-Wrap Lines"
 msgstr "Zawijaj wiersze"
 
 msgid "Autocomplete Paths"
-msgstr ""
+msgstr "Uzupełniaj ścieżki"
 
 msgid "Automatically Load Commit Message Template"
-msgstr ""
+msgstr "Sam wczytuj szablon opisu wdrożenia"
 
 msgid "Basic Regexp"
 msgstr "Podstawowe wyrażenie regularne"
@@ -627,6 +636,9 @@ msgstr "Gałąź istnieje"
 
 msgid "Branch Name"
 msgstr "Nazwa gałęzi"
+
+msgid "Branch name"
+msgstr ""
 
 #, python-format
 msgid "Branch: %s"
@@ -695,7 +707,7 @@ msgid "Changed Upstream"
 msgstr "Zmienione w źródle odgórnym"
 
 msgid "Check Published Commits when Amending"
-msgstr ""
+msgstr "Sprawdź publikację wdrożenia przed jego uzupełniania"
 
 msgid "Check Spelling"
 msgstr "Sprawdź pisownię"
@@ -704,7 +716,7 @@ msgid "Check spelling"
 msgstr "Sprawdź pisownię"
 
 msgid "Check whether a commit has been published when amending"
-msgstr ""
+msgstr "Sprawdź, czy wdrożenie zostało już opublikowane, przed jego uzupełnieniem"
 
 msgid "Checkout"
 msgstr "Przełącz"
@@ -871,6 +883,9 @@ msgstr "Utwórz wdrożenie scalania, nawet gdy scalanie będzie polegać na prze
 msgid "Create a new remote branch?"
 msgstr "Czy utworzyć nową zdalną gałąź?"
 
+msgid "Create a shallow clone with history truncated to the specified number of revisions.  0 performs a full clone."
+msgstr ""
+
 msgid "Create..."
 msgstr "Utwórz..."
 
@@ -941,7 +956,7 @@ msgstr "Usuń zdalną gałąź..."
 
 #, python-format
 msgid "Delete branch \"%s\"?"
-msgstr ""
+msgstr "Usuń gałąź \"%s\"?"
 
 msgid "Delete remote"
 msgstr "Usuń zdalne repozytorium"
@@ -965,6 +980,9 @@ msgstr "Nie udało się usunąć \"%s\""
 
 msgid "Deletions"
 msgstr "Usunięto"
+
+msgid "Depth"
+msgstr ""
 
 msgid "Detach"
 msgstr "Odłącz"
@@ -1006,7 +1024,7 @@ msgid "Directory Exists"
 msgstr "Katalog istnieje"
 
 msgid "Disable"
-msgstr ""
+msgstr "Wyłącz"
 
 msgid "Display Untracked Files"
 msgstr "Wyświetl niezarządzane pliki"
@@ -1061,7 +1079,7 @@ msgid "Email contributor"
 msgstr "Napisz do współtwórcy"
 
 msgid "Enable path autocompletion in tools"
-msgstr ""
+msgstr "Włącz uzupełnianie ścieżki w narzędziach"
 
 msgid "Enabled"
 msgstr "Uwzględnione"
@@ -1108,7 +1126,7 @@ msgstr "Błąd tworzenia przechowalni"
 
 #, python-format
 msgid "Error deleting branch \"%s\""
-msgstr ""
+msgstr "Błąd usuwania gałęzi \"%s\""
 
 #, python-format
 msgid "Error deleting remote \"%s\""
@@ -1382,7 +1400,7 @@ msgid "Ignore filename or pattern"
 msgstr "Pomiń nazwy plików lub wzorce"
 
 msgid "Ignore..."
-msgstr ""
+msgstr "Pomiń..."
 
 msgid "Include tags "
 msgstr "Uwzględnij znaczniki"
@@ -1412,7 +1430,7 @@ msgid "Invalid Revision"
 msgstr "Nieprawidłowe wydanie"
 
 msgid "Japanese translation"
-msgstr ""
+msgstr "Japońskie tłumaczenie"
 
 msgid "Keep *.orig Merge Backups"
 msgstr "Zachowaj kopie zapasowe *.orig po scalaniu"
@@ -1796,6 +1814,15 @@ msgstr "Przywróć"
 msgid "Reduce commit history to minimum"
 msgstr "Pomiń historię wdrożeń"
 
+msgid "Reference Repository"
+msgstr ""
+
+msgid "Reference URL"
+msgstr ""
+
+msgid "Reference repository to use when cloning (optional)"
+msgstr ""
+
 msgid "Refresh"
 msgstr "Odśwież"
 
@@ -1886,7 +1913,7 @@ msgid "Reset Hard"
 msgstr "Wyzeruj twardo"
 
 msgid "Reset Layout"
-msgstr ""
+msgstr "Wyzeruj układ"
 
 msgid "Reset Merge"
 msgstr "Wyzeruj ze scaleniem"
@@ -2317,6 +2344,15 @@ msgstr "Stan"
 msgid "Stop tracking paths"
 msgstr "Zaprzestań zarządzanie ścieżką/ścieżkami"
 
+msgid "Submodule URL (can be relative, ex: ../repo.git)"
+msgstr ""
+
+msgid "Submodule branch to track (optional)"
+msgstr ""
+
+msgid "Submodule path within the current repository (optional)"
+msgstr ""
+
 msgid "Submodules"
 msgstr "Podmoduły"
 
@@ -2378,6 +2414,12 @@ msgstr "Zostaną usunięte następujące pliki:"
 
 msgid "The revision expression cannot be empty."
 msgstr "Wyrażenie wydania nie może być puste."
+
+#, python-format
+msgid ""
+"The submodule will be added using\n"
+"\"%s\""
+msgstr ""
 
 #, python-format
 msgid ""
@@ -2443,6 +2485,9 @@ msgstr ""
 msgid "Toggle Enabled"
 msgstr "Uwzględnij/nie uwzględniaj"
 
+msgid "Toggle image diff"
+msgstr ""
+
 msgid "Toggle the branches filter"
 msgstr "Przełącz filtr gałęzi"
 
@@ -2457,6 +2502,9 @@ msgstr "Odgórna gałąź"
 
 msgid "Traditional Chinese (Taiwan) translation"
 msgstr "Tłumaczenia na tradycyjny chiński (Tajwan)"
+
+msgid "Translation"
+msgstr ""
 
 msgid "Translators"
 msgstr "Tłumacze"
@@ -2634,14 +2682,20 @@ msgstr "git-cola"
 msgid "git-cola diff"
 msgstr "Różnica git-cola"
 
+msgid "git://git.example.com/repo.git"
+msgstr ""
+
 msgid "grep result..."
 msgstr "wyszukaj w wynikach..."
 
 msgid "hotkeys.html"
 msgstr "hotkeys.html"
 
-msgid "title"
+msgid "path/to/submodule"
 msgstr ""
+
+msgid "title"
+msgstr "tytuł"
 
 msgid "unknown"
 msgstr "nieznany"
