@@ -69,14 +69,12 @@ class WidgetMixin(object):
             save = cfg.get('cola.savewindowsettings', default=True)
         if save:
             if settings is None:
-                settings = Settings()
-                settings.load()
+                settings = Settings.read()
             settings.save_gui_state(self)
 
     def restore_state(self, settings=None):
         if settings is None:
-            settings = Settings()
-            settings.load()
+            settings = Settings.read()
         state = settings.get_gui_state(self)
         if state:
             result = self.apply_state(state)
@@ -145,6 +143,7 @@ class WidgetMixin(object):
 
 
 class MainWindowMixin(WidgetMixin):
+
     def __init__(self):
         WidgetMixin.__init__(self)
         # Dockwidget options
@@ -170,8 +169,11 @@ class MainWindowMixin(WidgetMixin):
     def save_settings(self, settings=None):
         if settings is None:
             context = getattr(self, 'context', None)
-            settings = Settings()
-            settings.load()
+            if context is None:
+                settings = Settings.read()
+            else:
+                settings = context.settings
+                settings.load()
             settings.add_recent(core.getcwd(), prefs.maxrecent(context))
         return WidgetMixin.save_settings(self, settings=settings)
 
@@ -971,11 +973,12 @@ def progress(title, text, parent):
     return ProgressDialog(title, text, parent)
 
 
-def question(title, text, default=True):
+def question(title, text, default=True, logo=None):
     """Launches a QMessageBox question with the provided title and message.
     Passing "default=False" will make "No" the default choice."""
     parent = qtutils.active_window()
-    logo = icons.from_style(QtWidgets.QStyle.SP_MessageBoxQuestion)
+    if logo is None:
+        logo = icons.from_style(QtWidgets.QStyle.SP_MessageBoxQuestion)
     msgbox = MessageBox(
         parent=parent,
         title=title,
