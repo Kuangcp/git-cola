@@ -1,3 +1,23 @@
+.. _v3.9:
+
+v3.9
+====
+
+Usability, bells and whistles
+-----------------------------
+* The startup dialog now detects when Recent and Favorite repositories no
+  longer exist on disk, and offers to remove these entries when selected.
+  (`#1089 <https://github.com/git-cola/git-cola/pull/1089>`_)
+
+* The startup dialog now includes a simpler and more condensed folder view
+  that can be used for selecting Favorites and Recent repositories.
+  (`#1086 <https://github.com/git-cola/git-cola/pull/1086>`_)
+
+Translations
+------------
+* Updated Brazilian translation.
+  (`#1091 <https://github.com/git-cola/git-cola/pull/1091>`_)
+
 .. _v3.8:
 
 v3.8
@@ -29,6 +49,11 @@ Translations
 
 Packaging
 ---------
+* The `share/appdata` AppStream data was renamed to `share/metainfo`
+  in accordance with `AppStream standard changes from 2016
+  <https://github.com/ximion/appstream/blob/master/NEWS#L1363>`_.
+  (`#1079 <https://github.com/git-cola/git-cola/pull/1079>`_)
+
 * The ``cola`` modules are now installed into the Python ``site-packages``
   directory by default.  This allows distributions to package ``git-cola`` for
   multiple versions of Python.  See the PACKAGING NOTES section in the README
@@ -46,6 +71,11 @@ Packaging
   `takluyver/pynsist#149 <https://github.com/takluyver/pynsist/pull/149>`_
   and has now been removed.
   (`#1073 <https://github.com/git-cola/git-cola/pull/1073>`_)
+
+Fixes
+-----
+* `git dag` now uses integer widths when initializing its brushes.
+  (`#1080 <https://github.com/git-cola/git-cola/pull/1080>`_)
 
 .. _v3.7:
 

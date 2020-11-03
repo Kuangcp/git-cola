@@ -46,6 +46,7 @@ from .widgets import cfgactions
 from .widgets import standard
 from .widgets import startup
 from .settings import Session
+from .settings import Settings
 from . import cmds
 from . import core
 from . import compat
@@ -281,6 +282,7 @@ class ColaQApplication(QtWidgets.QApplication):
         skey = session_mgr.sessionKey()
         session_id = '%s_%s' % (sid, skey)
         session = Session(session_id, repo=core.getcwd())
+        session.update()
         view.save_state(settings=session)
 
 
@@ -335,7 +337,7 @@ def application_init(args, update=False):
     timer = context.timer
     timer.start('init')
 
-    new_worktree(context, args.repo, args.prompt, args.settings)
+    new_worktree(context, args.repo, args.prompt)
 
     if update:
         context.model.update_status()
@@ -349,6 +351,7 @@ def application_init(args, update=False):
 def new_context(args):
     """Create top-level ApplicationContext objects"""
     context = ApplicationContext(args)
+    context.settings = args.settings or Settings.read()
     context.git = git.create()
     context.cfg = gitcfg.create(context)
     context.fsmonitor = fsmonitor.create(context)
@@ -455,7 +458,7 @@ def new_application(context, args):
     )
 
 
-def new_worktree(context, repo, prompt, settings):
+def new_worktree(context, repo, prompt):
     """Find a Git repository, or prompt for one when not found"""
     model = context.model
     cfg = context.cfg
@@ -476,11 +479,32 @@ def new_worktree(context, repo, prompt, settings):
         # If we've gotten into this loop then that means that neither the
         # current directory nor the default repository were available.
         # Prompt the user for a repository.
-        startup_dlg = startup.StartupDialog(context, parent, settings=settings)
+        startup_dlg = startup.StartupDialog(context, parent)
         gitdir = startup_dlg.find_git_repo()
         if not gitdir:
             sys.exit(core.EXIT_NOINPUT)
+
+        if not core.exists(os.path.join(gitdir, '.git')):
+            offer_to_create_repo(context, gitdir)
+            valid = model.set_worktree(gitdir)
+            continue
+
         valid = model.set_worktree(gitdir)
+        if not valid:
+            standard.critical(N_('Error Opening Repository'),
+                              N_('Could not open %s.' % gitdir))
+
+
+def offer_to_create_repo(context, gitdir):
+    """Offer to create a new repo"""
+    title = N_('Repository Not Found')
+    text = N_('%s is not a Git repository.') % gitdir
+    informative_text = N_('Create a new repository at that location?')
+    if standard.confirm(title, text, informative_text, N_('Create')):
+        status, out, err = context.git.init(gitdir)
+        title = N_('Error Creating Repository')
+        if status != 0:
+            Interaction.command_error(title, 'git init', status, out, err)
 
 
 def async_update(context):
@@ -565,6 +589,7 @@ class ApplicationContext(object):
         self.model = None  # main.MainModel
         self.timer = None  # Timer
         self.runtask = None  # qtutils.RunTask
+        self.settings = None  # settings.Settings
         self.selection = None  # selection.SelectionModel
         self.fsmonitor = None  # fsmonitor
         self.view = None  # QWidget
