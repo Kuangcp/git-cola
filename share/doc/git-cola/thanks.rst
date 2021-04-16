@@ -5,6 +5,7 @@ Thanks
 * Aaron Cook
 * Aaron Malpas
 * Aaron Wolf
+* Abid Ahmad
 * Adam Lesperance
 * Adrien be
 * Adil
@@ -24,6 +25,7 @@ Thanks
 * armandg
 * Arthur Coelho
 * Audrius Karabanovas
+* Axel Heider
 * Balázs Meskó
 * balping
 * Barış ÇELİK
@@ -69,6 +71,7 @@ Thanks
 * Fabio Coatti
 * Felipe Morales
 * Filip Danilović
+* Floris Lambrechts
 * fu7mu4
 * Garoe Dorta
 * Geoffrey van Wyk
@@ -161,6 +164,7 @@ Thanks
 * Nikos Roussos
 * Noel Grandin
 * NotSqrt
+* nyanpasu64
 * ochristi
 * Oliver Haessler
 * OmegaPhil (Omega Weapon)
