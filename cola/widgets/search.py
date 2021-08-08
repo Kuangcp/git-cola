@@ -1,5 +1,5 @@
 """A widget for searching git commits"""
-from __future__ import division, absolute_import, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 import time
 
 from qtpy import QtCore
@@ -64,7 +64,7 @@ class SearchWidget(standard.Dialog):
         self.max_count = standard.SpinBox(value=500, mini=5, maxi=9995, step=5)
 
         self.commit_list = QtWidgets.QListWidget()
-        self.commit_list.setMinimumSize(QtCore.QSize(1, 1))
+        self.commit_list.setMinimumSize(QtCore.QSize(10, 10))
         self.commit_list.setAlternatingRowColors(True)
         selection_mode = QtWidgets.QAbstractItemView.SingleSelection
         self.commit_list.setSelectionMode(selection_mode)

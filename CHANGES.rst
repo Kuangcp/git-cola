@@ -1,3 +1,35 @@
+.. _v3.11:
+
+v3.11
+=====
+
+Usability, bells and whistles
+-----------------------------
+* The Status tool was improved to better retain selected files when
+  the state changes and the display is refreshed.
+  (`#1130 <https://github.com/git-cola/git-cola/issues/1130>`_)
+  (`#1131 <https://github.com/git-cola/git-cola/pull/1131>`_)
+
+* The Diff editor can now stage selected lines for untracked files.
+  Git Cola will detect when a file is untracked and will allow you to
+  partially stage it, just like existing tracked files.
+  (`#1146 <https://github.com/git-cola/git-cola/pull/1146>`_)
+  (`#1084 <https://github.com/git-cola/git-cola/issues/1084>`_)
+
+* Diffing of staged files has been implemented for repositories that contain
+  no commits.
+  (`#1149 <https://github.com/git-cola/git-cola/pull/1149>`_)
+  (`#1110 <https://github.com/git-cola/git-cola/issues/1110>`_)
+
+.. _v3.10.1:
+
+v3.10.1
+=======
+
+Fixes
+-----
+* Patch release to fix a typo in the Interactive Rebase feature.
+
 .. _v3.10:
 
 v3.10
@@ -5,6 +37,11 @@ v3.10
 
 Usability, bells and whistles
 -----------------------------
+* The git config reader now supports the `include.path` directive
+  for including config files.
+  (`#1136 <https://github.com/git-cola/git-cola/issues/1136>`_)
+  (`#1137 <https://github.com/git-cola/git-cola/pull/1137>`_)
+
 * The dialog for selecting commits now support filtering.
   (`#1121 <https://github.com/git-cola/git-cola/pull/1121>`_)
 
@@ -24,6 +61,21 @@ Usability, bells and whistles
   categories of files are selected (eg. when both modified and untracked
   header items are selected).
   (`#1117 <https://github.com/git-cola/git-cola/issues/1117>`_)
+
+Translations
+------------
+* Updated Hungarian translation.
+  (`#1135 <https://github.com/git-cola/git-cola/pull/1135>`_)
+
+Fixes
+-----
+* The "Interactive Rebase" feature was updated to work with Windows.
+
+* `make install-man` was updated to support Sphinx 4.0.
+  (`#1141 <https://github.com/git-cola/git-cola/issues/1141>`_)
+
+* `git cola --help-commands` was updated for newer versions of argparse.
+  (`#1133 <https://github.com/git-cola/git-cola/issues/1133>`_)
 
 Development
 -----------

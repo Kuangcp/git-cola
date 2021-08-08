@@ -39,6 +39,7 @@ Thanks
 * Bert Jacobs
 * Birger Skogeng Pedersen
 * Björn Ketelaars
+* Bob van der Linden
 * 林博仁 (Buo-ren Lin)
 * cclaus
 * Charles 101
@@ -59,7 +60,9 @@ Thanks
 * David Roman
 * Dawid Drozd
 * Dennis Gilmore
+* Demodian
 * deniz1a
+* Dmitriy Bogdanov
 * Dmitry Kann
 * Dmitry Pashkevich
 * Doug Hoskisson
@@ -69,6 +72,7 @@ Thanks
 * Erop @EgZvor
 * Erwan Bousse
 * Fabio Coatti
+* Fang Pengfei
 * Felipe Morales
 * Filip Danilović
 * Floris Lambrechts
@@ -145,6 +149,7 @@ Thanks
 * Matěj Šmíd
 * Matthew Levine
 * Matthias Mailänder
+* Max Harmathy
 * Micha Rosenbaum
 * Michael Geddes
 * Michael Homer
@@ -158,6 +163,7 @@ Thanks
 * Muhammad Bashir Al-Noimi
 * Myz
 * Naraesk
+* Nanda Lopes
 * Niel Buys
 * Nick Todd
 * Nicolas Dietrich

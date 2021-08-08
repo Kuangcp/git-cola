@@ -549,9 +549,18 @@ Defaults to `false`.
 
 cola.fileattributes
 -------------------
-Enables per-file gitattributes encoding support when set to `true`.
+Enables per-file gitattributes encoding and binary file support.
 This tells `git cola` to honor the configured encoding when displaying
 and applying diffs.
+
+A `.gitattributes` file can set the ``binary`` attribute in order to force
+specific untracked paths to be treated as binary files when diffing.
+Binary files are displayed using a hexdump display.
+
+.. sourcecode:: sh
+
+   # Treat *.exr files as binary files.
+   *.exr binary
 
 cola.fontdiff
 -------------
@@ -635,6 +644,11 @@ cola.readsize
 `git cola` avoids reading large binary untracked files.
 The maximum size to read is controlled by `cola.readsize`
 and defaults to `2048`.
+
+cola.resizebrowsercolumns
+-------------------------
+`git cola` will automatically resize the file browser columns as folders are
+expanded/collapsed when ``cola.resizebrowsercolumns`` is set to `true`.
 
 cola.safemode
 -------------
@@ -1062,6 +1076,17 @@ your home directory `~/.config/git-cola/git-bindir` that points to your git
 installation.  e.g.::
 
     C:/Tools/Git/bin
+
+SSH Agents for Key-based Authentication
+---------------------------------------
+You may need to setup ssh-agent in order to use SSH key-based authentication
+on Windows. It has been reported that starting OpenSSH agent in
+Windows Services and adding the key using Powershell are necessary in order
+to get things working.
+
+Please see the following links for more details.
+
+https://stackoverflow.com/questions/18683092/how-to-run-ssh-add-on-windows
 
 LINKS
 =====

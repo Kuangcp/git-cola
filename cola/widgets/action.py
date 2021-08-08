@@ -1,5 +1,5 @@
-"""The "Actions" widget"""
-from __future__ import division, absolute_import, unicode_literals
+"""Actions widget"""
+from __future__ import absolute_import, division, print_function, unicode_literals
 from functools import partial
 
 from qtpy import QtCore
@@ -31,7 +31,7 @@ class QFlowLayoutWidget(QtWidgets.QFrame):
             QtWidgets.QSizePolicy.Minimum, QtWidgets.QSizePolicy.Minimum
         )
         self.setSizePolicy(policy)
-        self.setMinimumSize(QtCore.QSize(1, 1))
+        self.setMinimumSize(QtCore.QSize(10, 10))
         self.aspect_ratio = 0.8
 
     def resizeEvent(self, event):

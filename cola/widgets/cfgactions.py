@@ -1,4 +1,4 @@
-from __future__ import division, absolute_import, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 import os
 
 from qtpy import QtCore
@@ -218,8 +218,8 @@ class ActionDialog(standard.Dialog):
             except KeyError:
                 pass
         else:
-            self.argslabel.setMinimumSize(1, 1)
-            self.argstxt.setMinimumSize(1, 1)
+            self.argslabel.setMinimumSize(10, 10)
+            self.argstxt.setMinimumSize(10, 10)
             self.argstxt.hide()
             self.argslabel.hide()
 

@@ -1,6 +1,5 @@
-# Copyright (C) 2007-2018 David Aguilar and contributors
 """Provide git-cola's version number"""
-from __future__ import division, absolute_import, unicode_literals
+from __future__ import absolute_import, division, print_function, unicode_literals
 import os
 import sys
 
@@ -36,6 +35,8 @@ _versions = {
     'force-with-lease': '1.8.5',
     # git submodule update --recursive was introduced in 1.6.5
     'submodule-update-recursive': '1.6.5',
+    # git include.path pseudo-variable was introduced in 1.7.10
+    'config-includes': '1.7.10',
     # git for-each-ref --sort=version:refname
     'version-sort': '2.7.0',
     # Qt support for QT_AUTO_SCREEN_SCALE_FACTOR and QT_SCALE_FACTOR
