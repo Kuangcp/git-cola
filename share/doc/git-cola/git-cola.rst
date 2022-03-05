@@ -126,7 +126,7 @@ configured.
 when editing files.  `gvim -f -o` uses splits.
 
 `git cola` is {vim, emacs, textpad, notepad++}-aware.
-When you select a line in the `grep` screen and press any of
+When you select a line in the diff or grep screens and press any of
 `Enter`, `Ctrl-e`, or the `Edit` button, you are taken to that exact line.
 
 The editor preference is saved in the `gui.editor` variable using
@@ -456,7 +456,7 @@ same order as is listed in the list.
 When a directory is dropped `git cola` walks the directory
 tree in search of patches.  `git cola` sorts the list of
 patches after they have all been found.  This allows you
-to control the order in which patchs are applied by placing
+to control the order in which patches are applied by placing
 patchsets into alphanumerically-sorted directories.
 
 CUSTOM WINDOW SETTINGS
@@ -477,6 +477,10 @@ To use icons appropriate for a dark application theme, configure
 ``git config --global cola.icontheme dark`` to use the dark icon theme.
 See :ref:`cola_icontheme` for more details.
 
+On macOS, using the ``default`` theme will automatically inherit "Dark Mode"
+color themes when configured via System Preferences.  You will need to
+configure the dark icon theme as noted above when dark mode is enabled.
+
 On Linux, you may want Qt to follow the Window manager theme by configuring it
 to do so using the ``qt5ct`` Qt5 configuration tool.  Install ``qt5ct`` on
 Debian/Ubuntu systems to make this work.::
@@ -486,15 +490,52 @@ Debian/Ubuntu systems to make this work.::
 Once installed, update your `~/.bash_profile` to activate ``qt5ct``::
 
     # Use the style configured using the qt5ct tool
-    QT_QPA_PLATFORMTHEME=qt5ct
-    export QT_QPA_PLATFORMTHEME
+    export QT_QPA_PLATFORMTHEME=qt5ct
 
 This only work with the `default` theme.  The other themes replace the color
 palette with theme-specific colors.
 
-On macOS, using the ``default`` theme will automatically inherit "Dark Mode"
-color themes when configured via System Preferences.  You will need to
-configure the dark icon theme as noted above when dark mode is enabled.
+Some systems may require that you override `QT_STYLE_OVERRIDE` in order to
+use a dark theme or to better interact with the Desktop environment.
+Some systems provide a theme that you can install::
+
+    sudo apt-get install adwaita-qt
+
+You can activate the theme using the following enviornment variable::
+
+    # Override the default theme to adwait-dark
+    export QT_STYLE_OVERRIDE=adwaita-dark
+
+`QT_STYLE_OVERRIDE` may already be set in your Desktop Environment, so check that
+variable for reference if you get unexpected hangs when launching `git-cola` or
+when the default theme does not follow the desktop's theme on Linux.
+
+If you don't want to set this variable globally then you can set it when launching
+cola from the command-line::
+
+    QT_STYLE_OVERRIDE=adwaita-dark git cola
+
+The following is a user-contributed custom `git-cola.desktop` file that can be used to
+launch Git Cola with these settings preset for you::
+
+    [Desktop Entry]
+    Name=Git Cola (dark)
+    Comment=The highly caffeinated Git GUI
+    TryExec=git-cola
+    Exec=env QT_STYLE_OVERRIDE=adwaita-dark git-cola --prompt --icon-theme dark
+    Icon=git-cola
+    StartupNotify=true
+    Terminal=false
+    Type=Application
+    Categories=Development;RevisionControl;
+    X-KDE-SubstituteUID=false
+
+You may also want to customize the diff colors when using a dark theme::
+
+    git config --global cola.color.add 86c19f
+    git config --global cola.color.remove c07067
+
+Please see `#760 <https://github.com/git-cola/git-cola/issues/760>`_ for more details.
 
 CONFIGURATION VARIABLES
 =======================
@@ -931,6 +972,15 @@ receives the name of the tool as GIT_GUITOOL, the name of the currently
 selected file as FILENAME, and the name of the current branch as CUR_BRANCH
 (if the head is detached, CUR_BRANCH is empty).
 
+If ``<name>`` contains slashes (``/``) then the leading part of the name,
+up until the final slash, is treated like a path of submenus under which the
+actions will be created.
+
+For example, configuring ``guitool.Commands/Util/echo.cmd`` creates a
+``Commands`` menu inside the top-level ``Actions`` menu, a ``Util`` menu
+inside the ``Commands`` menu and an ``echo`` action inside the ``Commands``
+submenu.
+
 guitool.<name>.background
 -------------------------
 Run the command in the background (similar to editing and difftool actions).
@@ -1087,6 +1137,17 @@ to get things working.
 Please see the following links for more details.
 
 https://stackoverflow.com/questions/18683092/how-to-run-ssh-add-on-windows
+
+FIPS Security Mode
+==================
+`FIPS Security Mode <https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/FIPS_Mode_-_an_explanation>`_
+is available in newer versions of Python. These include Python 3.9+ and the
+patched Python 3.6 used by CentOS8/RHEL8 (and possibly others).
+
+Git Cola uses the ``hashlib.md5`` function and adheres to the FIPS security
+mode when available. Git Cola does not use the MD5 value for security purposes.
+MD% is used only for the purposes of implementing the ``cola/gravatar.py``
+Gravatar client.
 
 LINKS
 =====

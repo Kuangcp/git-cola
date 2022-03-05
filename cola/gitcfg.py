@@ -7,8 +7,10 @@ from os.path import join
 import re
 import struct
 
+from qtpy import QtCore
+from qtpy.QtCore import Signal
+
 from . import core
-from . import observable
 from . import utils
 from . import version
 from .compat import int_types
@@ -70,14 +72,13 @@ def _cache_key(git):
 
 def _config_to_python(v):
     """Convert a Git config string into a Python value"""
-
     if v in ('true', 'yes'):
         v = True
     elif v in ('false', 'no'):
         v = False
     else:
         try:
-            v = int(v)
+            v = int(v)  # pylint: disable=redefined-variable-type
         except ValueError:
             pass
     return v
@@ -105,15 +106,15 @@ def _config_key_value(line, splitchar):
     return k, _config_to_python(v)
 
 
-class GitConfig(observable.Observable):
+class GitConfig(QtCore.QObject):
     """Encapsulate access to git-config values."""
 
-    message_user_config_changed = 'user_config_changed'
-    message_repo_config_changed = 'repo_config_changed'
-    message_updated = 'updated'
+    user_config_changed = Signal(str, object)
+    repo_config_changed = Signal(str, object)
+    updated = Signal()
 
     def __init__(self, context):
-        observable.Observable.__init__(self)
+        super(GitConfig, self).__init__()
         self.git = context.git
         self._map = {}
         self._system = {}
@@ -205,7 +206,7 @@ class GitConfig(observable.Observable):
         for dct in (self._system, self._user, self._repo):
             self._all.update(dct)
 
-        self.notify_observers(self.message_updated)
+        self.updated.emit()
 
     def read_config(self, path):
         """Return git config data from a path as a dictionary."""
@@ -352,8 +353,7 @@ class GitConfig(observable.Observable):
         else:
             self.git.config('--global', key, python_to_git(value))
         self.update()
-        msg = self.message_user_config_changed
-        self.notify_observers(msg, key, value)
+        self.user_config_changed.emit(key, value)
 
     def set_repo(self, key, value):
         if value in (None, ''):
@@ -361,8 +361,7 @@ class GitConfig(observable.Observable):
         else:
             self.git.config(key, python_to_git(value))
         self.update()
-        msg = self.message_repo_config_changed
-        self.notify_observers(msg, key, value)
+        self.repo_config_changed.emit(key, value)
 
     def find(self, pat):
         pat = pat.lower()
@@ -486,8 +485,10 @@ class GitConfig(observable.Observable):
         value = self.get('cola.color.%s' % key, default=default)
         struct_layout = core.encode('BBB')
         try:
+            # pylint: disable=no-member
             r, g, b = struct.unpack(struct_layout, unhex(value))
         except (struct.error, TypeError):
+            # pylint: disable=no-member
             r, g, b = struct.unpack(struct_layout, unhex(default))
         return (r, g, b)
 

@@ -29,10 +29,6 @@ from . import defs
 from . import imageview
 
 
-COMMITS_SELECTED = 'COMMITS_SELECTED'
-FILES_SELECTED = 'FILES_SELECTED'
-
-
 class DiffSyntaxHighlighter(QtGui.QSyntaxHighlighter):
     """Implements the diff syntax highlighting"""
 
@@ -238,21 +234,14 @@ class DiffLineNumbers(TextDecorator):
         self._palette = palette = self.palette()
         self._base = palette.color(QtGui.QPalette.Base)
         self._highlight = palette.color(QPalette.Highlight)
+        self._highlight.setAlphaF(0.3)
         self._highlight_text = palette.color(QPalette.HighlightedText)
         self._window = palette.color(QPalette.Window)
         self._disabled = palette.color(QPalette.Disabled, QPalette.Text)
 
     def set_diff(self, diff):
-        parser = self.parser
-        lines = parser.parse(diff)
-        if parser.valid:
-            self.lines = lines
-            self.formatter.set_digits(self.parser.digits())
-        else:
-            self.lines = None
-
-    def set_lines(self, lines):
-        self.lines = lines
+        self.lines = self.parser.parse(diff)
+        self.formatter.set_digits(self.parser.digits())
 
     def width_hint(self):
         if not self.isVisible():
@@ -266,10 +255,7 @@ class DiffLineNumbers(TextDecorator):
             columns = 2
             extra = 2  # one space in-between, one space after
 
-        if parser.valid:
-            digits = parser.digits() * columns
-        else:
-            digits = 4
+        digits = parser.digits() * columns
 
         return defs.margin + (self._char_width * (digits + extra))
 
@@ -278,18 +264,19 @@ class DiffLineNumbers(TextDecorator):
         self.highlight_line = line_number
 
     def current_line(self):
-        if self.lines and self.highlight_line >= 0:
+        lines = self.lines
+        if lines and self.highlight_line >= 0:
             # Find the next valid line
-            for line in self.lines[self.highlight_line :]:
+            for i in range(self.highlight_line, len(lines)):
                 # take the "new" line number: last value in tuple
-                line_number = line[-1]
+                line_number = lines[i][-1]
                 if line_number > 0:
                     return line_number
 
             # Find the previous valid line
-            for line in self.lines[self.highlight_line - 1 :: -1]:
+            for i in range(self.highlight_line - 1, -1, -1):
                 # take the "new" line number: last value in tuple
-                line_number = line[-1]
+                line_number = lines[i][-1]
                 if line_number > 0:
                     return line_number
         return None
@@ -306,30 +293,29 @@ class DiffLineNumbers(TextDecorator):
         content_offset = editor.contentOffset()
         block = editor.firstVisibleBlock()
         width = self.width()
+        text_width = width - (defs.margin * 2)
+        text_flags = Qt.AlignRight | Qt.AlignVCenter
         event_rect_bottom = event.rect().bottom()
 
+        highlight_line = self.highlight_line
         highlight = self._highlight
-        highlight.setAlphaF(0.3)
         highlight_text = self._highlight_text
         disabled = self._disabled
 
         fmt = self.formatter
         lines = self.lines
-        num_lines = len(self.lines)
-        painter.setPen(disabled)
-        text = ''
+        num_lines = len(lines)
 
         while block.isValid():
             block_number = block.blockNumber()
             if block_number >= num_lines:
                 break
             block_geom = editor.blockBoundingGeometry(block)
-            block_top = block_geom.translated(content_offset).top()
-            if not block.isVisible() or block_top >= event_rect_bottom:
+            rect = block_geom.translated(content_offset).toRect()
+            if not block.isVisible() or rect.top() >= event_rect_bottom:
                 break
 
-            rect = block_geom.translated(content_offset).toRect()
-            if block_number == self.highlight_line:
+            if block_number == highlight_line:
                 painter.fillRect(rect.x(), rect.y(), width, rect.height(), highlight)
                 painter.setPen(highlight_text)
             else:
@@ -346,9 +332,9 @@ class DiffLineNumbers(TextDecorator):
             painter.drawText(
                 rect.x(),
                 rect.y(),
-                self.width() - (defs.margin * 2),
+                text_width,
                 rect.height(),
-                Qt.AlignRight | Qt.AlignVCenter,
+                text_flags,
                 text,
             )
 
@@ -357,10 +343,6 @@ class DiffLineNumbers(TextDecorator):
 
 class Viewer(QtWidgets.QFrame):
     """Text and image diff viewers"""
-
-    images_changed = Signal(object)
-    diff_type_changed = Signal(object)
-    file_type_changed = Signal(object)
 
     def __init__(self, context, parent=None):
         super(Viewer, self).__init__(parent)
@@ -382,20 +364,13 @@ class Viewer(QtWidgets.QFrame):
         self.setLayout(self.main_layout)
 
         # Observe images
-        images_msg = model.message_images_changed
-        model.add_observer(images_msg, self.images_changed.emit)
-        # pylint: disable=no-member
-        self.images_changed.connect(self.set_images, type=Qt.QueuedConnection)
+        model.images_changed.connect(self.set_images, type=Qt.QueuedConnection)
 
         # Observe the diff type
-        diff_type_msg = model.message_diff_type_changed
-        model.add_observer(diff_type_msg, self.diff_type_changed.emit)
-        self.diff_type_changed.connect(self.set_diff_type, type=Qt.QueuedConnection)
+        model.diff_type_changed.connect(self.set_diff_type, type=Qt.QueuedConnection)
 
         # Observe the file type
-        file_type_msg = model.message_file_type_changed
-        model.add_observer(file_type_msg, self.file_type_changed.emit)
-        self.file_type_changed.connect(self.set_file_type, type=Qt.QueuedConnection)
+        model.file_type_changed.connect(self.set_file_type, type=Qt.QueuedConnection)
 
         # Observe the image mode combo box
         options.image_mode.currentIndexChanged.connect(lambda _: self.render())
@@ -710,8 +685,6 @@ class DiffEditor(DiffTextEdit):
     up = Signal()
     down = Signal()
     options_changed = Signal()
-    updated = Signal()
-    diff_text_updated = Signal(object)
 
     def __init__(self, context, options, parent):
         DiffTextEdit.__init__(self, context, parent, numbers=True)
@@ -723,7 +696,11 @@ class DiffEditor(DiffTextEdit):
         self.options = options
 
         self.action_apply_selection = qtutils.add_action(
-            self, 'Apply', self.apply_selection, hotkeys.STAGE_DIFF
+            self,
+            'Apply',
+            self.apply_selection,
+            hotkeys.STAGE_DIFF,
+            hotkeys.STAGE_DIFF_ALT,
         )
 
         self.action_revert_selection = qtutils.add_action(
@@ -741,15 +718,11 @@ class DiffEditor(DiffTextEdit):
         self.move_up = actions.move_up(self)
         self.move_down = actions.move_down(self)
 
-        diff_text_updated = model.message_diff_text_updated
-        model.add_observer(diff_text_updated, self.diff_text_updated.emit)
-        self.diff_text_updated.connect(self.set_diff, type=Qt.QueuedConnection)
+        model.diff_text_updated.connect(self.set_diff, type=Qt.QueuedConnection)
 
-        selection_model.add_observer(
-            selection_model.message_selection_changed, self.updated.emit
+        selection_model.selection_changed.connect(
+            self.refresh, type=Qt.QueuedConnection
         )
-        # pylint: disable=no-member
-        self.updated.connect(self.refresh, type=Qt.QueuedConnection)
         # Update the selection model when the cursor changes
         self.cursorPositionChanged.connect(self._update_line_number)
 
@@ -1004,7 +977,7 @@ class DiffEditor(DiffTextEdit):
 
 
 class DiffWidget(QtWidgets.QWidget):
-    def __init__(self, context, notifier, parent, is_commit=False):
+    def __init__(self, context, parent, is_commit=False):
         QtWidgets.QWidget.__init__(self, parent)
 
         self.context = context
@@ -1069,8 +1042,6 @@ class DiffWidget(QtWidgets.QWidget):
         )
         self.setLayout(self.main_layout)
 
-        notifier.add_observer(COMMITS_SELECTED, self.commits_selected)
-        notifier.add_observer(FILES_SELECTED, self.files_selected)
         self.set_tabwidth(prefs.tabwidth(context))
 
     def set_tabwidth(self, width):
@@ -1080,7 +1051,7 @@ class DiffWidget(QtWidgets.QWidget):
         context = self.context
         self.diff.save_scrollbar()
         self.diff.set_loading_message()
-        task = DiffInfoTask(context, oid, filename, self)
+        task = DiffInfoTask(context, oid, filename)
         self.context.runtask.start(task, result=self.set_diff)
 
     def commits_selected(self, commits):
@@ -1168,8 +1139,8 @@ class TextLabel(QtWidgets.QLabel):
 
 
 class DiffInfoTask(qtutils.Task):
-    def __init__(self, context, oid, filename, parent):
-        qtutils.Task.__init__(self, parent)
+    def __init__(self, context, oid, filename):
+        qtutils.Task.__init__(self)
         self.context = context
         self.oid = oid
         self.filename = filename

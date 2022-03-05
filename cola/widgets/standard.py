@@ -25,6 +25,8 @@ from . import defs
 class WidgetMixin(object):
     """Mix-in for common utilities and serialization of widget state"""
 
+    closed = Signal(QtWidgets.QWidget)
+
     def __init__(self):
         self._unmaximized_rect = {}
 
@@ -121,6 +123,7 @@ class WidgetMixin(object):
 
     def closeEvent(self, event):
         self.save_settings()
+        self.closed.emit(self)
         self.Base.closeEvent(self, event)
 
     def init_size(self, parent=None, settings=None, width=0, height=0):
@@ -993,8 +996,7 @@ def save_as(filename, title):
 
 
 def async_command(title, cmd, runtask):
-    parent = qtutils.active_window()
-    task = qtutils.SimpleTask(parent, partial(core.run_command, cmd))
+    task = qtutils.SimpleTask(partial(core.run_command, cmd))
     task.connect(partial(async_command_result, title, cmd))
     runtask.start(task)
 

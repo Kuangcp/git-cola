@@ -514,7 +514,7 @@ def async_update(context):
 
     """
     update_status = partial(context.model.update_status, update_index=True)
-    task = qtutils.SimpleTask(context.view, update_status)
+    task = qtutils.SimpleTask(update_status)
     context.runtask.start(task)
 
 
@@ -593,6 +593,7 @@ class ApplicationContext(object):
         self.selection = None  # selection.SelectionModel
         self.fsmonitor = None  # fsmonitor
         self.view = None  # QWidget
+        self.browser_windows = []  # list of browse.Browser
 
     def set_view(self, view):
         """Initialize view-specific members"""

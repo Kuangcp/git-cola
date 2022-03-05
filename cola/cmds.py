@@ -62,7 +62,7 @@ class EditModel(ContextCommand):
 
     def do(self):
         """Perform the operation."""
-        self.model.set_filename(self.new_filename)
+        self.model.filename = self.new_filename
         self.model.set_mode(self.new_mode)
         self.model.set_diff_text(self.new_diff_text)
         self.model.set_diff_type(self.new_diff_type)
@@ -70,7 +70,7 @@ class EditModel(ContextCommand):
 
     def undo(self):
         """Undo the operation."""
-        self.model.set_filename(self.old_filename)
+        self.model.filename = self.old_filename
         self.model.set_mode(self.old_mode)
         self.model.set_diff_text(self.old_diff_text)
         self.model.set_diff_type(self.old_diff_type)
@@ -1731,7 +1731,7 @@ class OpenRepo(EditModel):
         if self.model.set_worktree(self.repo_path):
             self.fsmonitor.stop()
             self.fsmonitor.start()
-            self.model.update_status()
+            self.model.update_status(reset=True)
             # Check if template should be loaded
             if self.context.cfg.get(prefs.AUTOTEMPLATE):
                 template_loader = LoadCommitMessageFromTemplate(self.context)
@@ -2690,7 +2690,7 @@ class UnstageSelected(Unstage):
     """Unstage selected files."""
 
     def __init__(self, context):
-        staged = self.selection.staged
+        staged = context.selection.staged
         super(UnstageSelected, self).__init__(context, staged)
 
 

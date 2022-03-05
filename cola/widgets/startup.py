@@ -10,6 +10,7 @@ from ..i18n import N_
 from .. import core
 from .. import display
 from .. import guicmds
+from .. import hotkeys
 from .. import icons
 from .. import qtutils
 from .. import version
@@ -138,6 +139,10 @@ class StartupDialog(standard.Dialog):
         qtutils.connect_button(self.clone_button, self.clone_repo)
         qtutils.connect_button(self.new_button, self.new_repo)
         qtutils.connect_button(self.close_button, self.reject)
+        # Open the selected repository when "enter" is pressed.
+        self.action_open_repo = qtutils.add_action(
+            self, N_('Open'), self.open_selected_bookmark, *hotkeys.ACCEPT
+        )
 
         # pylint: disable=no-member
         self.tab_bar.currentChanged.connect(self.tab_changed)
@@ -213,7 +218,7 @@ class StartupDialog(standard.Dialog):
     def clone_repo(self):
         context = self.context
         progress = standard.progress('', '', self)
-        clone.clone_repo(context, self, True, progress, self.clone_repo_done, False)
+        clone.clone_repo(context, True, progress, self.clone_repo_done, False)
 
     def clone_repo_done(self, task):
         if task.cmd and task.cmd.status == 0:
@@ -228,6 +233,11 @@ class StartupDialog(standard.Dialog):
         if repodir:
             self.repodir = repodir
             self.accept()
+
+    def open_selected_bookmark(self):
+        selected = self.bookmarks.selectedIndexes()
+        if selected:
+            self.open_bookmark(selected[0])
 
     def open_bookmark(self, index):
         if index.row() == 0:

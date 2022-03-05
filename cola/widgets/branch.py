@@ -39,8 +39,8 @@ def add_branch_to_menu(menu, branch, remote_branch, remote, upstream, fn):
 class AsyncGitActionTask(qtutils.Task):
     """Run git action asynchronously"""
 
-    def __init__(self, parent, git_helper, action, args, kwarg):
-        qtutils.Task.__init__(self, parent)
+    def __init__(self, git_helper, action, args, kwarg):
+        qtutils.Task.__init__(self)
         self.git_helper = git_helper
         self.action = action
         self.args = args
@@ -53,8 +53,6 @@ class AsyncGitActionTask(qtutils.Task):
 
 
 class BranchesWidget(QtWidgets.QFrame):
-    updated = Signal()
-
     def __init__(self, context, parent):
         QtWidgets.QFrame.__init__(self, parent)
         self.model = model = context.model
@@ -96,8 +94,7 @@ class BranchesWidget(QtWidgets.QFrame):
             self.sort_order_button, cmds.run(cmds.CycleReferenceSort, context)
         )
 
-        self.updated.connect(self.refresh, Qt.QueuedConnection)
-        model.add_observer(model.message_refs_updated, self.updated.emit)
+        model.refs_updated.connect(self.refresh, Qt.QueuedConnection)
 
     def toggle_filter(self):
         shown = not self.filter_widget.isVisible()
@@ -123,7 +120,6 @@ class BranchesTreeWidget(standard.TreeWidget):
     def __init__(self, context, parent=None):
         standard.TreeWidget.__init__(self, parent)
 
-        model = context.model
         self.context = context
 
         self.setSelectionMode(QtWidgets.QAbstractItemView.SingleSelection)
@@ -140,7 +136,7 @@ class BranchesTreeWidget(standard.TreeWidget):
         self._active = False
 
         self.updated.connect(self.refresh, type=Qt.QueuedConnection)
-        model.add_observer(model.message_updated, self.updated.emit)
+        context.model.updated.connect(self.updated)
 
         # Expand items when they are clicked
         # pylint: disable=no-member
@@ -393,7 +389,7 @@ class BranchesTreeWidget(standard.TreeWidget):
     def git_action_async(self, action, args, kwarg=None):
         if kwarg is None:
             kwarg = {}
-        task = AsyncGitActionTask(self, self.git_helper, action, args, kwarg)
+        task = AsyncGitActionTask(self, action, args, kwarg)
         progress = standard.progress(
             N_('Executing action %s') % action, N_('Updating'), self
         )

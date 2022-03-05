@@ -799,11 +799,11 @@ class DockTitleBarWidget(QtWidgets.QFrame):
         self.toggle_button.setToolTip(tooltip)
 
 
-def create_dock(title, parent, stretch=True, widget=None, fn=None):
+def create_dock(name, title, parent, stretch=True, widget=None, fn=None):
     """Create a dock widget and set it up accordingly."""
     dock = QtWidgets.QDockWidget(parent)
     dock.setWindowTitle(title)
-    dock.setObjectName(title)
+    dock.setObjectName(name)
     titlebar = DockTitleBarWidget(dock, title, stretch=stretch)
     dock.setTitleBarWidget(titlebar)
     dock.setAutoFillBackground(True)
@@ -939,10 +939,10 @@ class Task(QtCore.QRunnable):
 
     """
 
-    def __init__(self, parent):
+    def __init__(self):
         QtCore.QRunnable.__init__(self)
 
-        self.channel = Channel(parent)
+        self.channel = Channel()
         self.result = None
         self.setAutoDelete(False)
 
@@ -962,8 +962,8 @@ class Task(QtCore.QRunnable):
 class SimpleTask(Task):
     """Run a simple callable as a task"""
 
-    def __init__(self, parent, fn, *args, **kwargs):
-        Task.__init__(self, parent)
+    def __init__(self, fn, *args, **kwargs):
+        Task.__init__(self)
 
         self.fn = fn
         self.args = args
