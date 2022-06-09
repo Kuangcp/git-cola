@@ -1,3 +1,32 @@
+.. _v4.0.1:
+
+Usability, bells and whistles
+-----------------------------
+
+* Double-clicking dock widgets no longer creates sub-windows when the layout is locked.
+  (`#1176 <https://github.com/git-cola/git-cola/issues/1176>`_)
+  (`#1198 <https://github.com/git-cola/git-cola/pull/1198>`_)
+
+Fixes
+-----
+
+* We now guard against `locale.getdefaultlocale()` returning `None` in some
+  configurations, notably on macOS if none of 'LC_ALL', 'LC_CTYPE', 'LANG' or 'LANGUAGE'
+  are defined.
+  (`#1234 <https://github.com/git-cola/git-cola/issues/1234>`_)
+
+* The preferences dialog has been fixed to properly handle booleans.
+  (`#1235 <https://github.com/git-cola/git-cola/issues/1235>`_)
+
+* The `docs/` directory was restructured to avoid missing `setup.py` errors.
+  `share/doc/git-cola` is now a symlink pointing to `docs/`.
+  (`#1230 <https://github.com/git-cola/git-cola/issues/1230>`_)
+
+* Message boxes could sometimes display off-screen or using geometry that is larger
+  than the current desktop. Message box sizes are now clamped to the desktop size.
+  (`#1228 <https://github.com/git-cola/git-cola/issues/1228>`_)
+
+
 .. _v4.0.0:
 
 v4.0.0
@@ -6,17 +35,57 @@ v4.0.0
 Breaking Changes
 ----------------
 
-* The build system is now Python3-only. While Git Cola still technically runs under
-  Python2, it is no longer officially supported and may stop working in a future
-  release.
+These changes are primarily breaking changes for packagers of Git Cola.
+For example, Linux distribution and Homebrew package maintainers may need to
+be aware of these changes.
+
+Changes have been made build infrastructure and the resulting filesystem artifacts.
+
+* The build system is now Python3-only and has been modernized for PEP-517/518.
+  While Git Cola still builds and runs under Python2, it is no longer officially
+  supported and may stop working in a future release without notice.
   (`#1201 <https://github.com/git-cola/git-cola/issues/1201>`_)
 
-* The default `#!/usr/bin/env python` lines in the `git-cola` and `git-dag` wrapper
+* The `#!/usr/bin/env python` shebang lines in the `git-cola` and `git-dag` wrapper
   scripts have been updated to use `python3`.
   (`#1204 <https://github.com/git-cola/git-cola/pull/1204>`_)
 
+* The build system was switched to `setuptools` and no longer depends on `distutils`.
+  ``python setup.py {build,install,build_pot,build_mo}`` are no longer provided.
+  Use the https://pypa-build.readthedocs.io/en/stable/installation.html
+  ``python -m build`` tool to generate sdist and wheel distributions,
+  and ``pip install .`` to install Git Cola from source.
+  (`#1204 <https://github.com/git-cola/git-cola/pull/1204>`_)
+
+* The `git-cola`, `git-dag` and `git-cola-sequence-editor` commands are now installed
+  using setuptools entry points.
+
+* The `bin/` wrapper scripts in the source tree continue to be provided for convenience
+  but they are not the scripts that get installed.
+
+* The `qtpy` Python package is no longer installed alongside the `cola` Python package.
+
+* The `cola` package is now installed into the standard Python site-packages location.
+
+* The `share/git-cola/lib` private Python modules directory no longer exists.
+
+* The `NO_VENDOR_LIBS` and `NO_PRIVATE_LIBS` Makefile options are no longer necessary.
+
+* The `share/git-cola` filesystem namespace no longer exists. All of cola's package data
+  is distributed alongside the `cola` module as package data.
+
+* Building the Sphinx documentation now also requires the `jaraco.packaging` and
+  `rst.linker` packages. See `requirements/requirements-dev.txt` for the package
+  requirement details.
+
 Usability, bells and whistles
 -----------------------------
+
+* `Custom UI themes
+  <https://git-cola.readthedocs.io/en/latest/git-cola.html#custom-themes>`_
+  can be used by adding `*.qss` Qt stylesheet files to `~/.config/git-cola/themes/`.
+  (`#1222 <https://github.com/git-cola/git-cola/pull/1222>`_)
+  (`#1226 <https://github.com/git-cola/git-cola/pull/1226>`_)
 
 * Git Cola now keeps track of child Browser windows and will close all of them when
   the main window is closed.
@@ -24,6 +93,9 @@ Usability, bells and whistles
 
 Fixes
 -----
+
+* Staging conflicted binary files has been fixed to avoid Unicode decoding errors.
+  (`#1189 <https://github.com/git-cola/git-cola/issues/1189>`_)
 
 * Ensure that secure permissions are used when creating temporary files.
   (`#1209 <https://github.com/git-cola/git-cola/pull/1209>`_)

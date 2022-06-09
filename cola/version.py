@@ -2,6 +2,14 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 import os
 import sys
+try:
+    if sys.version_info < (3, 8):
+        import importlib_metadata as metadata
+    else:
+        from importlib import metadata
+except (ImportError, OSError):
+    metadata = None
+
 
 if __name__ == '__main__':
     srcdir = os.path.dirname(os.path.dirname(__file__))
@@ -10,11 +18,6 @@ if __name__ == '__main__':
 from .git import STDOUT  # noqa
 from .decorators import memoize  # noqa
 from ._version import VERSION  # noqa
-
-try:
-    from ._build_version import BUILD_VERSION
-except ImportError:
-    BUILD_VERSION = ''
 
 # minimum version requirements
 _versions = {
@@ -53,12 +56,13 @@ def get(key):
 
 def version():
     """Returns the current version"""
-    return VERSION
-
-
-def build_version():
-    """Return the build version, which includes the Git ID"""
-    return BUILD_VERSION
+    pkg_version = VERSION
+    if metadata is not None:
+        try:
+            pkg_version = metadata.version('git-cola')
+        except (ImportError, OSError):
+            pass
+    return pkg_version
 
 
 @memoize
@@ -111,20 +115,14 @@ def git_version(context):
     return result
 
 
-def cola_version(build=False):
-    if build:
-        suffix = build_version() or version()
-    else:
-        suffix = version()
+def cola_version():
+    suffix = version()
     return 'cola version %s' % suffix
 
 
-def print_version(brief=False, build=False):
+def print_version(brief=False):
     if brief:
-        if build:
-            msg = build_version()
-        else:
-            msg = version()
+        msg = version()
     else:
-        msg = cola_version(build=build)
+        msg = cola_version()
     sys.stdout.write('%s\n' % msg)

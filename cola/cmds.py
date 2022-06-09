@@ -348,7 +348,7 @@ class ApplyPatches(ContextCommand):
 
 
 class Archive(ContextCommand):
-    """"Export archives using the "git archive" command"""
+    """ "Export archives using the "git archive" command"""
 
     def __init__(self, context, ref, fmt, prefix, filename):
         super(Archive, self).__init__(context)
@@ -2342,7 +2342,7 @@ def is_conflict_free(path):
     """Return True if `path` contains no conflict markers"""
     rgx = re.compile(r'^(<<<<<<<|\|\|\|\|\|\|\||>>>>>>>) ')
     try:
-        with core.xopen(path, 'r') as f:
+        with core.xopen(path, 'rb') as f:
             for line in f:
                 line = core.decode(line, errors='ignore')
                 if rgx.match(line):
@@ -2512,6 +2512,7 @@ class StageModifiedAndUntracked(StageCarefully):
 
 class StageOrUnstageAll(ContextCommand):
     """If the selection is staged, unstage it, otherwise stage"""
+
     @staticmethod
     def name():
         return N_('Stage / Unstage All')

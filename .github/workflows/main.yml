@@ -37,27 +37,29 @@ jobs:
 
       - name: Install Dependencies
         run: |
+          set -x
           sudo apt-get update
           sudo apt-get install \
               black \
               gettext \
               flake8 \
               pylint \
+              python-is-python3 \
               python-pytest \
+              python-setuptools-scm \
               python3-pytest \
               python3-pytest-flake8
-
           # Runtime dependencies (required)
           sudo apt-get install \
+              python3-qtpy \
               python3-pyqt5
-
           # Runtime dependencies (optional)
           sudo apt-get install \
-              python3-qtpy \
               python3-send2trash
 
       - name: Build Translations
-        run: make i18n
+        run: |
+          make i18n
 
       - name: Run Unit Tests
         run: |
@@ -97,11 +99,9 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          pip install -r requirements/requirements.txt
-          pip install -r requirements/requirements-optional.txt
-          pip install -r requirements/requirements-maint.txt
-          pip install -r requirements/requirements-dev.txt
-          pip install PyQt5
+          pip install --requirement requirements/requirements.txt
+          pip install --requirement requirements/requirements-dev.txt
+          pip install --requirement requirements/requirements-maint.txt
 
       # Based on: contrib/win32/run-pynsist.sh
       - name: Build Installer
@@ -132,17 +132,17 @@ jobs:
 
       - name: Install Dependencies
         run: |
-          brew install sphinx-doc
+          set -x
           brew install git-cola
+          python3 -m venv env
+          source env/bin/activate
+          make requirements-dev
 
       - name: Build Bundle
         run: |
-          mkdir build
-          make \
-            PYTHON=$(brew --prefix python3)/bin/python3 \
-            PYTHON_CONFIG=$(brew --prefix python3)/bin/python3-config \
-            SPHINXBUILD=$(brew --prefix sphinx-doc)/bin/sphinx-build \
-            git-cola.app
+          set -x
+          source env/bin/activate
+          make git-cola.app
           mv git-cola.app build/
 
       - name: Upload Artifact
