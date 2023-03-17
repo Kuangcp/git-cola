@@ -185,7 +185,7 @@ class RemoteActionDialog(standard.Dialog):
 
         text = N_('No fast-forward')
         tooltip = N_(
-            'Create a merge commit even when the merge resolves as a ' 'fast-forward'
+            'Create a merge commit even when the merge resolves as a fast-forward'
         )
         self.no_ff_checkbox = qtutils.checkbox(
             checked=False, text=text, tooltip=tooltip
@@ -203,7 +203,7 @@ class RemoteActionDialog(standard.Dialog):
         self.tags_checkbox = qtutils.checkbox(text=N_('Include tags '))
 
         tooltip = N_(
-            'Remove remote-tracking branches that no longer ' 'exist on the remote'
+            'Remove remote-tracking branches that no longer exist on the remote'
         )
         self.prune_checkbox = qtutils.checkbox(text=N_('Prune '), tooltip=tooltip)
 
@@ -237,8 +237,6 @@ class RemoteActionDialog(standard.Dialog):
         self.options_layout = qtutils.hbox(
             defs.no_margin,
             defs.button_spacing,
-            self.close_button,
-            qtutils.STRETCH,
             self.force_checkbox,
             self.ff_only_checkbox,
             self.no_ff_checkbox,
@@ -247,6 +245,8 @@ class RemoteActionDialog(standard.Dialog):
             self.rebase_checkbox,
             self.upstream_checkbox,
             self.prompt_checkbox,
+            qtutils.STRETCH,
+            self.close_button,
             self.action_button,
         )
 

@@ -2,6 +2,7 @@ Thanks
 ======
 `git-cola` was made possible thanks to the contributions of the following people:
 
+* Aaron Boxer
 * Aaron Cook
 * Aaron Malpas
 * Aaron Wolf
@@ -12,6 +13,7 @@ Thanks
 * AJ Bagwell
 * akontsevich
 * Aleksey Kontsevich
+* Alexander Preißner
 * Alex Chernetz
 * Alex Gulyás
 * Alexander Kozienko
@@ -22,6 +24,7 @@ Thanks
 * Andrej Kvasnica
 * Andrew Chen
 * Andrew Hemming
+* Andy O'Neill
 * armandg
 * Arthur Coelho
 * Audrey Yeena Toskin
@@ -46,6 +49,7 @@ Thanks
 * 林博仁 (Buo-ren Lin)
 * cclaus
 * Charles 101
+* Chris Stefano
 * Christian Jann
 * Christoph Erhardt
 * Christopher Meng
@@ -58,6 +62,7 @@ Thanks
 * Dave Cottlehuber
 * Dave Thomas
 * David Aguilar
+* David Bold
 * David Fernandez
 * David LeGare
 * David Martínez Martí
@@ -69,14 +74,18 @@ Thanks
 * Dmitriy Bogdanov
 * Dmitry Kann
 * Dmitry Pashkevich
+* Dorian Marchal
 * Doug Hoskisson
 * Drugoy
 * Efimov Vasily
 * Eric Drechsel
+* Eric Wild
+* Ernst Widerberg
 * Erop @EgZvor
 * Erwan Bousse
 * Fabio Coatti
 * Fang Pengfei
+* feinstaub
 * Felipe Morales
 * Filip Danilović
 * Floris Lambrechts
@@ -85,7 +94,10 @@ Thanks
 * Geoffrey van Wyk
 * Georg Limbach
 * geotavros
+* Gianni Lerro
+* Giovanni Martins
 * `Git Hackers <http://git-scm.com/about>`_
+* Graham Bartlett
 * green-eyed-bear
 * Glen Mailer
 * Guillaume de Bure
@@ -98,10 +110,13 @@ Thanks
 * Igor Kopach
 * Ilya Tumaykin
 * Ingo Weinhold
+* Irfan Baig
 * Ismael Juma
 * Iulian Udrea
 * Ivar Smolin
 * Jad El Kik
+* Jacob Gustafson
+* Jakub Klos
 * Jan @hanksoff
 * Jan Šilhan
 * Jan Tumanov
@@ -132,6 +147,9 @@ Thanks
 * Kerrick Staley
 * Kevin Kofler
 * Kirit Sælensminde
+* Kisaragi Hiu
+* Klaas Neirinck
+* Kurt McKee
 * Kyle Slane
 * László Böszörményi
 * lcjh
@@ -150,11 +168,13 @@ Thanks
 * Maciej Filipiak
 * Mahmoud Hossam
 * Mateusz Kedzior
+* Matias N. Goldberg
 * Maicon D. Filippsen
 * Marcin Mielniczuk
 * Marco Costalba
 * Mariusz Jaskółka
 * Markus Heidelberg
+* Martin Gysel
 * Martin Konecny
 * Matěj Šmíd
 * Matthew Levine
@@ -164,6 +184,7 @@ Thanks
 * Micha Rosenbaum
 * Michael Geddes
 * Michael Homer
+* Michael Schwarz
 * Mickael Albertus
 * Miguel Boekhold
 * Mike Hanson
@@ -173,9 +194,9 @@ Thanks
 * Mithil Poojary
 * Mosaab Alzoubi
 * Muhammad Bashir Al-Noimi
-* Myz
-* Naraesk
+* nakanoi
 * Nanda Lopes
+* Naraesk
 * Niel Buys
 * Nick Todd
 * Nicolas Dietrich
@@ -196,11 +217,14 @@ Thanks
 * Paulo Fidalgo
 * Pavel Borecki
 * Pavel Rehak
+* Peer Sommerlund
 * Peter Dave Hello
+* Peter Jensen
 * Peter Júnoš
 * Petr Gladkikh
 * Philip Stark
 * Pilar Molina Lopez
+* Pius Raeder
 * Radek Novacek
 * Radek Postołowicz
 * Rafael Nascimento
@@ -216,6 +240,7 @@ Thanks
 * Rustam Safin
 * Sabri Ünal
 * Samsul Ma'arif
+* Scott Field
 * Sean Allred
 * Sebastian Brass
 * Sebastian Oliva
@@ -230,6 +255,7 @@ Thanks
 * Steffen Prohaska
 * Stéphane Cerveau
 * Stephen Groat
+* Suyandi
 * Sven Claussner
 * Szymon Judasz
 * Taylor Braun-Jones
@@ -242,6 +268,7 @@ Thanks
 * Tim Gates
 * Tim Schumacher
 * Trevor Alexander
+* Tyler Shellberg
 * Ugo Riboni
 * Uri Okrent
 * Utku Karatas

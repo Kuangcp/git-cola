@@ -228,7 +228,7 @@ def select_directory(paths):
         if core.isdir(path):
             return path
 
-    return os.path.dirname(paths[0])
+    return os.path.dirname(paths[0]) or core.getcwd()
 
 
 def strip_prefix(prefix, string):
@@ -309,7 +309,23 @@ def is_darwin():
 
 def is_win32():
     """Return True on win32"""
-    return sys.platform == 'win32' or sys.platform == 'cygwin'
+    return sys.platform in {'win32', 'cygwin'}
+
+
+def launch_default_app(paths):
+    """Execute the default application on the specified paths"""
+    if is_win32():
+        for path in paths:
+            if hasattr(os, 'startfile'):
+                os.startfile(path)  # pylint: disable=no-member
+        return
+
+    if is_darwin():
+        launcher = 'open'
+    else:
+        launcher = 'xdg-open'
+
+    core.fork([launcher] + paths)
 
 
 def expandpath(path):
@@ -414,3 +430,21 @@ class seq(object):
 
     def __getitem__(self, idx):
         return self.seq[idx]
+
+
+def catch_runtime_error(func, *args, **kwargs):
+    """Run the function safely.
+
+    Catch RuntimeError to avoid tracebacks during application shutdown.
+
+    """
+    # Signals and callbacks can sometimes get triggered during application shutdown.
+    # This can happen when exiting while background tasks are still processing.
+    # Guard against this by making this operation a no-op.
+    try:
+        valid = True
+        result = func(*args, **kwargs)
+    except RuntimeError:
+        valid = False
+        result = None
+    return (valid, result)

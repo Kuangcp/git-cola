@@ -1,9 +1,12 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 import os
 
+from qtpy import QtGui
+
 from . import cmds
 from . import core
 from . import difftool
+from . import display
 from . import gitcmds
 from . import icons
 from . import qtutils
@@ -11,6 +14,7 @@ from .i18n import N_
 from .interaction import Interaction
 from .widgets import completion
 from .widgets import editremotes
+from .widgets import switcher
 from .widgets.browse import BrowseBranch
 from .widgets.selectcommits import select_commits
 from .widgets.selectcommits import select_commits_and_output
@@ -52,9 +56,11 @@ def browse_other(context):
     BrowseBranch.browse(context, branch)
 
 
-def checkout_branch(context):
+def checkout_branch(context, default=None):
     """Launch the 'Checkout Branch' dialog."""
-    branch = choose_potential_branch(context, N_('Checkout Branch'), N_('Checkout'))
+    branch = choose_potential_branch(
+        context, N_('Checkout Branch'), N_('Checkout'), default=default
+    )
     if not branch:
         return
     cmds.do(cmds.CheckoutBranch, context, branch)
@@ -98,6 +104,7 @@ def new_repo(context):
 
 
 def open_new_repo(context):
+    """Create a new repository and open it"""
     dirname = new_repo(context)
     if not dirname:
         return
@@ -105,6 +112,7 @@ def open_new_repo(context):
 
 
 def new_bare_repo(context):
+    """Create a bare repository and configure a remote pointing to it"""
     result = None
     repo = prompt_for_new_bare_repo()
     if not repo:
@@ -125,6 +133,7 @@ def new_bare_repo(context):
 
 
 def prompt_for_new_bare_repo():
+    """Prompt for a directory and name for a new bare repository"""
     path = qtutils.opendir_dialog(N_('Select Directory...'), core.getcwd())
     if not path:
         return None
@@ -170,6 +179,15 @@ def export_patches(context):
     )
 
 
+def diff_against_commit(context):
+    """Diff against any commit and checkout changes using the Diff Editor"""
+    icon = icons.compare()
+    ref = choose_ref(context, N_('Diff Against Commit'), N_('Diff'), icon=icon)
+    if not ref:
+        return
+    cmds.do(cmds.DiffAgainstCommitMode, context, ref)
+
+
 def diff_expression(context):
     """Diff using an arbitrary expression."""
     tracked = gitcmds.tracked_branch(context)
@@ -182,8 +200,9 @@ def diff_expression(context):
 
 
 def open_repo(context):
+    """Open a repository in the current window"""
     model = context.model
-    dirname = qtutils.opendir_dialog(N_('Open Git Repository...'), model.getcwd())
+    dirname = qtutils.opendir_dialog(N_('Open Git Repository'), model.getcwd())
     if not dirname:
         return
     cmds.do(cmds.OpenRepo, context, dirname)
@@ -192,10 +211,54 @@ def open_repo(context):
 def open_repo_in_new_window(context):
     """Spawn a new cola session."""
     model = context.model
-    dirname = qtutils.opendir_dialog(N_('Open Git Repository...'), model.getcwd())
+    dirname = qtutils.opendir_dialog(N_('Open Git Repository'), model.getcwd())
     if not dirname:
         return
     cmds.do(cmds.OpenNewRepo, context, dirname)
+
+
+def open_quick_repo_search(context, parent=None):
+    """Open a Quick Repository Search dialog"""
+    if parent is None:
+        parent = qtutils.active_window()
+    settings = context.settings
+    items = settings.bookmarks + settings.recent
+
+    if items:
+        cfg = context.cfg
+        default_repo = cfg.get('cola.defaultrepo')
+
+        entries = QtGui.QStandardItemModel()
+        added = set()
+        normalize = display.normalize_path
+        star_icon = icons.star()
+        folder_icon = icons.folder()
+
+        for item in items:
+            key = normalize(item['path'])
+            if key in added:
+                continue
+
+            name = item['name']
+            if default_repo == item['path']:
+                icon = star_icon
+            else:
+                icon = folder_icon
+
+            entry = switcher.switcher_item(key, icon, name)
+            entries.appendRow(entry)
+            added.add(key)
+
+        title = N_('Quick Open Repository')
+        place_holder = N_('Search repositories by name...')
+        switcher.switcher_inner_view(
+            context,
+            entries,
+            title,
+            place_holder=place_holder,
+            enter_action=lambda entry: cmds.do(cmds.OpenRepo, context, entry.key),
+            parent=parent,
+        )
 
 
 def load_commitmsg(context):
@@ -207,23 +270,30 @@ def load_commitmsg(context):
 
 
 def choose_from_dialog(get, context, title, button_text, default, icon=None):
+    """Choose a value from a dialog using the `get` method"""
     parent = qtutils.active_window()
     return get(context, title, button_text, parent, default=default, icon=icon)
 
 
 def choose_ref(context, title, button_text, default=None, icon=None):
+    """Choose a Git ref and return it"""
     return choose_from_dialog(
         completion.GitRefDialog.get, context, title, button_text, default, icon=icon
     )
 
 
 def choose_branch(context, title, button_text, default=None, icon=None):
+    """Choose a branch and return either the chosen branch or an empty value"""
     return choose_from_dialog(
         completion.GitBranchDialog.get, context, title, button_text, default, icon=icon
     )
 
 
 def choose_potential_branch(context, title, button_text, default=None, icon=None):
+    """Choose a "potential" branch for checking out.
+
+    This dialog includes remote branches from which new local branches can be created.
+    """
     return choose_from_dialog(
         completion.GitCheckoutBranchDialog.get,
         context,
@@ -235,6 +305,7 @@ def choose_potential_branch(context, title, button_text, default=None, icon=None
 
 
 def choose_remote_branch(context, title, button_text, default=None, icon=None):
+    """Choose a remote branch"""
     return choose_from_dialog(
         completion.GitRemoteBranchDialog.get,
         context,
@@ -266,6 +337,7 @@ def rename_branch(context):
 
 
 def reset_soft(context):
+    """Run "git reset --soft" to reset the branch HEAD"""
     title = N_('Reset Branch (Soft)')
     ok_text = N_('Reset Branch')
     ref = choose_ref(context, title, ok_text, default='HEAD^')
@@ -274,6 +346,7 @@ def reset_soft(context):
 
 
 def reset_mixed(context):
+    """Run "git reset --mixed" to reset the branch HEAD and staging area"""
     title = N_('Reset Branch and Stage (Mixed)')
     ok_text = N_('Reset')
     ref = choose_ref(context, title, ok_text, default='HEAD^')
@@ -282,6 +355,7 @@ def reset_mixed(context):
 
 
 def reset_keep(context):
+    """Run "git reset --keep" safe reset to avoid clobbering local changes"""
     title = N_('Reset All (Keep Unstaged Changes)')
     ref = choose_ref(context, title, N_('Reset and Restore'))
     if ref:
@@ -289,6 +363,12 @@ def reset_keep(context):
 
 
 def reset_merge(context):
+    """Run "git reset --merge" to reset the working tree and staging area
+
+    The staging area is allowed to carry forward unmerged index entries,
+    but if any unstaged changes would be clobbered by the reset then the
+    reset is aborted.
+    """
     title = N_('Restore Worktree and Reset All (Merge)')
     ok_text = N_('Reset and Restore')
     ref = choose_ref(context, title, ok_text, default='HEAD^')
@@ -297,6 +377,7 @@ def reset_merge(context):
 
 
 def reset_hard(context):
+    """Run "git reset --hard" to fully reset the working tree and staging area"""
     title = N_('Restore Worktree and Reset All (Hard)')
     ok_text = N_('Reset and Restore')
     ref = choose_ref(context, title, ok_text, default='HEAD^')
@@ -305,6 +386,7 @@ def reset_hard(context):
 
 
 def restore_worktree(context):
+    """Restore the worktree to the content from the specified commit"""
     title = N_('Restore Worktree')
     ok_text = N_('Restore Worktree')
     ref = choose_ref(context, title, ok_text, default='HEAD^')

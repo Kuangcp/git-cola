@@ -11,9 +11,8 @@ all::
 # make doc                      # build docs
 # make flake8                   # python style checks
 # make pylint [color=1]         # run pylint; color=1 colorizes output
-# make pylint3k [color=1]       # run python2+3 compatibility checks
 # make format                   # run the black python formatter
-# make check [color=1]          # run test, doc, flake8, pylint3k, and pylint
+# make check [color=1]          # run test, doc, flake8 and pylint
 # make check file=<filename>    # run checks on <filename>
 #
 # Release Prep
@@ -73,7 +72,7 @@ ifneq ($(uname_S),Linux)
 endif
 
 TOX_FLAGS = $(VERBOSE_SHORT) --develop --skip-missing-interpreters
-TOX_ENVS ?= py{27,36,37,38,39,lint}
+TOX_ENVS ?= py{36,37,38,39,310,311}
 
 PYLINT_SCORE_FLAG := $(shell $(PYLINT) --score=no --help >/dev/null 2>&1 && echo " --score=no" || true)
 PYLINT_FLAGS = --rcfile=.pylintrc
@@ -107,6 +106,7 @@ ifdef DESTDIR
 	export DESTDIR
 endif
 install_args += --prefix="$(prefix)"
+install_args += --disable-pip-version-check
 export prefix
 
 PYTHON_DIRS = cola
@@ -166,9 +166,6 @@ uninstall::
 	$(RMDIR) "$(DESTDIR)$(prefix)"/share/applications 2>/dev/null || true
 	$(RMDIR) "$(DESTDIR)$(prefix)"/share/metainfo 2>/dev/null || true
 	$(RMDIR) "$(DESTDIR)$(prefix)"/share/doc 2>/dev/null || true
-	$(RMDIR) "$(DESTDIR)$(prefix)"/share/locale/*/LC_MESSAGES 2>/dev/null || true
-	$(RMDIR) "$(DESTDIR)$(prefix)"/share/locale/* 2>/dev/null || true
-	$(RMDIR) "$(DESTDIR)$(prefix)"/share/locale 2>/dev/null || true
 	$(RMDIR) "$(DESTDIR)$(prefix)"/share/icons/hicolor/scalable/apps 2>/dev/null || true
 	$(RMDIR) "$(DESTDIR)$(prefix)"/share/icons/hicolor/scalable 2>/dev/null || true
 	$(RMDIR) "$(DESTDIR)$(prefix)"/share/icons/hicolor 2>/dev/null || true
@@ -204,7 +201,6 @@ pot::
 		--language=Python \
 		--keyword=N_ \
 		--no-wrap \
-		--no-location \
 		--omit-header \
 		--sort-output \
 		--output-dir cola/i18n \
@@ -218,7 +214,6 @@ po::
 	for po in cola/i18n/*.po; \
 	do \
 		$(MSGMERGE) \
-			--no-location \
 			--no-wrap \
 			--no-fuzzy-matching \
 			--sort-output \
@@ -233,14 +228,21 @@ po::
 # Build a git-cola.app bundle.
 .PHONY: git-cola.app
 git-cola.app::
+    cola_full_version := $(shell ./bin/git-cola version --brief)
+
+git-cola.app::
 	$(MKDIR_P) $(cola_app)/Contents/MacOS
 	$(MKDIR_P) $(cola_app_resources)
-	$(PYTHON3) -m venv $(cola_app_resources)
+	$(PYTHON3) -m venv --copies $(cola_app_resources)
 	$(cola_app_resources)/bin/pip install --requirement requirements/requirements.txt
 	$(cola_app_resources)/bin/pip install --requirement requirements/requirements-optional.txt
 	$(cola_app_resources)/bin/pip install --requirement requirements/requirements-dev.txt
 
 	$(CP) contrib/darwin/Info.plist contrib/darwin/PkgInfo $(cola_app)/Contents
+ifneq ($(cola_full_version),)
+	sed -i -e s/0.0.0.0/$(cola_full_version)/ $(cola_app)/Contents/Info.plist
+endif
+	sed -i -e s/0.0.0/$(cola_version)/ $(cola_app)/Contents/Info.plist
 	$(CP) contrib/darwin/git-cola $(cola_app)/Contents/MacOS
 	$(CP) contrib/darwin/git-cola.icns $(cola_app)/Contents/Resources
 	$(MAKE) PIP=$(cola_app_resources)/bin/pip \
@@ -262,12 +264,6 @@ flake8::
 	$(FLAKE8) $(FLAKE8_FLAGS) $(flags) \
 	$(ALL_PYTHON_DIRS) contrib
 
-.PHONY: pylint3k
-pylint3k::
-	$(PYLINT) --version
-	$(PYLINT) $(PYLINT_FLAGS) --py3k $(flags) \
-	$(ALL_PYTHON_DIRS)
-
 .PHONY: pylint
 pylint::
 	$(PYLINT) --version
@@ -280,14 +276,11 @@ ifdef file
 check::
 	$(FLAKE8) $(FLAKE8_FLAGS) $(flags) $(file)
 	$(PYLINT) $(PYLINT_FLAGS) --output-format=colorized $(flags) $(file)
-	$(PYLINT) $(PYLINT_FLAGS) --output-format=colorized --py3k $(flags) $(file)
 else
-# NOTE: flake8 is not part of "make check" because the pytest-flake8 plugin runs flake8
-# checks during "make test" via pytest.
 check:: all
 check:: test
 check:: doc
-check:: pylint3k
+check:: flake8
 check:: pylint
 endif
 
@@ -317,8 +310,8 @@ requirements-optional::
 
 .PHONY: tox
 tox::
-	$(TOX) $(TOX_FLAGS) $(flags)
+	$(TOX) $(TOX_FLAGS) --parallel auto -e "${TOX_ENVS}" $(flags)
 
 .PHONY: tox-check
 tox-check::
-	$(TOX) $(TOX_FLAGS) --parallel auto -e "$(TOX_ENVS)" $(flags)
+	$(TOX) $(TOX_FLAGS) --parallel auto -e check $(flags)

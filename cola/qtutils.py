@@ -29,31 +29,38 @@ def active_window():
     return QtWidgets.QApplication.activeWindow()
 
 
+def current_palette():
+    """Return the QPalette for the current application"""
+    return QtWidgets.QApplication.instance().palette()
+
+
 def connect_action(action, fn):
     """Connect an action to a function"""
-    action.triggered[bool].connect(lambda x: fn())
+    action.triggered[bool].connect(lambda x: fn(), type=Qt.QueuedConnection)
 
 
 def connect_action_bool(action, fn):
     """Connect a triggered(bool) action to a function"""
-    action.triggered[bool].connect(fn)
+    action.triggered[bool].connect(fn, type=Qt.QueuedConnection)
 
 
 def connect_button(button, fn):
     """Connect a button to a function"""
     # Some versions of Qt send the `bool` argument to the clicked callback,
     # and some do not.  The lambda consumes all callback-provided arguments.
-    button.clicked.connect(lambda *args, **kwargs: fn())
+    button.clicked.connect(lambda *args, **kwargs: fn(), type=Qt.QueuedConnection)
 
 
 def connect_checkbox(widget, fn):
     """Connect a checkbox to a function taking bool"""
-    widget.clicked.connect(lambda *args, **kwargs: fn(get(checkbox)))
+    widget.clicked.connect(
+        lambda *args, **kwargs: fn(get(checkbox)), type=Qt.QueuedConnection
+    )
 
 
 def connect_released(button, fn):
     """Connect a button to a function"""
-    button.released.connect(fn)
+    button.released.connect(fn, type=Qt.QueuedConnection)
 
 
 def button_action(button, action):
@@ -63,7 +70,7 @@ def button_action(button, action):
 
 def connect_toggle(toggle, fn):
     """Connect a toggle button to a function"""
-    toggle.toggled.connect(fn)
+    toggle.toggled.connect(fn, type=Qt.QueuedConnection)
 
 
 def disconnect(signal):
@@ -74,7 +81,7 @@ def disconnect(signal):
         pass
 
 
-def get(widget):
+def get(widget, default=None):
     """Query a widget for its python value"""
     if hasattr(widget, 'isChecked'):
         value = widget.isChecked()
@@ -89,7 +96,7 @@ def get(widget):
     elif hasattr(widget, 'date'):
         value = widget.date().toString(Qt.ISODate)
     else:
-        value = None
+        value = default
     return value
 
 
@@ -304,9 +311,7 @@ def prompt_n(msg, inputs):
             long_value = k + v
 
     metrics = QtGui.QFontMetrics(dialog.font())
-    min_width = metrics.width(long_value) + 100
-    if min_width > 720:
-        min_width = 720
+    min_width = min(720, metrics.width(long_value) + 100)
     dialog.setMinimumWidth(min_width)
 
     ok_b = ok_button(msg, enabled=False)
@@ -321,7 +326,9 @@ def prompt_n(msg, inputs):
         lineedit = QtWidgets.QLineEdit()
         # Enable the OK button only when all fields have been populated
         # pylint: disable=no-member
-        lineedit.textChanged.connect(lambda x: ok_b.setEnabled(all(get_values())))
+        lineedit.textChanged.connect(
+            lambda x: ok_b.setEnabled(all(get_values())), type=Qt.QueuedConnection
+        )
         if value:
             lineedit.setText(value)
         form_widgets.append((name, lineedit))
@@ -342,9 +349,32 @@ def prompt_n(msg, inputs):
     return (ok, text)
 
 
+def standard_item_type_value(value):
+    """Return a custom UserType for use in QTreeWidgetItem.type() overrides"""
+    return custom_item_type_value(QtGui.QStandardItem, value)
+
+
+def graphics_item_type_value(value):
+    """Return a custom UserType for use in QGraphicsItem.type() overrides"""
+    return custom_item_type_value(QtWidgets.QGraphicsItem, value)
+
+
+def custom_item_type_value(cls, value):
+    """Return a custom cls.UserType for use in cls.type() overrides"""
+    user_type = enum_value(cls.UserType)
+    return user_type + value
+
+
+def enum_value(value):
+    """Qt6 has enums with an inner '.value' attribute."""
+    if hasattr(value, 'value'):
+        value = value.value
+    return value
+
+
 class TreeWidgetItem(QtWidgets.QTreeWidgetItem):
 
-    TYPE = QtGui.QStandardItem.UserType + 101
+    TYPE = standard_item_type_value(101)
 
     def __init__(self, path, icon, deleted):
         QtWidgets.QTreeWidgetItem.__init__(self)
@@ -442,9 +472,11 @@ def open_files(title, directory=None, filters=''):
 
 def opendir_dialog(caption, path):
     """Prompts for a directory path"""
-
     options = (
-        QtWidgets.QFileDialog.ShowDirsOnly | QtWidgets.QFileDialog.DontResolveSymlinks
+        QtWidgets.QFileDialog.Directory
+        | QtWidgets.QFileDialog.DontResolveSymlinks
+        | QtWidgets.QFileDialog.ReadOnly
+        | QtWidgets.QFileDialog.ShowDirsOnly
     )
     return compat.getexistingdirectory(
         parent=active_window(), caption=caption, basedir=path, options=options
@@ -504,13 +536,29 @@ def add_action_bool(widget, text, fn, checked, *shortcuts):
     return action
 
 
-def add_action(widget, text, fn, *shortcuts):
+def add_action(widget, text, func, *shortcuts):
+    """Create a QAction and bind it to the `func` callback and hotkeys"""
     tip = text
-    return _add_action(widget, text, tip, fn, connect_action, *shortcuts)
+    return _add_action(widget, text, tip, func, connect_action, *shortcuts)
 
 
-def add_action_with_status_tip(widget, text, tip, fn, *shortcuts):
-    return _add_action(widget, text, tip, fn, connect_action, *shortcuts)
+def add_action_with_icon(widget, icon, text, func, *shortcuts):
+    """Create a QAction using a custom icon bound to the `func` callback and hotkeys"""
+    tip = text
+    action = _add_action(widget, text, tip, func, connect_action, *shortcuts)
+    action.setIcon(icon)
+    return action
+
+
+def add_action_with_status_tip(widget, text, tip, func, *shortcuts):
+    return _add_action(widget, text, tip, func, connect_action, *shortcuts)
+
+
+def menu_separator(widget):
+    """Return a QAction whose isSeparator() returns true. Used in context menus"""
+    action = QtWidgets.QAction('', widget)
+    action.setSeparator(True)
+    return action
 
 
 def _add_action(widget, text, tip, fn, connect, *shortcuts):
@@ -682,7 +730,7 @@ def tool_button():
     return button
 
 
-def create_action_button(tooltip=None, icon=None):
+def create_action_button(tooltip=None, icon=None, visible=True):
     """Create a small toolbutton for use in dock title widgets"""
     button = tool_button()
     if tooltip is not None:
@@ -690,6 +738,7 @@ def create_action_button(tooltip=None, icon=None):
     if icon is not None:
         button.setIcon(icon)
         button.setIconSize(QtCore.QSize(defs.small_icon, defs.small_icon))
+    button.setVisible(visible)
     return button
 
 
@@ -876,36 +925,60 @@ def create_toolbutton(text=None, layout=None, tooltip=None, icon=None):
     return button
 
 
+def create_toolbutton_with_callback(callback, text, icon, tooltip, layout=None):
+    """Create a toolbutton that runs the specified callback"""
+    toolbutton = create_toolbutton(text=text, layout=layout, tooltip=tooltip, icon=icon)
+    connect_button(toolbutton, callback)
+    return toolbutton
+
+
 # pylint: disable=line-too-long
-def mimedata_from_paths(context, paths):
+def mimedata_from_paths(context, paths, include_urls=True):
     """Return mimedata with a list of absolute path URLs
 
-    The text/x-moz-list format is always included by Qt, and doing
-    mimedata.removeFormat('text/x-moz-url') has no effect.
-    C.f. http://www.qtcentre.org/threads/44643-Dragging-text-uri-list-Qt-inserts-garbage
+    Set `include_urls` to False to prevent URLs from being included
+    in the mimedata. This is useful in some terminals that do not gracefully handle
+    multiple URLs being included in the payload.
 
-    gnome-terminal expects utf-16 encoded text, but other terminals,
-    e.g. terminator, prefer utf-8, so allow cola.dragencoding
-    to override the default.
+    This allows the mimedata to contain just plain a plain text value that we
+    are able to format ourselves.
 
+    Older verisons of gnome-terminal expected a utf-16 encoding, but that
+    behavior is no longer needed.
     """  # noqa
-    cfg = context.cfg
     abspaths = [core.abspath(path) for path in paths]
-    urls = [QtCore.QUrl.fromLocalFile(path) for path in abspaths]
-
-    mimedata = QtCore.QMimeData()
-    mimedata.setUrls(urls)
-
     paths_text = core.list2cmdline(abspaths)
-    encoding = cfg.get('cola.dragencoding', 'utf-16')
-    moz_text = core.encode(paths_text, encoding=encoding)
-    mimedata.setData('text/x-moz-url', moz_text)
+
+    # The text/x-moz-list format is always included by Qt, and doing
+    # mimedata.removeFormat('text/x-moz-url') has no effect.
+    # http://www.qtcentre.org/threads/44643-Dragging-text-uri-list-Qt-inserts-garbage
+    #
+    # Older versions of gnome-terminal expect utf-16 encoded text, but other terminals,
+    # e.g. terminator, expect utf-8, so use cola.dragencoding to override the default.
+    # NOTE: text/x-moz-url does not seem to be used/needed by modern versions of
+    # gnome-terminal, kitty, and terminator.
+    mimedata = QtCore.QMimeData()
+    mimedata.setText(paths_text)
+    if include_urls:
+        urls = [QtCore.QUrl.fromLocalFile(path) for path in abspaths]
+        encoding = context.cfg.get('cola.dragencoding', 'utf-16')
+        encoded_text = core.encode(paths_text, encoding=encoding)
+        mimedata.setUrls(urls)
+        mimedata.setData('text/x-moz-url', encoded_text)
 
     return mimedata
 
 
-def path_mimetypes():
-    return ['text/uri-list', 'text/x-moz-url']
+def path_mimetypes(include_urls=True):
+    """Return a list of mimetypes that we generate"""
+    mime_types = [
+        'text/plain',
+        'text/plain;charset=utf-8',
+    ]
+    if include_urls:
+        mime_types.append('text/uri-list')
+        mime_types.append('text/x-moz-url')
+    return mime_types
 
 
 class BlockSignals(object):
@@ -988,6 +1061,9 @@ class RunTask(QtCore.QObject):
         self.result_fn = result
         if progress is not None:
             progress.show()
+            if hasattr(progress, 'start'):
+                progress.start()
+
         # prevents garbage collection bugs in certain PyQt4 versions
         self.tasks.append(task)
         task_id = id(task)
@@ -996,6 +1072,7 @@ class RunTask(QtCore.QObject):
         self.threadpool.start(task)
 
     def finish(self, task):
+        """The task has finished. Run the finish and result callbacks"""
         task_id = id(task)
         try:
             self.tasks.remove(task)
@@ -1008,6 +1085,8 @@ class RunTask(QtCore.QObject):
             finish = progress = result = None
 
         if progress is not None:
+            if hasattr(progress, 'stop'):
+                progress.stop()
             progress.hide()
 
         if result is not None:
@@ -1019,31 +1098,57 @@ class RunTask(QtCore.QObject):
 
 # Syntax highlighting
 
-
 def rgb(r, g, b):
+    """Create a QColor from r, g, b arguments"""
     color = QtGui.QColor()
     color.setRgb(r, g, b)
     return color
 
 
 def rgba(r, g, b, a=255):
+    """Create a QColor with alpha from r, g, b, a arguments"""
     color = rgb(r, g, b)
     color.setAlpha(a)
     return color
 
 
 def RGB(args):
+    """Create a QColor from a list of [r, g, b] arguments"""
     return rgb(*args)
 
 
 def rgb_css(color):
-    """Convert a QColor into an rgb(int, int, int) CSS string"""
-    return 'rgb(%d, %d, %d)' % (color.red(), color.green(), color.blue())
+    """Convert a QColor into an rgb #abcdef CSS string"""
+    return '#%s' % rgb_hex(color)
 
 
 def rgb_hex(color):
     """Convert a QColor into a hex aabbcc string"""
     return '%02x%02x%02x' % (color.red(), color.green(), color.blue())
+
+
+def clamp_color(value):
+    """Clamp an integer value between 0 and 255"""
+    return min(255, max(value, 0))
+
+
+def css_color(value):
+    """Convert a #abcdef hex string into a QColor"""
+    if value.startswith('#'):
+        value = value[1:]
+    try:
+        r = clamp_color(int(value[:2], base=16))  # ab
+    except ValueError:
+        r = 255
+    try:
+        g = clamp_color(int(value[2:4], base=16))  # cd
+    except ValueError:
+        g = 255
+    try:
+        b = clamp_color(int(value[4:6], base=16))  # ef
+    except ValueError:
+        b = 255
+    return rgb(r, g, b)
 
 
 def hsl(h, s, light):
@@ -1053,6 +1158,7 @@ def hsl(h, s, light):
 
 
 def hsl_css(h, s, light):
+    """Convert HSL values to a CSS #abcdef color string"""
     return rgb_css(hsl(h, s, light))
 
 
@@ -1074,7 +1180,7 @@ class ImageFormats(object):
         # portability: python3 data() returns bytes, python2 returns str
         decode = core.decode
         formats = [decode(x.data()) for x in formats_qba]
-        self.extensions = set(['.' + fmt for fmt in formats])
+        self.extensions = {'.' + fmt for fmt in formats}
 
     def ok(self, filename):
         _, ext = os.path.splitext(filename)
@@ -1136,3 +1242,18 @@ def get_selected_items(widget, idx):
     """Return the selected items under the top-level item"""
     item = widget.topLevelItem(idx)
     return tree_selection_items(item)
+
+
+def add_menu_actions(menu, menu_actions):
+    """Add actions to a menu, treating None as a separator"""
+    current_actions = menu.actions()
+    if current_actions:
+        first_action = current_actions[0]
+    else:
+        first_action = None
+        menu.addSeparator()
+
+    for action in menu_actions:
+        if action is None:
+            action = menu_separator(menu)
+        menu.insertAction(first_action, action)

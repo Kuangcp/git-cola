@@ -74,6 +74,7 @@ The following files are from Github's
 - git-merge.svg
 - link-external.svg
 - pencil.svg
+- play.svg
 - plus.svg
 - primitive-dot.svg
 - question.svg
@@ -87,6 +88,7 @@ The following files are from Github's
 - sync.svg
 - tag.svg
 - telescope.svg
+- terminal.svg
 - three-bars.svg
 - trashcan.svg
 - unfold.svg

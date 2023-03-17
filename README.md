@@ -2,9 +2,11 @@
 
 Git Cola is a powerful Git GUI with a slick and intuitive user interface.
 
-    git clone https://github.com/git-cola/git-cola
+    git clone https://github.com/git-cola/git-cola.git
 
+[![License](https://img.shields.io/:license-GPL-green.svg)](LICENSE)
 [![Build status](https://github.com/git-cola/git-cola/actions/workflows/main.yml/badge.svg?branch=main&event=push)](https://github.com/git-cola/git-cola/actions/workflows/main.yml)
+[![OpenSSF Best Practices](https://bestpractices.coreinfrastructure.org/projects/251/badge)](https://bestpractices.coreinfrastructure.org/projects/251)
 
 * [Screenshots](https://git-cola.github.io/screenshots.html)
 
@@ -38,14 +40,15 @@ Git Cola is a powerful Git GUI with a slick and intuitive user interface.
 
 * [QtPy](https://github.com/spyder-ide/qtpy) 1.1.0 or newer.
 
-Git Cola uses QtPy, so you can choose between PyQt5 and PySide2 by setting
-the `QT_API` environment variable to `pyqt5` or `pyside2` as desired.
-`qtpy` defaults to `pyqt5` and falls back to `pyside2` if `pyqt5` is not installed.
+Git Cola uses QtPy, so you can choose between PyQt6, PyQt5 and PySide2 by setting
+the `QT_API` environment variable to `pyqt6`, `pyqt5` or `pyside2` as desired.
+`qtpy` defaults to `pyqt5` and falls back to `pyqt6` and `pyside2` if `pyqt5`
+is not installed.
 
 Any of the following Python Qt libraries must be installed:
 
-* [PyQt5](https://www.riverbankcomputing.com/software/pyqt/download5)
-  5.6 or newer.
+* [PyQt5 / PyQt6](https://www.riverbankcomputing.com/software/pyqt/download5)
+  5.6 or newer is required. Qt 6.0 is also supported via QtPy.
 
 * [PySide2](https://github.com/PySide/PySide)
   5.11.0 or newer.
@@ -62,54 +65,10 @@ Python modules are installed.
 
 # Installation
 
-**IMPORTANT**: never run `pip install` as root or outside of a Python virtualenv!
+**IMPORTANT**: never run `pip install` or `make install` as root or outside of a
+Python virtualenv!
 
-You can install the latest released version using `pip`:
-
-    python3 -m venv env3
-    ./env3/bin/pip install git-cola
-    ./env3/bin/git-cola
-
-Add the `env3/bin` directory to your `$PATH` (or symlink to `bin/git-cola` from somewhere
-in your `$PATH`) allows you to launch Git Cola like any other built-in `git` command:
-
-    git cola
-    git dag
-
-## Python Virtual Environments
-
-If you don't have PyQt installed then the easiest way to get it is to use a Python
-virtualenv and install Git Cola into it in "editable" mode so that you can "upgrade"
-Git Cola by running `git pull`.
-
-    # Create a virtualenv called "env3" and activate it.
-    python3 -m venv env3
-    source env3/bin/activate
-
-    # One-time setup: install optional requirements for development.
-    make requirements-dev requirements-optional
-
-    # Install git-cola in "editable" mode so that it uses the source tree.
-    make develop
-
-    # Run Git Cola via the "git-cola" Git subcommand.
-    git cola
-
-If you add `env3/bin` (or symlink to `bin/git-cola` ) to your `$PATH` then you can
-run `git cola` as if it were a builtin `git` command.
-
-## Standalone Installation
-
-Running `make install` will install Git Cola in your `$HOME` directory
-(`$HOME/bin/git-cola`, `$HOME/lib`, etc).
-
-If you want to do a global install you can do
-
-    make prefix=/usr/local install
-
-The `Makefile` also supports `DESTDIR`:
-
-    make DESTDIR=/tmp/stage prefix=/usr/local install
+There are several ways to install Git Cola.
 
 ## Linux
 
@@ -158,12 +117,89 @@ but it has not been updated for a while.
     cd /usr/ports/devel/git-cola && make clean install
 
 
+## Install into a Python Virtualenv from PyPI using pip
+
+**IMPORTANT**: never run `pip install` or `make install` as root or outside of a
+Python virtualenv!
+
+One way to install the latest released version is to use `venv` (virtualenv) and `pip`.
+This installs [git-cola from pypi.org](https://pypi.org/project/git-cola/).
+
+If you already have `PyQt5` installed from your distribution's package manager
+then you should skip the `pip install PyQt` steps.
+
+If you already have the `qt5-devel` package installed then you can lookup its version so
+that your virtualenv can install a compatible version of PyQt using `qmake`:
+
+    QT_VERSION=$(qmake -query QT_VERSION)
+    QT_VERSION_MAJOR=$(qmake -query QT_VERSION | head -c 1)
+    echo PyQt${QT_VERSION_MAJOR}==${QT_VERSION}
+
+Take note of the `PyQtX==A.B.C` value so that you can specify it when installing
+PyQt below if, and only if, you have `qmake` installed and want to interoperate
+with its corresponding Qt installation.
+
+    python3 -m venv --system-site-packages env3
+
+    # Skip this command if you already have PyQt installed or if you do not have qmake
+    ./env3/bin/pip install PyQt${QT_VERSION_MAJOR}==${QT_VERSION}
+
+    ./env3/bin/pip install git-cola
+    ./env3/bin/git-cola
+
+Add the `env3/bin` directory to your `PATH` or symlink to `bin/git-cola` from
+somewhere in your `PATH` such as `~/.local/bin/git-cola`, and you can launch
+Git Cola like any other built-in `git` command:
+
+    git cola
+    git dag
+
+
+## Install into a Python Virtualenv from Source
+
+If you don't have PyQt installed then the easiest way to get it is to use a Python
+virtualenv and install Git Cola into it in "editable" mode. This install method
+lets you upgrade Git Cola by running `git pull`.
+
+    # Create a virtualenv called "env3" and activate it.
+    python3 -m venv --system-site-packages env3
+    source env3/bin/activate
+
+    # One-time setup: install optional requirements for development.
+    make requirements-dev requirements-optional
+
+    # Install git-cola in "editable" mode so that it uses the source tree.
+    make develop
+
+    # Run Git Cola via the "git-cola" Git subcommand.
+    git cola
+
+
+If you add `env3/bin` (or symlink to `bin/git-cola` ) to your `$PATH` then you can
+run `git cola` as if it were a builtin `git` command from outside of the virtualenv
+(eg. after running "deactivate" or when opening a new shell).
+
+
+## Standalone Installation from Source
+
+Running `make install prefix=$HOME/.local` will install Git Cola in your
+`$HOME/.local` directory (`$HOME/.local/bin/git-cola`, `$HOME/.local/lib`, etc).
+
+This installation method assumes that the `qtpy` and `PyQt*` dependencies have
+been pre-installed.
+
+The `Makefile` also supports `DESTDIR` to support creating packages for Linux package
+managers:
+
+    make DESTDIR=/tmp/stage prefix=/usr/local install
+
+
 ## macOS
 
-For most end-users we recommend using either Homebrew or `pip install git-cola`
-inside of a virtualenv.
+For most end-users we recommend using either Homebrew or installing into
+a Python virtualenv as described above.
 
-You can install Git Cola using the same `Makefile` steps above to install from source.
+You can install Git Cola from source using the same steps as above.
 
 ### Homebrew
 

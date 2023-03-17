@@ -36,6 +36,7 @@ from . import browse
 from . import cfgactions
 from . import clone
 from . import commitmsg
+from . import common
 from . import compare
 from . import createbranch
 from . import createtag
@@ -89,8 +90,9 @@ class MainView(standard.MainWindow):
             )
 
         # "Actions" widget
+        self.actionswidget = action.ActionButtons(context, self)
         self.actionsdock = create_dock(
-            'Actions', N_('Actions'), self, widget=action.ActionButtons(context, self)
+            'Actions', N_('Actions'), self, widget=self.actionswidget
         )
         qtutils.hide_dock(self.actionsdock)
 
@@ -232,6 +234,34 @@ class MainView(standard.MainWindow):
         )
         self.apply_patches_action.setIcon(icons.diff())
 
+        self.apply_patches_abort_action = add_action(
+            self,
+            N_('Abort Applying Patches...'),
+            cmds.run(cmds.AbortApplyPatch, context),
+        )
+        self.apply_patches_abort_action.setIcon(icons.style_dialog_discard())
+        self.apply_patches_abort_action.setToolTip(
+            N_('Abort the current "git am" patch session')
+        )
+
+        self.apply_patches_continue_action = add_action(
+            self,
+            N_('Continue Applying Patches'),
+            cmds.run(cmds.ApplyPatchesContinue, context),
+        )
+        self.apply_patches_continue_action.setToolTip(
+            N_('Commit the current state and continue applying patches')
+        )
+        self.apply_patches_continue_action.setIcon(icons.commit())
+
+        self.apply_patches_skip_action = add_action(
+            self, N_('Skip Current Patch'), cmds.run(cmds.ApplyPatchesContinue, context)
+        )
+        self.apply_patches_skip_action.setToolTip(
+            N_('Skip applying the current patch and continue applying patches')
+        )
+        self.apply_patches_skip_action.setIcon(icons.discard())
+
         self.export_patches_action = add_action(
             self,
             N_('Export Patches...'),
@@ -276,7 +306,6 @@ class MainView(standard.MainWindow):
             N_('Find Files'),
             partial(finder.finder, context),
             hotkeys.FINDER,
-            hotkeys.FINDER_SECONDARY,
         )
         self.find_files_action.setIcon(icons.search())
 
@@ -295,6 +324,10 @@ class MainView(standard.MainWindow):
             hotkeys.CHERRY_PICK,
         )
         self.cherry_pick_action.setIcon(icons.cherry_pick())
+        self.cherry_pick_abort_action = add_action(
+            self, N_('Abort Cherry-Pick...'), cmds.run(cmds.AbortCherryPick, context)
+        )
+        self.cherry_pick_abort_action.setIcon(icons.style_dialog_discard())
 
         self.load_commitmsg_action = add_action(
             self, N_('Load Commit Message...'), partial(guicmds.load_commitmsg, context)
@@ -328,7 +361,7 @@ class MainView(standard.MainWindow):
         self.merge_abort_action = add_action(
             self, N_('Abort Merge...'), cmds.run(cmds.AbortMerge, context)
         )
-        self.merge_abort_action.setIcon(icons.style_dialog_reset())
+        self.merge_abort_action.setIcon(icons.style_dialog_discard())
 
         self.update_submodules_action = add_action(
             self,
@@ -478,6 +511,18 @@ class MainView(standard.MainWindow):
             self, N_('About'), partial(about.about_dialog, context)
         )
 
+        self.diff_against_commit_action = add_action(
+            self,
+            N_('Against Commit... (Diff Mode)'),
+            partial(guicmds.diff_against_commit, context),
+        )
+        self.diff_against_commit_action.setIcon(icons.compare())
+
+        self.exit_diff_mode_action = add_action(
+            self, N_('Exit Diff Mode'), cmds.run(cmds.ResetMode, context)
+        )
+        self.exit_diff_mode_action.setIcon(icons.compare())
+
         self.diff_expression_action = add_action(
             self, N_('Expression...'), partial(guicmds.diff_expression, context)
         )
@@ -547,10 +592,12 @@ class MainView(standard.MainWindow):
             cmds.run(cmds.Rebase, context),
             hotkeys.REBASE_START_AND_CONTINUE,
         )
+        self.rebase_start_action.setIcon(icons.play())
 
         self.rebase_edit_todo_action = add_action(
             self, N_('Edit...'), cmds.run(cmds.RebaseEditTodo, context)
         )
+        self.rebase_edit_todo_action.setIcon(icons.edit())
 
         self.rebase_continue_action = add_action(
             self,
@@ -558,14 +605,17 @@ class MainView(standard.MainWindow):
             cmds.run(cmds.RebaseContinue, context),
             hotkeys.REBASE_START_AND_CONTINUE,
         )
+        self.rebase_continue_action.setIcon(icons.play())
 
         self.rebase_skip_action = add_action(
             self, N_('Skip Current Patch'), cmds.run(cmds.RebaseSkip, context)
         )
+        self.rebase_skip_action.setIcon(icons.delete())
 
         self.rebase_abort_action = add_action(
             self, N_('Abort'), cmds.run(cmds.RebaseAbort, context)
         )
+        self.rebase_abort_action.setIcon(icons.close())
 
         # For "Start Rebase" only, reverse the first argument to setEnabled()
         # so that we can operate on it as a group.
@@ -599,6 +649,18 @@ class MainView(standard.MainWindow):
             self, N_('Reset Layout'), self.reset_layout
         )
 
+        self.quick_repository_search = add_action(
+            self,
+            N_('Quick Open...'),
+            lambda: guicmds.open_quick_repo_search(self.context, parent=self),
+            hotkeys.OPEN_REPO_SEARCH,
+        )
+        self.quick_repository_search.setIcon(icons.search())
+
+        self.terminal_action = common.terminal_action(
+            context, self, hotkey=hotkeys.TERMINAL
+        )
+
         # Create the application menu
         self.menubar = QtWidgets.QMenuBar(self)
         self.setMenuBar(self.menubar)
@@ -606,6 +668,7 @@ class MainView(standard.MainWindow):
         # File Menu
         add_menu = qtutils.add_menu
         self.file_menu = add_menu(N_('&File'), self.menubar)
+        self.file_menu.addAction(self.quick_repository_search)
         # File->Open Recent menu
         self.open_recent_menu = self.file_menu.addMenu(N_('Open Recent'))
         self.open_recent_menu.setIcon(icons.folder())
@@ -621,9 +684,15 @@ class MainView(standard.MainWindow):
         self.file_menu.addAction(self.edit_remotes_action)
         self.file_menu.addAction(self.browse_recently_modified_action)
         self.file_menu.addSeparator()
-        self.file_menu.addAction(self.apply_patches_action)
-        self.file_menu.addAction(self.export_patches_action)
         self.file_menu.addAction(self.save_tarball_action)
+
+        self.patches_menu = self.file_menu.addMenu(N_('Patches'))
+        self.patches_menu.setIcon(icons.diff())
+        self.patches_menu.addAction(self.export_patches_action)
+        self.patches_menu.addAction(self.apply_patches_action)
+        self.patches_menu.addAction(self.apply_patches_continue_action)
+        self.patches_menu.addAction(self.apply_patches_skip_action)
+        self.patches_menu.addAction(self.apply_patches_abort_action)
 
         # Git Annex / Git LFS
         annex = core.find_executable('git-annex')
@@ -676,10 +745,12 @@ class MainView(standard.MainWindow):
         )
         select_all.setIcon(icons.select_all())
         edit_menu.addSeparator()
-        commitmsg.add_menu_actions(edit_menu, self.commiteditor.menu_actions)
+        qtutils.add_menu_actions(edit_menu, self.commiteditor.menu_actions)
 
         # Actions menu
         self.actions_menu = add_menu(N_('Actions'), self.menubar)
+        if self.terminal_action is not None:
+            self.actions_menu.addAction(self.terminal_action)
         self.actions_menu.addAction(self.fetch_action)
         self.actions_menu.addAction(self.push_action)
         self.actions_menu.addAction(self.pull_action)
@@ -687,6 +758,7 @@ class MainView(standard.MainWindow):
         self.actions_menu.addSeparator()
         self.actions_menu.addAction(self.create_tag_action)
         self.actions_menu.addAction(self.cherry_pick_action)
+        self.actions_menu.addAction(self.cherry_pick_abort_action)
         self.actions_menu.addAction(self.merge_local_action)
         self.actions_menu.addAction(self.merge_abort_action)
         self.actions_menu.addSeparator()
@@ -719,8 +791,10 @@ class MainView(standard.MainWindow):
         self.diff_menu = add_menu(N_('Diff'), self.menubar)
         self.diff_menu.addAction(self.diff_expression_action)
         self.diff_menu.addAction(self.branch_compare_action)
-        self.diff_menu.addSeparator()
         self.diff_menu.addAction(self.show_diffstat_action)
+        self.diff_menu.addSeparator()
+        self.diff_menu.addAction(self.diff_against_commit_action)
+        self.diff_menu.addAction(self.exit_diff_mode_action)
 
         # Branch Menu
         self.branch_menu = add_menu(N_('Branch'), self.menubar)
@@ -1007,10 +1081,12 @@ class MainView(standard.MainWindow):
     def refresh(self):
         """Update the title with the current branch and directory name."""
         curbranch = self.model.currentbranch
-        curdir = core.getcwd()
         is_merging = self.model.is_merging
         is_rebasing = self.model.is_rebasing
+        is_applying_patch = self.model.is_applying_patch
+        is_cherry_picking = self.model.is_rebasing
 
+        curdir = core.getcwd()
         msg = N_('Repository: %s') % curdir
         msg += '\n'
         msg += N_('Branch: %s') % curbranch
@@ -1022,7 +1098,18 @@ class MainView(standard.MainWindow):
                 'Resolve conflicts, commit changes, and run:\n'
                 '    Rebase > Continue'
             )
-
+        elif is_applying_patch:
+            msg += '\n\n'
+            msg += N_(
+                'This repository has unresolved conflicts after applying a patch.\n'
+                'Resolve conflicts and commit changes.'
+            )
+        elif is_cherry_picking:
+            msg += '\n\n'
+            msg += N_(
+                'This repository is in the middle of a cherry-pick.\n'
+                'Resolve conflicts and commit changes.'
+            )
         elif is_merging:
             msg += '\n\n'
             msg += N_(
@@ -1038,7 +1125,11 @@ class MainView(standard.MainWindow):
             self.commit_amend_action.setChecked(False)
 
         self.commitdock.setToolTip(msg)
+
+        self.actionswidget.set_mode(self.mode)
         self.commiteditor.set_mode(self.mode)
+        self.statuswidget.set_mode(self.mode)
+
         self.update_actions()
 
     def refresh_window_title(self):
@@ -1047,18 +1138,28 @@ class MainView(standard.MainWindow):
 
         project = self.model.project
         curbranch = self.model.currentbranch
+        is_cherry_picking = self.model.is_cherry_picking
         is_merging = self.model.is_merging
         is_rebasing = self.model.is_rebasing
+        is_applying_patch = self.model.is_applying_patch
+        is_diff_mode = self.model.is_diff_mode()
+        is_amend_mode = self.mode == self.model.mode_amend
+
         prefix = uchr(0xAB)
         suffix = uchr(0xBB)
 
-        if is_rebasing:
-            alerts.append(N_('Rebasing'))
+        if is_amend_mode:
+            alerts.append(N_('Amending'))
+        elif is_diff_mode:
+            alerts.append(N_('Diff Mode'))
+        elif is_cherry_picking:
+            alerts.append(N_('Cherry-picking'))
         elif is_merging:
             alerts.append(N_('Merging'))
-
-        if self.mode == self.model.mode_amend:
-            alerts.append(N_('Amending'))
+        elif is_rebasing:
+            alerts.append(N_('Rebasing'))
+        elif is_applying_patch:
+            alerts.append(N_('Applying Patch'))
 
         if alerts:
             alert_text = (prefix + ' %s ' + suffix + ' ') % ', '.join(alerts)
@@ -1083,6 +1184,14 @@ class MainView(standard.MainWindow):
 
         self.annex_init_action.setEnabled(not self.model.annex)
         self.lfs_init_action.setEnabled(not self.model.lfs)
+        self.merge_abort_action.setEnabled(self.model.is_merging)
+        self.cherry_pick_abort_action.setEnabled(self.model.is_cherry_picking)
+        self.apply_patches_continue_action.setEnabled(self.model.is_applying_patch)
+        self.apply_patches_skip_action.setEnabled(self.model.is_applying_patch)
+        self.apply_patches_abort_action.setEnabled(self.model.is_applying_patch)
+
+        diff_mode = self.model.mode == self.model.mode_diff
+        self.exit_diff_mode_action.setEnabled(diff_mode)
 
     def update_menu_actions(self):
         # Enable the Prepare Commit Message action if the hook exists
@@ -1186,7 +1295,7 @@ class MainView(standard.MainWindow):
         self.dag = dag.git_dag(self.context, existing_view=self.dag)
 
     def show_cursor_position(self, rows, cols):
-        display = '%02d:%02d' % (rows, cols)
+        display_content = '%02d:%02d' % (rows, cols)
         css = """
             <style>
             .good {
@@ -1214,7 +1323,7 @@ class MainView(standard.MainWindow):
             cls = 'first-warning'
         else:
             cls = 'good'
-        div = '<div class="%s">%s</div>' % (cls, display)
+        div = '<div class="%s">%s</div>' % (cls, display_content)
         self.position_label.setText(css + div)
 
 

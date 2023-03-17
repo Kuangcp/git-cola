@@ -190,8 +190,8 @@ class CreateBranchDialog(standard.Dialog):
         self.buttons_layout = qtutils.hbox(
             defs.margin,
             defs.spacing,
-            self.close_button,
             qtutils.STRETCH,
+            self.close_button,
             self.create_button,
         )
 
@@ -250,7 +250,7 @@ class CreateBranchDialog(standard.Dialog):
         if not branch or not revision:
             Interaction.critical(
                 N_('Missing Data'),
-                N_('Please provide both a branch ' 'name and revision expression.'),
+                N_('Please provide both a branch name and revision expression.'),
             )
             return
         if branch in existing_branches:
@@ -264,7 +264,7 @@ class CreateBranchDialog(standard.Dialog):
 
         if check_branch:
             msg = N_(
-                'Resetting "%(branch)s" to "%(revision)s" ' 'will lose commits.'
+                'Resetting "%(branch)s" to "%(revision)s" will lose commits.'
             ) % dict(branch=branch, revision=revision)
             if ffwd_only:
                 Interaction.critical(N_('Branch Exists'), msg)

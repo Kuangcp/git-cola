@@ -80,7 +80,7 @@ class GrepThread(QtCore.QThread):
             args = utils.shell_split(query)
         else:
             args = [query]
-        status, out, err = git.grep(self.regexp_mode, n=True, *args)
+        status, out, err = git.grep(self.regexp_mode, n=True, _readonly=True, *args)
         if query == self.query:
             self.result.emit(status, out, err)
         else:
@@ -166,10 +166,10 @@ class Grep(Dialog):
         self.bottom_layout = qtutils.hbox(
             defs.no_margin,
             defs.button_spacing,
-            self.close_button,
-            qtutils.STRETCH,
-            self.shell_checkbox,
             self.refresh_button,
+            self.shell_checkbox,
+            qtutils.STRETCH,
+            self.close_button,
             self.edit_button,
         )
 
@@ -325,12 +325,7 @@ class GrepTextView(VimHintedPlainTextEdit):
         self.context = context
         self.goto_action = qtutils.add_action(self, 'Launch Editor', self.edit)
         self.goto_action.setShortcut(hotkeys.EDIT)
-
-    def contextMenuEvent(self, event):
-        menu = self.createStandardContextMenu(event.pos())
-        menu.addSeparator()
-        menu.addAction(self.goto_action)
-        menu.exec_(self.mapToGlobal(event.pos()))
+        self.menu_actions.append(self.goto_action)
 
     def edit(self):
         goto_grep(self.context, self.selected_line())

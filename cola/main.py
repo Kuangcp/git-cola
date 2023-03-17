@@ -28,10 +28,6 @@ def main(argv=None):
     return args.func(args)
 
 
-def winmain():
-    return app.winmain(main)
-
-
 def parse_args(argv):
     parser = argparse.ArgumentParser()
     # Newer versions of argparse (Python 3.6+) emit an error message for
@@ -350,6 +346,12 @@ def add_rebase_command(subparser):
         help="passed to 'git apply' by 'git rebase'",
     )
     parser.add_argument(
+        '--update-refs',
+        default=False,
+        action='store_true',
+        help='update branches that point to commits that are being rebased',
+    )
+    parser.add_argument(
         '-C',
         dest='context_lines',
         default=None,
@@ -652,6 +654,7 @@ def cmd_rebase(args):
         'abort': args.abort,
         'skip': args.skip,
         'edit_todo': args.edit_todo,
+        'update_refs': args.update_refs,
         'upstream': args.upstream,
         'branch': args.branch,
     }
@@ -710,4 +713,4 @@ def shortcut_launch():
     argv = sys.argv[1:]
     if not argv:
         argv = ['cola', '--prompt']
-    return app.winmain(main, argv)
+    return main(argv=argv)

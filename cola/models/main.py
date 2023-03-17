@@ -7,6 +7,7 @@ from qtpy.QtCore import Signal
 
 from .. import core
 from .. import gitcmds
+from .. import gitcfg
 from .. import version
 from ..git import STDOUT
 from . import prefs
@@ -45,19 +46,23 @@ class MainModel(QtCore.QObject):
     mode_none = 'none'  # Default: nothing's happened, do nothing
     mode_worktree = 'worktree'  # Comparing index to worktree
     mode_diffstat = 'diffstat'  # Showing a diffstat
+    mode_display = 'display'  # Displaying arbitrary information
     mode_untracked = 'untracked'  # Dealing with an untracked file
     mode_untracked_diff = 'untracked-diff'  # Diffing an untracked file
     mode_index = 'index'  # Comparing index to last commit
     mode_amend = 'amend'  # Amending a commit
+    mode_diff = 'diff'  # Diffing against an arbitrary commit
 
     # Modes where we can checkout files from the $head
-    modes_undoable = set((mode_amend, mode_index, mode_worktree))
+    modes_undoable = set((mode_amend, mode_diff, mode_index, mode_worktree))
 
     # Modes where we can partially stage files
-    modes_stageable = set((mode_amend, mode_worktree, mode_untracked_diff))
+    modes_partially_stageable = set(
+        (mode_amend, mode_diff, mode_worktree, mode_untracked_diff)
+    )
 
     # Modes where we can partially unstage files
-    modes_unstageable = set((mode_amend, mode_index))
+    modes_unstageable = set((mode_amend, mode_diff, mode_index))
 
     unstaged = property(lambda self: self.modified + self.unmerged + self.untracked)
     """An aggregate of the modified, unmerged, and untracked file lists."""
@@ -80,8 +85,10 @@ class MainModel(QtCore.QObject):
         self.file_type = Types.TEXT
         self.mode = self.mode_none
         self.filename = None
+        self.is_cherry_picking = False
         self.is_merging = False
         self.is_rebasing = False
+        self.is_applying_patch = False
         self.currentbranch = ''
         self.directory = ''
         self.project = ''
@@ -103,6 +110,7 @@ class MainModel(QtCore.QObject):
         self.submodules = set()
         self.submodules_list = None  # lazy loaded
 
+        self.error = None  # The last error message.
         self.ref_sort = 0  # (0: version, 1:reverse-chrono)
         self.local_branches = []
         self.remote_branches = []
@@ -110,33 +118,61 @@ class MainModel(QtCore.QObject):
         if cwd:
             self.set_worktree(cwd)
 
-    def unstageable(self):
+    def is_diff_mode(self):
+        """Are we in diff mode?"""
+        return self.mode == self.mode_diff
+
+    def is_unstageable(self):
+        """Are we in a mode that supports "unstage" actions?"""
         return self.mode in self.modes_unstageable
 
-    def amending(self):
+    def is_amend_mode(self):
+        """Are we amending a commit?"""
         return self.mode == self.mode_amend
 
-    def undoable(self):
-        """Whether we can checkout files from the $head."""
+    def is_undoable(self):
+        """Can we checkout from the current branch or head ref?"""
         return self.mode in self.modes_undoable
 
-    def stageable(self):
+    def is_partially_stageable(self):
+        """Whether partial staging should be allowed."""
+        return self.mode in self.modes_partially_stageable
+
+    def is_stageable(self):
         """Whether staging should be allowed."""
-        return self.mode in self.modes_stageable
+        return self.is_partially_stageable() or self.mode == self.mode_untracked
 
     def all_branches(self):
         return self.local_branches + self.remote_branches
 
     def set_worktree(self, worktree):
+        last_worktree = self.git.paths.worktree
         self.git.set_worktree(worktree)
+
         is_valid = self.git.is_valid()
         if is_valid:
+            reset = last_worktree is None or last_worktree != worktree
             cwd = self.git.getcwd()
             self.project = os.path.basename(cwd)
             self.set_directory(cwd)
             core.chdir(cwd)
-            self.update_config(reset=True)
-            self.worktree_changed.emit()
+            self.update_config(reset=reset)
+
+            # Detect the "git init" scenario by checking for branches.
+            # If no branches exist then we cannot use "git rev-parse" yet.
+            err = None
+            refs = self.git.git_path('refs', 'heads')
+            if core.exists(refs) and core.listdir(refs):
+                # "git rev-parse" exits with a non-zero exit status when the
+                # safe.directory protection is active.
+                status, _, err = self.git.rev_parse('HEAD')
+                is_valid = status == 0
+            if is_valid:
+                self.error = None
+                self.worktree_changed.emit()
+            else:
+                self.error = err
+
         return is_valid
 
     def is_git_lfs_enabled(self):
@@ -205,16 +241,29 @@ class MainModel(QtCore.QObject):
     def set_directory(self, path):
         self.directory = path
 
-    def set_mode(self, mode):
-        if self.amending():
-            if mode != self.mode_none:
-                return
-        if self.is_merging and mode == self.mode_amend:
+    def set_mode(self, mode, head=None):
+        """Set the current editing mode (worktree, index, amending, ...)"""
+        # Do not allow going into index or worktree mode when amending.
+        if self.is_amend_mode() and mode != self.mode_none:
+            return
+        # We cannot amend in the middle of git cherry-pick, git am or git merge.
+        if (
+            self.is_cherry_picking or self.is_merging or self.is_applying_patch
+        ) and mode == self.mode_amend:
             mode = self.mode
-        if mode == self.mode_amend:
-            head = 'HEAD^'
+
+        # Stay in diff mode until explicitly reset.
+        if self.mode == self.mode_diff and mode != self.mode_none:
+            mode = self.mode_diff
+            head = head or self.head
         else:
-            head = 'HEAD'
+            # If we are amending then we'll use "HEAD^", otherwise use the specified
+            # head or "HEAD" if head has not been specified.
+            if mode == self.mode_amend:
+                head = 'HEAD^'
+            elif not head:
+                head = 'HEAD'
+
         self.head = head
         self.mode = mode
         self.mode_changed.emit(mode)
@@ -233,8 +282,15 @@ class MainModel(QtCore.QObject):
         self.updated.emit()
 
     def update_file_status(self, update_index=False):
+        """Update modified/staged files status"""
         self.emit_about_to_update()
         self.update_files(update_index=update_index, emit=True)
+
+    def update_file_merge_status(self):
+        """Update modified/staged files and Merge/Rebase/Cherry-pick status"""
+        self.emit_about_to_update()
+        self._update_merge_rebase_status()
+        self.update_file_status()
 
     def update_status(self, update_index=False, reset=False):
         # Give observers a chance to respond
@@ -299,7 +355,7 @@ class MainModel(QtCore.QObject):
         return not self.local_branches
 
     def _update_remotes(self):
-        self.remotes = self.git.remote()[STDOUT].splitlines()
+        self.remotes = gitcfg.get_remotes(self.cfg)
 
     def _update_branches_and_tags(self):
         context = self.context
@@ -319,20 +375,25 @@ class MainModel(QtCore.QObject):
         self.refs_updated.emit()
 
     def _update_merge_rebase_status(self):
+        cherry_pick_head = self.git.git_path('CHERRY_PICK_HEAD')
         merge_head = self.git.git_path('MERGE_HEAD')
         rebase_merge = self.git.git_path('rebase-merge')
+        rebase_apply = self.git.git_path('rebase-apply', 'applying')
+        self.is_cherry_picking = cherry_pick_head and core.exists(cherry_pick_head)
         self.is_merging = merge_head and core.exists(merge_head)
         self.is_rebasing = rebase_merge and core.exists(rebase_merge)
-        if self.is_merging and self.mode == self.mode_amend:
+        self.is_applying_patch = rebase_apply and core.exists(rebase_apply)
+        if self.mode == self.mode_amend and (
+            self.is_merging or self.is_cherry_picking or self.is_applying_patch
+        ):
             self.set_mode(self.mode_none)
 
     def _update_commitmsg(self):
         """Check for merge message files and update the commit message
 
-        The message is cleared when the merge completes
-
+        The message is cleared when the merge completes.
         """
-        if self.amending():
+        if self.is_amend_mode():
             return
         # Check if there's a message file in .git/
         context = self.context
@@ -405,21 +466,6 @@ class MainModel(QtCore.QObject):
         Pass track=True to create a local tracking branch.
         """
         return self.git.branch(name, base, track=track, force=force)
-
-    def cherry_pick_list(self, revs):
-        """Cherry-picks each revision into the current branch.
-        Returns a list of command output strings (1 per cherry pick)"""
-        if not revs:
-            return []
-        outs = []
-        errs = []
-        status = 0
-        for rev in revs:
-            stat, out, err = self.git.cherry_pick(rev)
-            status = max(stat, status)
-            outs.append(out)
-            errs.append(err)
-        return (status, '\n'.join(outs), '\n'.join(errs))
 
     def is_commit_published(self):
         """Return True if the latest commit exists in any remote branch"""

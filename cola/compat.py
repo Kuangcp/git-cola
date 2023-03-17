@@ -15,7 +15,7 @@ PY_VERSION_MAJOR = PY_VERSION[0]
 PY2 = PY_VERSION_MAJOR == 2
 PY3 = PY_VERSION_MAJOR >= 3
 PY26_PLUS = PY2 and sys.version_info[1] >= 6
-WIN32 = sys.platform == 'win32' or sys.platform == 'cygwin'
+WIN32 = sys.platform in {'win32', 'cygwin'}
 ENCODING = 'utf-8'
 
 
@@ -23,7 +23,6 @@ if PY3:
 
     def bstr(x, encoding=ENCODING):
         return bytes(x, encoding=encoding)
-
 
 elif PY26_PLUS:
     bstr = bytes
@@ -43,7 +42,7 @@ if PY3:
     uchr = chr
 else:
     bchr = chr
-    maxsize = 2 ** 31
+    maxsize = 2**31
     # pylint: disable=unicode-builtin
     ustr = unicode  # noqa
     # pylint: disable=unichr-builtin
@@ -52,7 +51,7 @@ else:
     int_types = (int, long)  # noqa
 
 # Qt's max 32-bit signed integer range (-2147483648 to 2147483647)
-maxint = (2 ** 31) - 1
+maxint = (2**31) - 1
 
 
 def setenv(key, value):

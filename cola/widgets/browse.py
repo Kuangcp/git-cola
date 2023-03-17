@@ -1,4 +1,5 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
+import shlex
 
 from qtpy.QtCore import Qt
 from qtpy.QtCore import Signal
@@ -52,6 +53,7 @@ def save_path(context, path, model):
 
 
 class Browser(standard.Widget):
+    """A repository branch file browser. Browses files provided by GitRepoModel"""
     # Read-only mode property
     mode = property(lambda self: self.model.mode)
 
@@ -202,17 +204,16 @@ class RepoTreeView(standard.TreeView):
 
         self.action_refresh = common.refresh_action(context, self)
 
-        if not utils.is_win32():
-            self.action_default_app = common.default_app_action(
-                context, self, self.selected_paths
-            )
+        self.action_default_app = common.default_app_action(
+            context, self, self.selected_paths
+        )
 
-            self.action_parent_dir = common.parent_dir_action(
-                context, self, self.selected_paths
-            )
+        self.action_parent_dir = common.parent_dir_action(
+            context, self, self.selected_paths
+        )
 
         self.action_terminal = common.terminal_action(
-            context, self, self.selected_paths
+            context, self, func=self.selected_paths
         )
 
         self.x_width = QtGui.QFontMetrics(self.font()).width('x')
@@ -349,9 +350,8 @@ class RepoTreeView(standard.TreeView):
 
         self.action_editor.setEnabled(selected)
         self.action_history.setEnabled(selected)
-        if not utils.is_win32():
-            self.action_default_app.setEnabled(selected)
-            self.action_parent_dir.setEnabled(selected)
+        self.action_default_app.setEnabled(selected)
+        self.action_parent_dir.setEnabled(selected)
 
         if self.action_terminal is not None:
             self.action_terminal.setEnabled(selected)
@@ -380,10 +380,9 @@ class RepoTreeView(standard.TreeView):
         menu.addAction(self.action_revert_uncommitted)
         menu.addAction(self.action_untrack)
         menu.addAction(self.action_rename)
-        if not utils.is_win32():
-            menu.addSeparator()
-            menu.addAction(self.action_default_app)
-            menu.addAction(self.action_parent_dir)
+        menu.addSeparator()
+        menu.addAction(self.action_default_app)
+        menu.addAction(self.action_parent_dir)
 
         if self.action_terminal is not None:
             menu.addAction(self.action_terminal)
@@ -553,7 +552,16 @@ class SaveBlob(cmds.ContextCommand):
         model = self.browse_model
         ref = '%s:%s' % (model.ref, model.relpath)
         with core.xopen(model.filename, 'wb') as fp:
-            status, _, _ = git.show(ref, _stdout=fp)
+            status, output, err = git.show(ref, _stdout=fp)
+
+        out = '# git show %s >%s\n%s' % (
+            shlex.quote(ref),
+            shlex.quote(model.filename),
+            output,
+        )
+        Interaction.command(N_('Error Saving File'), 'git show', status, out, err)
+        if status != 0:
+            return
 
         msg = N_('Saved "%(filename)s" from "%(ref)s" to "%(destination)s"') % dict(
             filename=model.relpath, ref=model.ref, destination=model.filename

@@ -1,6 +1,6 @@
 # -* coding: utf-8 -*-
 #
-# License: MIT (see LICENSE file provided)
+# License: MIT (see extras/polib/LICENSE file provided)
 # vim: set expandtab tabstop=4 shiftwidth=4 softtabstop=4:
 
 """
@@ -55,7 +55,6 @@ if sys.version_info < (3,):
 
     def u(s):
         return compat.ustr(s, "unicode_escape")
-
 
 else:
     PY3 = True

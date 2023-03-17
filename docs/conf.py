@@ -19,8 +19,11 @@ extensions = [
     'sphinx.ext.todo',
     'sphinx.ext.coverage',
     'sphinxtogithub',
-    'jaraco.packaging.sphinx',
-    'rst.linker',
+    # https://github.com/git-cola/git-cola/issues/1250
+    # https://github.com/jaraco/jaraco.packaging/issues/7
+    # 'jaraco.packaging.sphinx',
+    # Python 3.11 https://github.com/git-cola/git-cola/issues/1251
+    #'rst.linker',
 ]
 if sphinx_rtd_theme:
     extensions.append('sphinx_rtd_theme')
@@ -77,17 +80,21 @@ latex_documents = [
 # Example configuration for intersphinx: refer to the Python standard library.
 intersphinx_mapping = {'https://docs.python.org/3': None}
 
+# {package_url} is provided py jaraco.packaging.sphinx when available
+# for use in the rst.linker configuration. We expand the value manually for now.
+package_url = 'https://github.com/git-cola/git-cola'
+
 link_files = {
     '../CHANGES.rst': dict(
         using=dict(GH='https://github.com'),
         replace=[
             dict(
                 pattern=r'(Issue #|\B#)(?P<issue>\d+)',
-                url='{package_url}/issues/{issue}',
+                url='%s/issues/{issue}' % package_url,
             ),
             dict(
                 pattern=r'\B\+(?P<pull>\d+)',
-                url='{package_url}/pull/{pull}',
+                url='%s/pull/{pull}' % package_url,
             ),
             dict(
                 pattern=r'^(?m)((?P<scm_version>v?\d+(\.\d+){1,2}))\n[-=]+\n',

@@ -1,5 +1,6 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
 import re
+import time
 
 from qtpy import QtCore
 from qtpy import QtGui
@@ -297,15 +298,11 @@ class GatherCompletionsThread(QtCore.QThread):
 
     def dispose(self):
         self.running = False
-        try:
-            self.wait()
-        except RuntimeError:
-            # The C++ object may have already been deleted by python while
-            # the application is tearing down. This is fine.
-            pass
+        utils.catch_runtime_error(self.wait)
 
     def run(self):
-        text = None
+        text = ''
+        items = []
         self.running = True
         # Loop when the matched text changes between the start and end time.
         # This happens when gather_matches() takes too long and the
@@ -434,6 +431,12 @@ class CompletionModel(QtGui.QStandardItemModel):
         return ((), (), set())
 
     def apply_matches(self, match_tuple):
+        """Build widgets for all of the matching items"""
+        if not match_tuple:
+            # Results from background tasks may arrive after the widget
+            # has been destroyed.
+            utils.catch_runtime_error(self.set_items, [])
+            return
         matched_refs, matched_paths, dirs = match_tuple
         QStandardItem = QtGui.QStandardItem
 
@@ -457,12 +460,14 @@ class CompletionModel(QtGui.QStandardItemModel):
                 item.setIcon(from_filename(match))
             items.append(item)
 
-        try:
-            self.clear()
-            self.invisibleRootItem().appendRows(items)
-            self.updated.emit()
-        except RuntimeError:  # C++ object has been deleted
-            pass
+        # Results from background tasks can arrive after the widget has been destroyed.
+        utils.catch_runtime_error(self.set_items, items)
+
+    def set_items(self, items):
+        """Clear the widget and add items to the model"""
+        self.clear()
+        self.invisibleRootItem().appendRows(items)
+        self.updated.emit()
 
     def dispose(self):
         self.update_thread.dispose()
@@ -476,9 +481,8 @@ def _lower(x):
     return x.lower()
 
 
-def filter_matches(match_text, candidates, case_sensitive, sort_key=lambda x: x):
+def filter_matches(match_text, candidates, case_sensitive, sort_key=None):
     """Filter candidates and return the matches"""
-
     if case_sensitive:
         case_transform = _identity
     else:
@@ -490,13 +494,21 @@ def filter_matches(match_text, candidates, case_sensitive, sort_key=lambda x: x)
     else:
         matches = list(candidates)
 
-    matches.sort(key=lambda x: sort_key(case_transform(x)))
+    if case_sensitive:
+        if sort_key is None:
+            matches.sort()
+        else:
+            matches.sort(key=sort_key)
+    else:
+        if sort_key is None:
+            matches.sort(key=_lower)
+        else:
+            matches.sort(key=lambda x: sort_key(_lower(x)))
     return matches
 
 
 def filter_path_matches(match_text, file_list, case_sensitive):
     """Return matching completions from a list of candidate files"""
-
     files = set(file_list)
     files_and_dirs = utils.add_parents(files)
     dirs = files_and_dirs.difference(files)
@@ -529,7 +541,7 @@ class GitCompletionModel(CompletionModel):
     def __init__(self, context, parent):
         CompletionModel.__init__(self, context, parent)
         self.context = context
-        context.model.updated.connect(self.model_updated)
+        context.model.updated.connect(self.model_updated, type=Qt.QueuedConnection)
 
     def gather_matches(self, case_sensitive):
         refs = filter_matches(
@@ -547,7 +559,7 @@ class GitRefCompletionModel(GitCompletionModel):
 
     def __init__(self, context, parent):
         GitCompletionModel.__init__(self, context, parent)
-        context.model.refs_updated.connect(self.model_updated)
+        context.model.refs_updated.connect(self.model_updated, type=Qt.QueuedConnection)
 
     def matches(self):
         model = self.context.model
@@ -673,18 +685,32 @@ class GitLogCompletionModel(GitRefCompletionModel):
 
     def __init__(self, context, parent):
         GitRefCompletionModel.__init__(self, context, parent)
-        self.model_updated.connect(self.gather_paths, type=Qt.QueuedConnection)
         self._paths = []
         self._model = context.model
+        self._runtask = qtutils.RunTask(parent=self)
+        self._time = 0.0  # ensure that the first event runs a task.
+        self.model_updated.connect(
+            self._start_gathering_paths, type=Qt.QueuedConnection
+        )
+
+    def _start_gathering_paths(self):
+        """Gather paths when the model changes"""
+        # Debounce updates that land within 1 second of each other.
+        if time.time() - self._time > 1.0:
+            self._runtask.start(qtutils.SimpleTask(self.gather_paths))
+        self._time = time.time()
 
     def gather_paths(self):
-        if not self._model.cfg.get(prefs.AUTOCOMPLETE_PATHS, True):
+        """Gather paths and store them in the model"""
+        self._time = time.time()
+        if self._model.cfg.get(prefs.AUTOCOMPLETE_PATHS, True):
+            self._paths = gitcmds.tracked_files(self.context)
+        else:
             self._paths = []
-            return
-        context = self.context
-        self._paths = gitcmds.tracked_files(context)
+        self._time = time.time()
 
     def gather_matches(self, case_sensitive):
+        """Filter paths and refs to find matching entries"""
         if not self._paths:
             self.gather_paths()
         refs = filter_matches(
@@ -731,6 +757,7 @@ GitTrackedLineEdit = bind_lineedit(GitTrackedCompletionModel, hint='<path>')
 
 
 class GitDialog(QtWidgets.QDialog):
+    # The "lineedit" argument is provided by the derived class constructor.
     def __init__(self, lineedit, context, title, text, parent, icon=None):
         QtWidgets.QDialog.__init__(self, parent)
         self.context = context
@@ -748,8 +775,8 @@ class GitDialog(QtWidgets.QDialog):
             defs.no_margin,
             defs.button_spacing,
             qtutils.STRETCH,
-            self.ok_button,
             self.close_button,
+            self.ok_button,
         )
 
         self.main_layout = qtutils.vbox(

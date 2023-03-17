@@ -1,5 +1,4 @@
 from __future__ import absolute_import, division, print_function, unicode_literals
-import os
 
 from qtpy import QtCore
 from qtpy import QtWidgets
@@ -15,6 +14,7 @@ from ..compat import ustr
 from ..i18n import N_
 from ..models import prefs
 from ..models.prefs import Defaults
+from ..models.prefs import fallback_editor
 
 
 def preferences(context, model=None, parent=None):
@@ -27,7 +27,7 @@ def preferences(context, model=None, parent=None):
 
 
 class FormWidget(QtWidgets.QWidget):
-    def __init__(self, context, model, parent, source='user'):
+    def __init__(self, context, model, parent, source='global'):
         QtWidgets.QWidget.__init__(self, parent)
         self.context = context
         self.cfg = context.cfg
@@ -91,7 +91,7 @@ class FormWidget(QtWidgets.QWidget):
         return runner
 
     def update_from_config(self):
-        if self.source == 'user':
+        if self.source == 'global':
             getter = self.cfg.get_user_or_system
         else:
             getter = self.cfg.get
@@ -135,6 +135,9 @@ class RepoFormWidget(FormWidget):
         tooltip = N_('Detect conflict markers in unmerged files')
         self.check_conflicts = qtutils.checkbox(checked=True, tooltip=tooltip)
 
+        tooltip = N_('Use gravatar.com to lookup icons for author emails')
+        self.enable_gravatar = qtutils.checkbox(checked=True, tooltip=tooltip)
+
         tooltip = N_('Prevent "Stage" from staging all files when nothing is selected')
         self.safe_mode = qtutils.checkbox(checked=False, tooltip=tooltip)
 
@@ -158,6 +161,7 @@ class RepoFormWidget(FormWidget):
         self.add_row(N_('Show Diffstat After Merge'), self.merge_diffstat)
         self.add_row(N_('Display Untracked Files'), self.display_untracked)
         self.add_row(N_('Detect Conflict Markers'), self.check_conflicts)
+        self.add_row(N_('Enable Gravatar Icons'), self.enable_gravatar)
         self.add_row(N_('Safe Mode'), self.safe_mode)
         self.add_row(N_('Autocomplete Paths'), self.autocomplete_paths)
         self.add_row(
@@ -168,6 +172,7 @@ class RepoFormWidget(FormWidget):
             {
                 prefs.AUTOTEMPLATE: (self.autotemplate, Defaults.autotemplate),
                 prefs.CHECK_CONFLICTS: (self.check_conflicts, Defaults.check_conflicts),
+                prefs.ENABLE_GRAVATAR: (self.enable_gravatar, Defaults.enable_gravatar),
                 prefs.CHECK_PUBLISHED_COMMITS: (
                     self.check_published_commits,
                     Defaults.check_published_commits,
@@ -212,6 +217,7 @@ class SettingsFormWidget(FormWidget):
         self.mergetool = QtWidgets.QLineEdit()
 
         self.linebreak = qtutils.checkbox()
+        self.mouse_zoom = qtutils.checkbox()
         self.keep_merge_backups = qtutils.checkbox()
         self.sort_bookmarks = qtutils.checkbox()
         self.save_window_settings = qtutils.checkbox()
@@ -234,6 +240,7 @@ class SettingsFormWidget(FormWidget):
         self.add_row(N_('Save GUI Settings'), self.save_window_settings)
         self.add_row(N_('Resize File Browser columns'), self.resize_browser_columns)
         self.add_row(N_('Check spelling'), self.check_spelling)
+        self.add_row(N_('Ctrl+MouseWheel to Zoom'), self.mouse_zoom)
 
         self.set_config(
             {
@@ -248,7 +255,7 @@ class SettingsFormWidget(FormWidget):
                 prefs.MAXRECENT: (self.maxrecent, Defaults.maxrecent),
                 prefs.SORT_BOOKMARKS: (self.sort_bookmarks, Defaults.sort_bookmarks),
                 prefs.DIFFTOOL: (self.difftool, Defaults.difftool),
-                prefs.EDITOR: (self.editor, os.getenv('VISUAL', Defaults.editor)),
+                prefs.EDITOR: (self.editor, fallback_editor()),
                 prefs.HISTORY_BROWSER: (
                     self.historybrowser,
                     prefs.default_history_browser(),
@@ -264,6 +271,7 @@ class SettingsFormWidget(FormWidget):
                     Defaults.resize_browser_columns,
                 ),
                 prefs.SPELL_CHECK: (self.check_spelling, Defaults.spellcheck),
+                prefs.MOUSE_ZOOM: (self.mouse_zoom, Defaults.mouse_zoom),
             }
         )
 
@@ -287,10 +295,10 @@ class SettingsFormWidget(FormWidget):
     def font_size_changed(self, size):
         font = self.fixed_font.currentFont()
         font.setPointSize(size)
-        cmds.do(prefs.SetConfig, self.model, 'user', prefs.FONTDIFF, font.toString())
+        cmds.do(prefs.SetConfig, self.model, 'global', prefs.FONTDIFF, font.toString())
 
     def current_font_changed(self, font):
-        cmds.do(prefs.SetConfig, self.model, 'user', prefs.FONTDIFF, font.toString())
+        cmds.do(prefs.SetConfig, self.model, 'global', prefs.FONTDIFF, font.toString())
 
 
 class AppearanceFormWidget(FormWidget):
@@ -308,6 +316,7 @@ class AppearanceFormWidget(FormWidget):
         self.bold_headers = qtutils.checkbox()
         self.status_show_totals = qtutils.checkbox()
         self.status_indent = qtutils.checkbox()
+        self.block_cursor = qtutils.checkbox(checked=True)
 
         self.add_row(N_('GUI theme'), self.theme)
         self.add_row(N_('Icon theme'), self.icon_theme)
@@ -315,6 +324,7 @@ class AppearanceFormWidget(FormWidget):
         self.add_row(N_('Bold on dark headers instead of italic'), self.bold_headers)
         self.add_row(N_('Show file counts in Status titles'), self.status_show_totals)
         self.add_row(N_('Indent Status paths'), self.status_indent)
+        self.add_row(N_('Use a block cursor in diff editors'), self.block_cursor)
 
         self.set_config(
             {
@@ -327,6 +337,7 @@ class AppearanceFormWidget(FormWidget):
                 prefs.STATUS_INDENT: (self.status_indent, Defaults.status_indent),
                 prefs.THEME: (self.theme, Defaults.theme),
                 prefs.ICON_THEME: (self.icon_theme, Defaults.icon_theme),
+                prefs.BLOCK_CURSOR: (self.block_cursor, Defaults.block_cursor),
             }
         )
 
@@ -371,8 +382,8 @@ class PreferencesView(standard.Dialog):
         self.tab_bar.addTab(N_('Settings'))
         self.tab_bar.addTab(N_('Appearance'))
 
-        self.user_form = RepoFormWidget(context, model, self, source='user')
-        self.repo_form = RepoFormWidget(context, model, self, source='repo')
+        self.user_form = RepoFormWidget(context, model, self, source='global')
+        self.repo_form = RepoFormWidget(context, model, self, source='local')
         self.options_form = SettingsFormWidget(context, model, self)
         self.appearance_form = AppearanceFormWidget(context, model, self)
         self.appearance = AppearanceWidget(self.appearance_form, self)

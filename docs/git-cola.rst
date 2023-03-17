@@ -13,32 +13,32 @@ Git Cola is a sleek and powerful Git GUI.
 OPTIONS
 =======
 
---amend
--------
+``--amend``
+-----------
 Start `git cola` in amend mode.
 
---prompt
---------
+``--prompt``
+------------
 Prompt for a Git repository.  Defaults to the current directory.
 
--r, --repo <path>
------------------
+``-r, --repo <path>``
+---------------------
 Open the Git repository at `<path>`.  Defaults to the current directory.
 
--s, --status-filter <filter>
-----------------------------
+``-s, --status-filter <filter>``
+--------------------------------
 Apply the path filter to the status widget.
 
---version
----------
+``--version``
+-------------
 Print the `git cola` version and exit.
 
--h, --help
-----------
+``-h, --help``
+--------------
 Show usage and optional arguments.
 
---help-commands
----------------
+``--help-commands``
+-------------------
 Show available sub-commands.
 
 SUB-COMMANDS
@@ -119,8 +119,17 @@ Print the `git cola` version.
 CONFIGURE YOUR EDITOR
 =====================
 The editor used by `Ctrl-e` is configured from the Preferences screen.
-The environment variable `$VISUAL` is consulted when no editor has been
-configured.
+
+The following environment variables are consulted when no editor is configured.
+If defined, the first of these variables is used:
+
+* `GIT_VISUAL`
+* `VISUAL`
+* `GIT_EDITOR`
+* `EDITOR`
+
+The `*VISUAL` variables are consulted before the `*EDITOR` variables so that you can
+configure a graphical editor independently of the editor used by the Git CLI.
 
 *ProTip*: Configuring your editor to `gvim -f -p` will open multiple tabs
 when editing files.  `gvim -f -o` uses splits.
@@ -131,6 +140,29 @@ When you select a line in the diff or grep screens and press any of
 
 The editor preference is saved in the `gui.editor` variable using
 `git config <http://git-scm.com/docs/git-config>`_.
+
+The following are some recommend editor configurations.
+
+* Neovim + Neovim-Qt
+
+.. sourcecode:: sh
+
+   git config --global core.editor nvim
+   git config --global gui.editor 'nvim-qt --nofork'
+
+* Vim + gvim
+
+.. sourcecode:: sh
+
+   git config --global core.editor vim
+   git config --global gui.editor 'gvim -f'
+
+* Sublime Text
+
+.. sourcecode:: sh
+
+   git config --global gui.editor 'subl --wait'
+
 
 KEYBOARD SHORTCUTS
 ==================
@@ -179,6 +211,7 @@ The Diff editor can be focused with `Ctrl-j`.
 the Status tool can be focused with `Ctrl-k`.
 the Commit tool can be focused with `Ctrl-l`.
 
+
 .. _status:
 
 STATUS
@@ -199,14 +232,28 @@ as the ergonomical and vim-like `j` and `k` shortcut keys.
 
 There are several convenient ways to interact with files in the `Status` tool.
 
-Selecting a file displays its diff in the :ref:`Diff` viewer.
+Selecting a file displays its diff in the `Diff` viewer.
 Double-clicking a file stages its contents, as does the
 the `Ctrl-s` shortcut key.
 
-`Ctrl-e` opens selected files in the conifgured editor, and
+`Ctrl-e` opens selected files in the configured editor, and
 `Ctrl-d` opens selected files using `git difftool <http://git-scm.com/docs/git-difftool>`_
 
 Additional actions can be performed using the right-click context menu.
+
+Drag and Drop
+-------------
+Files can be dragged from the the `Status` tool onto other applications.
+
+Some terminals will treat a drag with multiple files by separating them with newlines,
+which is less amenable for pasting command-line arguments.
+
+To avoid this issue, hold down `Alt / Option` when dragging from the `Status` tool.
+The drag and drop payload will no longer contain local file URLs -- it will contain
+plain text that is amenable for use on a command-line.
+
+Note: if drag and drop is not working and you are on Wayland then you may
+need to ``export QT_QPA_PLATFORM=wayland`` in your environment.
 
 Actions
 -------
@@ -260,6 +307,7 @@ Add to .gitignore
 ~~~~~~~~~~~~~~~~~
 Adds untracked files to to the .gitignore file.
 
+
 .. _diff:
 
 DIFF
@@ -271,6 +319,10 @@ Extraneous whitespace is shown with a pure-red background.
 Right-clicking in the diff provides access to additional actions
 that use either the cursor location or text selection.
 
+The "Copy Diff" action at ``Alt + Shift + C`` copies the selected lines to the
+clipboard. The ``+``, ``-`` and `` `` diff line prefixes are stripped from each line
+when copying diffs using the "Copy Diff" action.
+
 Staging content for commit
 --------------------------
 The ``@@`` patterns denote a new diff hunk.  Selecting lines of diff
@@ -281,6 +333,19 @@ entire patch diff hunk.
 The corresponding opposite commands can be performed on staged files as well,
 e.g. staged content can be selectively removed from the index when we are
 viewing diffs for staged content.
+
+Diff Against Commit (Diff Mode)
+-------------------------------
+*Diff Mode* allows you to selectively unstage and revert edits from arbitrary commits
+so that you can bring these edits back into your worktree.
+
+You can use the diff editor to unstage edits against arbitrary commits by using the
+``Diff > Against Commit... (Diff Mode)`` menu action.
+
+You can exit *Diff Mode* by clicking on the red circle-slash icon on the Status
+widget, by using the ``Diff > Exit Diff mode`` menu action, or by clicking in
+an empty area in the `Status` tool.
+
 
 COMMIT MESSAGE EDITOR
 =====================
@@ -501,9 +566,9 @@ Some systems provide a theme that you can install::
 
     sudo apt-get install adwaita-qt
 
-You can activate the theme using the following enviornment variable::
+You can activate the theme using the following environment variable::
 
-    # Override the default theme to adwait-dark
+    # Override the default theme to adwaita-dark
     export QT_STYLE_OVERRIDE=adwaita-dark
 
 `QT_STYLE_OVERRIDE` may already be set in your Desktop Environment, so check that
@@ -567,6 +632,12 @@ cola.blameviewer
 ----------------
 The command used to blame files.  Defaults to `git gui blame`.
 
+cola.blockcursor
+----------------
+Whether to use a "block" cursor in diff editors. The block cursor is easier to
+see compared to a line cursor. Set to `false` to use a thin "line" cursor.
+Defauls to `true`.
+
 cola.browserdockable
 --------------------
 Whether to create a dock widget with the `Browser` tool.
@@ -590,12 +661,28 @@ cola.dictionary
 Specifies an additional dictionary for `git cola` to use in its spell checker.
 This should be configured to the path of a newline-separated list of words.
 
+By default, `git cola` searches for `dict/words` and `dict/propernames` dictionary
+files in `~/.local/share` and `$XDG_DATA_DIRS`.
+
+If `$XDG_DATA_DIRS` is undefined or set to an empty value then `/usr/local/share` and
+`/usr/share` are searched for dictionary files.
+
+Dictionary files are newline-separated and contain one word per line.
+
 cola.expandtab
 --------------
 Expand tabs into spaces in the commit message editor.  When set to `true`,
 `git cola` will insert a configurable number of spaces when tab is pressed.
 The number of spaces is determined by `cola.tabwidth`.
 Defaults to `false`.
+
+cola.gravatar
+-------------
+Use the `gravatar.com` service to lookup icons for author emails.
+Gravatar icons work by sending an MD5 hash of an author's email to `gravatar.com`
+when requesting an icon. Warning: this feature can leak information.
+Network requests to `gravatar.com` are disabled when set to `false`.
+Defaults to `true`.
 
 cola.fileattributes
 -------------------
@@ -617,7 +704,7 @@ cola.fontdiff
 Specifies the font to use for `git cola`'s diff display.
 
 cola.hidpi
--------------
+----------
 Specifies the High DPI displays scale factor. Set `0` to automatically scaled.
 Setting value between 0 and 1 is undefined.
 This option requires at least Qt 5.6 to work.
@@ -649,7 +736,7 @@ command line, once for each icon theme, in the order that they should be
 searched.  This can be used to override a subset of the icons, and fallback
 to the built-in icons for the remainder.
 
-cola.imagediff.<extension>
+cola.imagediff.[extension]
 --------------------------
 Enable image diffs for the specified file extension.  For example, configuring
 `git config --global cola.imagediff.svg false` will disable use of the visual
@@ -680,6 +767,12 @@ cola.maxrecent
 `git cola` caps the number of recent repositories to avoid cluttering
 the start and recent repositories menu.  The maximum number of repositories to
 remember is controlled by `cola.maxrecent` and defaults to `8`.
+
+cola.mousezoom
+--------------
+Controls whether zooming text using Ctrl + MouseWheel scroll is enabled.
+Set to `false to disable scrolling with the mouse wheel.
+Defauls to `true`.
 
 cola.dragencoding
 -----------------
@@ -765,23 +858,25 @@ accordingly.
 cola.terminalshellquote
 -----------------------
 Some terminal require that the command string get passed as a string.
-For example, ``xfce4-terminal -e "git difftool"`` requires shellquoting,
+For example, ``xfce4-terminal -e "git difftool"`` requires shell quoting,
 whereas ``gnome-terminal -- git difftool`` does not.
 
 You should not need to set this variable for the built-in terminals
 cola knows about -- it will behave correctly without configuration.
 For example, when unconfigured, cola already knows that xfce4-terminal
-requires shellquoting.
+requires shell quoting.
 
 This configuration variable is for custom terminals outside of the builtin set.
 The table below shows the builtin configuration.
 
-    Terminal            cola.terminal           cola.terminalshellquote
-    --------            -------------           -----------------------
-    gnome-terminal      gnome-terminal --       false
-    konsole             konsole -e              false
-    xfce4-terminal      xfce4-terminal -e       true
-    xterm               xterm -e                false
+=================== ======================= =============================
+Terminal            ``cola.terminal``       ``cola.terminalshellquote``
+=================== ======================= =============================
+gnome-terminal      ``gnome-terminal --``   ``false``
+konsole             ``konsole -e``          ``false``
+xfce4-terminal      ``xfce4-terminal -e``   ``true``
+xterm               ``xterm -e``            ``false``
+=================== ======================= =============================
 
 cola.textwidth
 --------------
@@ -1155,7 +1250,7 @@ patched Python 3.6 used by CentOS8/RHEL8 (and possibly others).
 
 Git Cola uses the ``hashlib.md5`` function and adheres to the FIPS security
 mode when available. Git Cola does not use the MD5 value for security purposes.
-MD% is used only for the purposes of implementing the ``cola/gravatar.py``
+MD5 is used only for the purposes of implementing the ``cola/gravatar.py``
 Gravatar client.
 
 LINKS

@@ -303,23 +303,9 @@ class TreeMixin(object):
         was_collapsed = not was_expanded
 
         # Vim keybindings...
-        # Rewrite the event before marshalling to QTreeView.event()
-        key = event.key()
+        event = _create_vim_navigation_key_event(event)
 
-        # Remap 'H' to 'Left'
-        if key == Qt.Key_H:
-            event = QtGui.QKeyEvent(event.type(), Qt.Key_Left, event.modifiers())
-        # Remap 'J' to 'Down'
-        elif key == Qt.Key_J:
-            event = QtGui.QKeyEvent(event.type(), Qt.Key_Down, event.modifiers())
-        # Remap 'K' to 'Up'
-        elif key == Qt.Key_K:
-            event = QtGui.QKeyEvent(event.type(), Qt.Key_Up, event.modifiers())
-        # Remap 'L' to 'Right'
-        elif key == Qt.Key_L:
-            event = QtGui.QKeyEvent(event.type(), Qt.Key_Right, event.modifiers())
-
-        # Re-read the event key to take the remappings into account
+        # Read the updated event key to take the remappings into account
         key = event.key()
         if key == Qt.Key_Up:
             idxs = widget.selectedIndexes()
@@ -429,6 +415,24 @@ class TreeMixin(object):
                 widths = widths[:count]
             for idx, value in enumerate(widths):
                 widget.setColumnWidth(idx, value)
+
+
+def _create_vim_navigation_key_event(event):
+    """Support minimal Vim-like keybindings by rewriting the QKeyEvents"""
+    key = event.key()
+    # Remap 'H' to 'Left'
+    if key == Qt.Key_H:
+        event = QtGui.QKeyEvent(event.type(), Qt.Key_Left, event.modifiers())
+    # Remap 'J' to 'Down'
+    elif key == Qt.Key_J:
+        event = QtGui.QKeyEvent(event.type(), Qt.Key_Down, event.modifiers())
+    # Remap 'K' to 'Up'
+    elif key == Qt.Key_K:
+        event = QtGui.QKeyEvent(event.type(), Qt.Key_Up, event.modifiers())
+    # Remap 'L' to 'Right'
+    elif key == Qt.Key_L:
+        event = QtGui.QKeyEvent(event.type(), Qt.Key_Right, event.modifiers())
+    return event
 
 
 class DraggableTreeMixin(TreeMixin):
@@ -647,40 +651,45 @@ class ProgressDialog(QtWidgets.QProgressDialog):
 
     def __init__(self, title, label, parent):
         QtWidgets.QProgressDialog.__init__(self, parent)
+        self._parent = parent
         if parent is not None:
             self.setWindowModality(Qt.WindowModal)
+
+        self.animation_thread = ProgressAnimationThread(label, self)
+        self.animation_thread.updated.connect(self.set_text, type=Qt.QueuedConnection)
+
         self.reset()
         self.setRange(0, 0)
         self.setMinimumDuration(0)
         self.setCancelButton(None)
         self.setFont(qtutils.default_monospace_font())
-        self.thread = ProgressAnimationThread(label, self)
-        self.thread.updated.connect(self.refresh, type=Qt.QueuedConnection)
-
         self.set_details(title, label)
 
     def set_details(self, title, label):
+        """Update the window title and progress label"""
         self.setWindowTitle(title)
         self.setLabelText(label + '     ')
-        self.thread.set_text(label)
+        self.animation_thread.set_text(label)
 
-    def refresh(self, txt):
+    def set_text(self, txt):
+        """Set the label text"""
         self.setLabelText(txt)
 
     def keyPressEvent(self, event):
+        """Customize keyPressEvent to remove the ESC key cancel feature"""
         if event.key() != Qt.Key_Escape:
             super(ProgressDialog, self).keyPressEvent(event)
 
-    def show(self):
+    def start(self):
+        """Start the animation thread and use a wait cursor"""
         QtWidgets.QApplication.setOverrideCursor(Qt.WaitCursor)
-        super(ProgressDialog, self).show()
-        self.thread.start()
+        self.animation_thread.start()
 
-    def hide(self):
+    def stop(self):
+        """Stop the animation thread and restore the normal cursor"""
+        self.animation_thread.stop()
+        self.animation_thread.wait()
         QtWidgets.QApplication.restoreOverrideCursor()
-        self.thread.stop()
-        self.thread.wait()
-        super(ProgressDialog, self).hide()
 
 
 class ProgressAnimationThread(QtCore.QThread):
