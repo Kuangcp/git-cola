@@ -32,8 +32,8 @@ def mklist(obj):
 
 def read_json(path):
     try:
-        with core.xopen(path, 'rt') as fp:
-            return mkdict(json.load(fp))
+        with core.open_read(path) as f:
+            return mkdict(json.load(f))
     except (ValueError, TypeError, OSError, IOError):  # bad path or json
         return {}
 
@@ -44,7 +44,7 @@ def write_json(values, path):
         parent = os.path.dirname(path)
         if not core.isdir(parent):
             core.makedirs(parent)
-        with core.xopen(path, 'wt') as fp:
+        with core.open_write(path) as fp:
             json.dump(values, fp, indent=4)
     except (ValueError, TypeError, OSError, IOError):
         sys.stderr.write('git-cola: error writing "%s"\n' % path)
@@ -242,14 +242,14 @@ class Settings(object):
         normalize = display.normalize_path
         if self.bookmarks and not isinstance(self.bookmarks[0], dict):
             bookmarks = [
-                dict(name=os.path.basename(path), path=normalize(path))
+                {'name': os.path.basename(path), 'path': normalize(path)}
                 for path in self.bookmarks
             ]
             self.values['bookmarks'] = bookmarks
 
         if self.recent and not isinstance(self.recent[0], dict):
             recent = [
-                dict(name=os.path.basename(path), path=normalize(path))
+                {'name': os.path.basename(path), 'path': normalize(path)}
                 for path in self.recent
             ]
             self.values['recent'] = recent

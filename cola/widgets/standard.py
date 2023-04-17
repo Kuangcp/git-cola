@@ -43,9 +43,7 @@ class WidgetMixin(object):
         self.move(x, y)
 
     def resize_to_desktop(self):
-        desktop = QtWidgets.QApplication.instance().desktop()
-        width = desktop.width()
-        height = desktop.height()
+        width, height = qtutils.desktop_size()
         if utils.is_darwin():
             self.resize(width, height)
         else:
@@ -332,14 +330,12 @@ class TreeMixin(object):
 
         # Process non-root entries with valid parents only.
         elif key == Qt.Key_Left and index.parent().isValid():
-
             # File entries have rowCount() == 0
             model = widget.model()
-            if (
-                hasattr(model, 'itemFromIndex')
-                and model.itemFromIndex(index).rowCount() == 0
-            ):
-                widget.setCurrentIndex(index.parent())
+            if hasattr(model, 'itemFromIndex'):
+                item = model.itemFromIndex(index)
+                if hasattr(item, 'rowCount') and item.rowCount() == 0:
+                    widget.setCurrentIndex(index.parent())
 
             # Otherwise, do this for collapsed directories only
             elif was_collapsed:
@@ -375,12 +371,11 @@ class TreeMixin(object):
         widget = self.widget
         if hasattr(widget, 'selectedItems'):
             return widget.selectedItems()
+        if hasattr(widget, 'itemFromIndex'):
+            item_from_index = widget.itemFromIndex
         else:
-            if hasattr(widget, 'itemFromIndex'):
-                item_from_index = widget.itemFromIndex
-            else:
-                item_from_index = widget.model().itemFromIndex
-            return [item_from_index(i) for i in widget.selectedIndexes()]
+            item_from_index = widget.model().itemFromIndex
+        return [item_from_index(i) for i in widget.selectedIndexes()]
 
     def selected_item(self):
         """Return the first selected item"""
@@ -529,7 +524,6 @@ class Dialog(WidgetMixin, QtWidgets.QDialog):
         self.dispose()
         return self.Base.reject(self)
 
-    # pylint: disable=no-self-use
     def dispose(self):
         """Extension method for model deregistration in sub-classes"""
         return

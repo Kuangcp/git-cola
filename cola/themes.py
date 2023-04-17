@@ -37,12 +37,11 @@ class Theme(object):
     def build_style_sheet(self, app_palette):
         if self.style_sheet == EStylesheet.CUSTOM:
             return self.style_sheet_custom(app_palette)
-        elif self.style_sheet == EStylesheet.FLAT:
+        if self.style_sheet == EStylesheet.FLAT:
             return self.style_sheet_flat()
-        else:
-            window = app_palette.color(QtGui.QPalette.Window)
-            self.is_palette_dark = window.lightnessF() < 0.5
-            return style_sheet_default(app_palette)
+        window = app_palette.color(QtGui.QPalette.Window)
+        self.is_palette_dark = window.lightnessF() < 0.5
+        return style_sheet_default(app_palette)
 
     def build_palette(self, app_palette):
         QPalette = QtGui.QPalette
@@ -464,18 +463,18 @@ class Theme(object):
                 padding-left: 4px;
             }
 
-            """ % dict(
-            background=background,
-            field=field,
-            button=color_rgb,
-            darker=darker,
-            lighter=lighter,
-            grayed=grayed,
-            button_text=button_text,
-            field_text=field_text,
-            separator=defs.separator,
-            focus=focus,
-        )
+            """ % {
+            'background': background,
+            'field': field,
+            'button': color_rgb,
+            'darker': darker,
+            'lighter': lighter,
+            'grayed': grayed,
+            'button_text': button_text,
+            'field_text': field_text,
+            'separator': defs.separator,
+            'focus': focus,
+        }
 
     def style_sheet_custom(self, app_palette):
         """Get custom style sheet.
@@ -615,20 +614,20 @@ def style_sheet_default(palette):
             background: %(highlight_rgb)s;
         }
 
-        """ % dict(
-        separator=defs.separator,
-        window_rgb=window_rgb,
-        highlight_rgb=highlight_rgb,
-        shadow_rgb=shadow_rgb,
-        base_rgb=base_rgb,
-        checkbox_border=defs.border,
-        checkbox_icon=icons.check_name(),
-        checkbox_size=defs.checkbox,
-        radio_border=defs.radio_border,
-        radio_icon=icons.dot_name(),
-        radio_radius=defs.radio // 2,
-        radio_size=defs.radio,
-    )
+        """ % {
+        'separator': defs.separator,
+        'window_rgb': window_rgb,
+        'highlight_rgb': highlight_rgb,
+        'shadow_rgb': shadow_rgb,
+        'base_rgb': base_rgb,
+        'checkbox_border': defs.border,
+        'checkbox_icon': icons.check_name(),
+        'checkbox_size': defs.checkbox,
+        'radio_border': defs.radio_border,
+        'radio_icon': icons.dot_name(),
+        'radio_radius': defs.radio // 2,
+        'radio_size': defs.radio,
+    }
 
 
 def get_all_themes():
@@ -680,7 +679,7 @@ def get_all_themes():
             N_('Flat dark red'),
             True,
             style_sheet=EStylesheet.FLAT,
-            main_color='#cc5452'
+            main_color='#cc5452',
         ),
         Theme(
             'flat-dark-grey',

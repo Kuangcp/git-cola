@@ -54,6 +54,7 @@ def save_path(context, path, model):
 
 class Browser(standard.Widget):
     """A repository branch file browser. Browses files provided by GitRepoModel"""
+
     # Read-only mode property
     mode = property(lambda self: self.model.mode)
 
@@ -88,7 +89,10 @@ class Browser(standard.Widget):
         msg += N_('Branch: %s') % branch
         self.setToolTip(msg)
 
-        scope = dict(project=self.model.project, branch=branch)
+        scope = {
+            'project': self.model.project,
+            'branch': branch,
+        }
         title = N_('%(project)s: %(branch)s - Browse') % scope
         if self.mode == self.model.mode_amend:
             title += ' %s' % N_('(Amending)')
@@ -563,9 +567,11 @@ class SaveBlob(cmds.ContextCommand):
         if status != 0:
             return
 
-        msg = N_('Saved "%(filename)s" from "%(ref)s" to "%(destination)s"') % dict(
-            filename=model.relpath, ref=model.ref, destination=model.filename
-        )
+        msg = N_('Saved "%(filename)s" from "%(ref)s" to "%(destination)s"') % {
+            'filename': model.relpath,
+            'ref': model.ref,
+            'destination': model.filename,
+        }
         Interaction.log_status(status, msg, '')
 
         Interaction.information(

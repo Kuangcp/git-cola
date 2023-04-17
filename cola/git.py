@@ -36,8 +36,8 @@ OID_LENGTH = 40
 _index_lock = threading.Lock()
 
 
-def dashify(s):
-    return s.replace('_', '-')
+def dashify(value):
+    return value.replace('_', '-')
 
 
 def is_git_dir(git_dir):
@@ -67,12 +67,12 @@ def is_git_dir(git_dir):
     return result
 
 
-def is_git_file(f):
-    return core.isfile(f) and os.path.basename(f) == '.git'
+def is_git_file(filename):
+    return core.isfile(filename) and os.path.basename(filename) == '.git'
 
 
-def is_git_worktree(d):
-    return is_git_dir(join(d, '.git'))
+def is_git_worktree(dirname):
+    return is_git_dir(join(dirname, '.git'))
 
 
 def is_git_repository(path):
@@ -188,7 +188,6 @@ class Git(object):
         self._valid = {}  #: Store the result of is_git_dir() for performance
         self.set_worktree(core.getcwd())
 
-    # pylint: disable=no-self-use
     def is_git_repository(self, path):
         return is_git_repository(path)
 
@@ -286,7 +285,7 @@ class Git(object):
         # Start the process
         # Guard against thread-unsafe .git/index.lock files
         if not _readonly:
-            _index_lock.acquire()
+            _index_lock.acquire()  # pylint: disable=consider-using-with
         try:
             status, out, err = core.run_command(
                 command,
@@ -332,7 +331,7 @@ class Git(object):
     def git(self, cmd, *args, **kwargs):
         # Handle optional arguments prior to calling transform_kwargs
         # otherwise they'll end up in args, which is bad.
-        _kwargs = dict(_cwd=self.getcwd())
+        _kwargs = {'_cwd': self.getcwd()}
         execute_kwargs = (
             '_cwd',
             '_decode',
@@ -363,14 +362,14 @@ class Git(object):
         call.extend(args)
         try:
             result = self.execute(call, **_kwargs)
-        except OSError as e:
-            if WIN32 and e.errno == errno.ENOENT:
+        except OSError as exc:
+            if WIN32 and exc.errno == errno.ENOENT:
                 # see if git exists at all. on win32 it can fail with ENOENT in
                 # case of argv overflow. we should be safe from that but use
                 # defensive coding for the worst-case scenario. On UNIX
                 # we have ENAMETOOLONG but that doesn't exist on Windows.
                 if _git_is_installed():
-                    raise e
+                    raise exc
                 _print_win32_git_hint()
             result = (1, '', "error: unable to execute '%s'" % GIT)
         return result
@@ -408,20 +407,20 @@ def transform_kwargs(**kwargs):
     args = []
     types_to_stringify = (ustr, float, str) + int_types
 
-    for k, v in kwargs.items():
+    for k, value in kwargs.items():
         if len(k) == 1:
             dashes = '-'
-            eq = ''
+            equals = ''
         else:
             dashes = '--'
-            eq = '='
+            equals = '='
         # isinstance(False, int) is True, so we have to check bool first
-        if isinstance(v, bool):
-            if v:
+        if isinstance(value, bool):
+            if value:
                 args.append('%s%s' % (dashes, dashify(k)))
             # else: pass  # False is ignored; flag=False inhibits --flag
-        elif isinstance(v, types_to_stringify):
-            args.append('%s%s%s%s' % (dashes, dashify(k), eq, v))
+        elif isinstance(value, types_to_stringify):
+            args.append('%s%s%s%s' % (dashes, dashify(k), equals, value))
 
     return args
 

@@ -177,8 +177,8 @@ class BaseTextEditExtension(QtCore.QObject):
     def set_tabwidth(self, width):
         self._tabwidth = width
         font = self.widget.font()
-        fm = QtGui.QFontMetrics(font)
-        pixels = fm.width('M' * width)
+        metrics = QtGui.QFontMetrics(font)
+        pixels = metrics.width('M' * width)
         self.widget.setTabStopWidth(pixels)
 
     def selected_line(self):
@@ -261,17 +261,16 @@ class BaseTextEditExtension(QtCore.QObject):
 
     # For extension by sub-classes
 
-    # pylint: disable=no-self-use
     def init(self):
         """Called during init for class-specific settings"""
         return
 
-    # pylint: disable=no-self-use,unused-argument
+    # pylint: disable=unused-argument
     def set_textwidth(self, width):
         """Set the text width"""
         return
 
-    # pylint: disable=no-self-use,unused-argument
+    # pylint: disable=unused-argument
     def set_linebreak(self, brk):
         """Enable word wrapping"""
         return
@@ -379,31 +378,28 @@ class PlainTextEdit(QtWidgets.QPlainTextEdit):
 
 class TextSearchWidget(QtWidgets.QWidget):
     """The search dialog that displays over a text edit field"""
-    search_text = Signal(object, bool)
 
-    def __init__(self, parent):
+    def __init__(self, widget, parent):
         super(TextSearchWidget, self).__init__(parent)
         self.setAutoFillBackground(True)
+        self._widget = widget
         self._parent = parent
 
         self.text = HintedDefaultLineEdit(N_('Find in diff'), parent=self)
 
         self.prev_button = qtutils.create_action_button(
-            tooltip=N_('Find the previous occurrence of the phrase'),
-            icon=icons.up()
+            tooltip=N_('Find the previous occurrence of the phrase'), icon=icons.up()
         )
 
         self.next_button = qtutils.create_action_button(
-            tooltip=N_('Find the next occurrence of the phrase'),
-            icon=icons.down()
+            tooltip=N_('Find the next occurrence of the phrase'), icon=icons.down()
         )
 
         self.match_case_checkbox = qtutils.checkbox(N_('Match Case'))
         self.whole_words_checkbox = qtutils.checkbox(N_('Whole Words'))
 
         self.close_button = qtutils.create_action_button(
-            tooltip=N_('Close the find bar'),
-            icon=icons.close()
+            tooltip=N_('Close the find bar'), icon=icons.close()
         )
 
         layout = qtutils.hbox(
@@ -424,6 +420,19 @@ class TextSearchWidget(QtWidgets.QWidget):
         self.text.returnPressed.connect(self.search)
         self.text.textChanged.connect(self.search)
 
+        self.search_next_action = qtutils.add_action(
+            parent,
+            N_('Find next item'),
+            self.search,
+            hotkeys.SEARCH_NEXT,
+        )
+        self.search_prev_action = qtutils.add_action(
+            parent,
+            N_('Find previous item'),
+            self.search_backwards,
+            hotkeys.SEARCH_PREV,
+        )
+
         qtutils.connect_button(self.next_button, self.search)
         qtutils.connect_button(self.prev_button, self.search_backwards)
         qtutils.connect_button(self.close_button, self.hide_search)
@@ -432,11 +441,11 @@ class TextSearchWidget(QtWidgets.QWidget):
 
     def search(self):
         """Emit a signal with the current search text"""
-        self.search_text.emit(self.text.get(), False)
+        self.search_text(backwards=False)
 
     def search_backwards(self):
         """Emit a signal with the current search text for a backwards search"""
-        self.search_text.emit(self.text.get(), True)
+        self.search_text(backwards=True)
 
     def hide_search(self):
         """Hide the search window"""
@@ -457,6 +466,43 @@ class TextSearchWidget(QtWidgets.QWidget):
     def is_case_sensitive(self):
         """Are we searching using a case-insensitive search?"""
         return self.match_case_checkbox.isChecked()
+
+    def search_text(self, backwards=False):
+        """Search the diff text for the given text"""
+        text = self.text.get()
+        cursor = self._widget.textCursor()
+        if cursor.hasSelection():
+            selected_text = cursor.selectedText()
+            case_sensitive = self.is_case_sensitive()
+            if text_matches(case_sensitive, selected_text, text):
+                if backwards:
+                    position = cursor.selectionStart()
+                else:
+                    position = cursor.selectionEnd()
+            else:
+                if backwards:
+                    position = cursor.selectionEnd()
+                else:
+                    position = cursor.selectionStart()
+            cursor.setPosition(position)
+            self._widget.setTextCursor(cursor)
+
+        flags = self.find_flags(backwards)
+        if not self._widget.find(text, flags):
+            if backwards:
+                location = QtGui.QTextCursor.End
+            else:
+                location = QtGui.QTextCursor.Start
+            cursor.movePosition(location, QtGui.QTextCursor.MoveAnchor)
+            self._widget.setTextCursor(cursor)
+            self._widget.find(text, flags)
+
+
+def text_matches(case_sensitive, a, b):
+    """Compare text with case sensitivity taken into account"""
+    if case_sensitive:
+        return a == b
+    return a.lower() == b.lower()
 
 
 class TextEditExtension(BaseTextEditExtension):
@@ -638,12 +684,12 @@ class HintWidget(QtCore.QObject):
         error_bg_rgb = qtutils.rgb_css(error_bg_color)
         error_fg_rgb = qtutils.rgb_css(error_fg_color)
 
-        env = dict(
-            name=widget.__class__.__name__,
-            error_fg_rgb=error_fg_rgb,
-            error_bg_rgb=error_bg_rgb,
-            hint_rgb=hint_rgb,
-        )
+        env = {
+            'name': widget.__class__.__name__,
+            'error_fg_rgb': error_fg_rgb,
+            'error_bg_rgb': error_bg_rgb,
+            'hint_rgb': hint_rgb,
+        }
 
         self._default_style = ''
 
@@ -1157,4 +1203,4 @@ class LineNumbers(TextDecorator):
                 Qt.AlignRight | Qt.AlignVCenter,
                 number,
             )
-            block = block.next()  # pylint: disable=next-method-called
+            block = block.next()

@@ -63,98 +63,124 @@ class DiffSyntaxHighlighter(QtGui.QSyntaxHighlighter):
 
         dark = palette.color(QPalette.Base).lightnessF() < 0.5
 
-        self.color_text = qtutils.RGB(cfg.color('text', '030303'))
-        self.color_add = qtutils.RGB(cfg.color('add', '77aa77' if dark else 'd2ffe4'))
-        self.color_remove = qtutils.RGB(
+        self.color_text = qtutils.rgb_triple(cfg.color('text', '030303'))
+        self.color_add = qtutils.rgb_triple(
+            cfg.color('add', '77aa77' if dark else 'd2ffe4')
+        )
+        self.color_remove = qtutils.rgb_triple(
             cfg.color('remove', 'aa7777' if dark else 'fee0e4')
         )
-        self.color_header = qtutils.RGB(cfg.color('header', header))
+        self.color_header = qtutils.rgb_triple(cfg.color('header', header))
 
-        self.diff_header_fmt = qtutils.make_format(fg=self.color_header)
-        self.bold_diff_header_fmt = qtutils.make_format(fg=self.color_header, bold=True)
-
-        self.diff_add_fmt = qtutils.make_format(fg=self.color_text, bg=self.color_add)
-        self.diff_remove_fmt = qtutils.make_format(
-            fg=self.color_text, bg=self.color_remove
+        self.diff_header_fmt = qtutils.make_format(foreground=self.color_header)
+        self.bold_diff_header_fmt = qtutils.make_format(
+            foreground=self.color_header, bold=True
         )
-        self.bad_whitespace_fmt = qtutils.make_format(bg=Qt.red)
+
+        self.diff_add_fmt = qtutils.make_format(
+            foreground=self.color_text, background=self.color_add
+        )
+        self.diff_remove_fmt = qtutils.make_format(
+            foreground=self.color_text, background=self.color_remove
+        )
+        self.bad_whitespace_fmt = qtutils.make_format(background=Qt.red)
         self.setCurrentBlockState(self.INITIAL_STATE)
 
     def set_enabled(self, enabled):
         self.enabled = enabled
 
     def highlightBlock(self, text):
+        """Highlight the current text block"""
         if not self.enabled or not text:
             return
-        # Aliases for quick local access
-        initial_state = self.INITIAL_STATE
-        default_state = self.DEFAULT_STATE
-        diff_state = self.DIFF_STATE
-        diffstat_state = self.DIFFSTAT_STATE
-        diff_file_header_state = self.DIFF_FILE_HEADER_STATE
-        submodule_state = self.SUBMODULE_STATE
-        end_state = self.END_STATE
+        formats = []
+        state = self.get_next_state(text)
+        if state == self.DIFFSTAT_STATE:
+            state, formats = self.get_formats_for_diffstat(state, text)
+        elif state == self.DIFF_FILE_HEADER_STATE:
+            state, formats = self.get_formats_for_diff_header(state, text)
+        elif state == self.DIFF_STATE:
+            state, formats = self.get_formats_for_diff_text(state, text)
 
-        diff_file_header_start_rgx = self.DIFF_FILE_HEADER_START_RGX
-        diff_hunk_header_rgx = self.DIFF_HUNK_HEADER_RGX
-        bad_whitespace_rgx = self.BAD_WHITESPACE_RGX
-
-        diff_header_fmt = self.diff_header_fmt
-        bold_diff_header_fmt = self.bold_diff_header_fmt
-        diff_add_fmt = self.diff_add_fmt
-        diff_remove_fmt = self.diff_remove_fmt
-        bad_whitespace_fmt = self.bad_whitespace_fmt
-
-        state = self.previousBlockState()
-        if state == initial_state:
-            if text.startswith('Submodule '):
-                state = submodule_state
-            elif text.startswith('diff --git '):
-                state = diffstat_state
-            elif self.is_commit:
-                state = default_state
-            else:
-                state = diffstat_state
-
-        if state == diffstat_state:
-            if diff_file_header_start_rgx.match(text):
-                state = diff_file_header_state
-                self.setFormat(0, len(text), diff_header_fmt)
-            elif diff_hunk_header_rgx.match(text):
-                state = diff_state
-                self.setFormat(0, len(text), bold_diff_header_fmt)
-            elif '|' in text:
-                i = text.index('|')
-                self.setFormat(0, i, bold_diff_header_fmt)
-                self.setFormat(i, len(text) - i, diff_header_fmt)
-            else:
-                self.setFormat(0, len(text), diff_header_fmt)
-        elif state == diff_file_header_state:
-            if diff_hunk_header_rgx.match(text):
-                state = diff_state
-                self.setFormat(0, len(text), bold_diff_header_fmt)
-            else:
-                self.setFormat(0, len(text), diff_header_fmt)
-        elif state == diff_state:
-            if diff_file_header_start_rgx.match(text):
-                state = diff_file_header_state
-                self.setFormat(0, len(text), diff_header_fmt)
-            elif diff_hunk_header_rgx.match(text):
-                self.setFormat(0, len(text), bold_diff_header_fmt)
-            elif text.startswith('-'):
-                if text == '-- ':
-                    state = end_state
-                else:
-                    self.setFormat(0, len(text), diff_remove_fmt)
-            elif text.startswith('+'):
-                self.setFormat(0, len(text), diff_add_fmt)
-                if self.whitespace:
-                    m = bad_whitespace_rgx.search(text)
-                    if m is not None:
-                        i = m.start()
-                        self.setFormat(i, len(text) - i, bad_whitespace_fmt)
+        for start, end, fmt in formats:
+            self.setFormat(start, end, fmt)
 
         self.setCurrentBlockState(state)
+
+    def get_next_state(self, text):
+        """Transition to the next state based on the input text"""
+        state = self.previousBlockState()
+        if state == DiffSyntaxHighlighter.INITIAL_STATE:
+            if text.startswith('Submodule '):
+                state = DiffSyntaxHighlighter.SUBMODULE_STATE
+            elif text.startswith('diff --git '):
+                state = DiffSyntaxHighlighter.DIFFSTAT_STATE
+            elif self.is_commit:
+                state = DiffSyntaxHighlighter.DEFAULT_STATE
+            else:
+                state = DiffSyntaxHighlighter.DIFFSTAT_STATE
+
+        return state
+
+    def get_formats_for_diffstat(self, state, text):
+        """Returns (state, [(start, end, fmt), ...]) for highlighting diffstat text"""
+        formats = []
+        if self.DIFF_FILE_HEADER_START_RGX.match(text):
+            state = self.DIFF_FILE_HEADER_STATE
+            end = len(text)
+            fmt = self.diff_header_fmt
+            formats.append((0, end, fmt))
+        elif self.DIFF_HUNK_HEADER_RGX.match(text):
+            state = self.DIFF_STATE
+            end = len(text)
+            fmt = self.bold_diff_header_fmt
+            formats.append((0, end, fmt))
+        elif '|' in text:
+            offset = text.index('|')
+            formats.append((0, offset, self.bold_diff_header_fmt))
+            formats.append((offset, len(text) - offset, self.diff_header_fmt))
+        else:
+            formats.append((0, len(text), self.diff_header_fmt))
+
+        return state, formats
+
+    def get_formats_for_diff_header(self, state, text):
+        """Returns (state, [(start, end, fmt), ...]) for highlighting diff headers"""
+        formats = []
+        if self.DIFF_HUNK_HEADER_RGX.match(text):
+            state = self.DIFF_STATE
+            formats.append((0, len(text), self.bold_diff_header_fmt))
+        else:
+            formats.append((0, len(text), self.diff_header_fmt))
+
+        return state, formats
+
+    def get_formats_for_diff_text(self, state, text):
+        """Return (state, [(start, end fmt), ...]) for highlighting diff text"""
+        formats = []
+
+        if self.DIFF_FILE_HEADER_START_RGX.match(text):
+            state = self.DIFF_FILE_HEADER_STATE
+            formats.append((0, len(text), self.diff_header_fmt))
+
+        elif self.DIFF_HUNK_HEADER_RGX.match(text):
+            formats.append((0, len(text), self.bold_diff_header_fmt))
+
+        elif text.startswith('-'):
+            if text == '-- ':
+                state = self.END_STATE
+            else:
+                formats.append((0, len(text), self.diff_remove_fmt))
+
+        elif text.startswith('+'):
+            formats.append((0, len(text), self.diff_add_fmt))
+            if self.whitespace:
+                match = self.BAD_WHITESPACE_RGX.search(text)
+                if match is not None:
+                    start = match.start()
+                    formats.append((start, len(text) - start, self.bad_whitespace_fmt))
+
+        return state, formats
 
 
 # pylint: disable=too-many-ancestors
@@ -187,8 +213,8 @@ class DiffTextEdit(VimHintedPlainTextEdit):
         self.menu_actions.append(self.copy_diff_action)
 
         # pylint: disable=no-member
-        self.cursorPositionChanged.connect(self._cursor_changed, Qt.QueuedConnection)
-        self.selectionChanged.connect(self._selection_changed, Qt.QueuedConnection)
+        self.cursorPositionChanged.connect(self._cursor_changed)
+        self.selectionChanged.connect(self._selection_changed)
 
     def setFont(self, font):
         """Override setFont() so that we can use a custom "block" cursor"""
@@ -201,7 +227,7 @@ class DiffTextEdit(VimHintedPlainTextEdit):
     def _cursor_changed(self):
         """Update the line number display when the cursor changes"""
         line_number = max(0, self.textCursor().blockNumber())
-        if self.numbers:
+        if self.numbers is not None:
             self.numbers.set_highlighted(line_number)
 
     def _selection_changed(self):
@@ -435,11 +461,12 @@ class DiffLineNumbers(TextDecorator):
                 text,
             )
 
-            block = block.next()  # pylint: disable=next-method-called
+            block = block.next()
 
 
 class Viewer(QtWidgets.QFrame):
     """Text and image diff viewers"""
+
     INDEX_TEXT = 0
     INDEX_IMAGE = 1
 
@@ -454,7 +481,7 @@ class Viewer(QtWidgets.QFrame):
         self.text = DiffEditor(context, options, self)
         self.image = imageview.ImageView(parent=self)
         self.image.setFocusPolicy(Qt.NoFocus)
-        self.search_widget = TextSearchWidget(self)
+        self.search_widget = TextSearchWidget(self.text, self)
         self.search_widget.hide()
 
         stack = self.stack = QtWidgets.QStackedWidget(self)
@@ -484,25 +511,11 @@ class Viewer(QtWidgets.QFrame):
 
         self.setFocusProxy(self.text)
 
-        self.search_widget.search_text.connect(self.search_text)
-
         self.search_action = qtutils.add_action(
             self,
             N_('Search in Diff'),
             self.show_search_diff,
             hotkeys.SEARCH,
-        )
-        self.search_next_action = qtutils.add_action(
-            self,
-            N_('Find next item'),
-            self.search_widget.search,
-            hotkeys.SEARCH_NEXT,
-        )
-        self.search_prev_action = qtutils.add_action(
-            self,
-            N_('Find previous item'),
-            self.search_widget.search_backwards,
-            hotkeys.SEARCH_PREV,
         )
 
     def show_search_diff(self):
@@ -513,35 +526,6 @@ class Viewer(QtWidgets.QFrame):
         if not self.search_widget.isVisible():
             self.search_widget.show()
         self.search_widget.setFocus(True)
-
-    def search_text(self, text, backwards):
-        """Search the diff text for the given text"""
-        cursor = self.text.textCursor()
-        if cursor.hasSelection():
-            selected_text = cursor.selectedText()
-            case_sensitive = self.search_widget.is_case_sensitive()
-            if text_matches(case_sensitive, selected_text, text):
-                if backwards:
-                    position = cursor.selectionStart()
-                else:
-                    position = cursor.selectionEnd()
-            else:
-                if backwards:
-                    position = cursor.selectionEnd()
-                else:
-                    position = cursor.selectionStart()
-            cursor.setPosition(position)
-            self.text.setTextCursor(cursor)
-
-        flags = self.search_widget.find_flags(backwards)
-        if not self.text.find(text, flags):
-            if backwards:
-                location = QtGui.QTextCursor.End
-            else:
-                location = QtGui.QTextCursor.Start
-            cursor.movePosition(location, QtGui.QTextCursor.MoveAnchor)
-            self.text.setTextCursor(cursor)
-            self.text.find(text, flags)
 
     def export_state(self, state):
         state['show_diff_line_numbers'] = self.options.show_line_numbers.isChecked()
@@ -703,13 +687,6 @@ def create_image(width, height):
     image = QtGui.QImage(size, QtGui.QImage.Format_ARGB32_Premultiplied)
     image.fill(Qt.transparent)
     return image
-
-
-def text_matches(case_sensitive, a, b):
-    """Compare text with case sensitivity taken into account"""
-    if case_sensitive:
-        return a == b
-    return a.lower() == b.lower()
 
 
 def create_painter(image):
@@ -1156,15 +1133,13 @@ class DiffEditor(DiffTextEdit):
         patch = diffparse.Patch.parse(self.model.filename, self.model.diff_text)
         if self.has_selection():
             return patch.extract_subset(first_line_idx, last_line_idx, reverse=reverse)
-        else:
-            return patch.extract_hunk(first_line_idx, reverse=reverse)
+        return patch.extract_hunk(first_line_idx, reverse=reverse)
 
     def patch_encoding(self):
         if isinstance(self.model.diff_text, core.UStr):
             # original encoding must prevail
             return self.model.diff_text.encoding
-        else:
-            return self.context.cfg.file_encoding(self.model.filename)
+        return self.context.cfg.file_encoding(self.model.filename)
 
     def process_diff_selection(
         self, reverse=False, apply_to_worktree=False, edit=False
@@ -1363,6 +1338,35 @@ class DiffWidget(QtWidgets.QWidget):
             self.set_diff_range(oid_start.oid, oid_end.oid, filename=filenames[0])
         else:
             self.set_diff_oid(self.oid, filename=filenames[0])
+
+
+class DiffPanel(QtWidgets.QWidget):
+    """A combined diff + search panel"""
+
+    def __init__(self, diff_widget, text_widget, parent):
+        super(DiffPanel, self).__init__(parent)
+        self.diff_widget = diff_widget
+        self.search_widget = TextSearchWidget(text_widget, self)
+        self.search_widget.hide()
+        layout = qtutils.vbox(
+            defs.no_margin, defs.spacing, self.diff_widget, self.search_widget
+        )
+        self.setLayout(layout)
+        self.setFocusProxy(self.diff_widget)
+
+        self.search_action = qtutils.add_action(
+            self,
+            N_('Search in Diff'),
+            self.show_search,
+            hotkeys.SEARCH,
+        )
+
+    def show_search(self):
+        """Show a dialog for searching diffs"""
+        # The diff search is only active in text mode.
+        if not self.search_widget.isVisible():
+            self.search_widget.show()
+        self.search_widget.setFocus(True)
 
 
 class TextLabel(QtWidgets.QLabel):

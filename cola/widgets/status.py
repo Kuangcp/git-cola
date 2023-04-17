@@ -98,7 +98,7 @@ class StatusWidget(QtWidgets.QFrame):
     def set_initial_size(self):
         """Set the initial size of the status widget"""
         self.setMaximumWidth(222)
-        QtCore.QTimer.singleShot(1, lambda: self.setMaximumWidth(2**13))
+        QtCore.QTimer.singleShot(1, lambda: self.setMaximumWidth(2 ** 13))
 
     def refresh(self):
         """Refresh the tree and rerun the diff to see updates"""
@@ -238,16 +238,12 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
 
         # Checkout the selected paths using "git checkout --ours".
         self.checkout_ours_action = qtutils.add_action(
-            self,
-            cmds.CheckoutOurs.name(),
-            cmds.run(cmds.CheckoutOurs, context)
+            self, cmds.CheckoutOurs.name(), cmds.run(cmds.CheckoutOurs, context)
         )
 
         # Checkout the selected paths using "git checkout --theirs".
         self.checkout_theirs_action = qtutils.add_action(
-            self,
-            cmds.CheckoutTheirs.name(),
-            cmds.run(cmds.CheckoutTheirs, context)
+            self, cmds.CheckoutTheirs.name(), cmds.run(cmds.CheckoutTheirs, context)
         )
 
         self.copy_path_action = qtutils.add_action(
@@ -502,7 +498,7 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
                 # if the modified or untracked headers are selected.
                 cmds.do(cmds.UnstageAll, context)
                 return  # Everything was unstaged. There's nothing more to be done.
-            elif is_modified and is_untracked:
+            if is_modified and is_untracked:
                 # If both modified and untracked headers are selected then
                 # stage everything.
                 cmds.do(cmds.StageModifiedAndUntracked, context)
@@ -511,7 +507,7 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
             # possibly a subset of the other category (eg. all modified and
             # some untracked).  We don't return here so that StageOrUnstage
             # gets a chance to run below.
-            elif is_modified:
+            if is_modified:
                 cmds.do(cmds.StageModified, context)
             elif is_untracked:
                 cmds.do(cmds.StageUntracked, context)
@@ -1123,8 +1119,7 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
             cls = {
                 STAGED_IDX: cmds.DiffStagedSummary,
                 MODIFIED_IDX: cmds.Diffstat,
-                # TODO implement UnmergedSummary
-                # UNMERGED_IDX: cmds.UnmergedSummary,
+                UNMERGED_IDX: cmds.UnmergedSummary,
                 UNTRACKED_IDX: cmds.UntrackedSummary,
             }.get(idx, cmds.Diffstat)
             cmds.do(cls, context)
@@ -1251,7 +1246,6 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
         include_urls = not self._alt_drag
         return qtutils.mimedata_from_paths(context, paths, include_urls=include_urls)
 
-    # pylint: disable=no-self-use
     def mimeTypes(self):
         """Return the mimetypes that this widget generates"""
         return qtutils.path_mimetypes(include_urls=not self._alt_drag)
@@ -1331,6 +1325,7 @@ def show_help(context):
 
 class StatusFilterWidget(QtWidgets.QWidget):
     """Filter paths displayed by the Status tool"""
+
     def __init__(self, context, parent=None):
         QtWidgets.QWidget.__init__(self, parent)
         self.context = context
@@ -1687,12 +1682,12 @@ class CopyLeadingPathWidget(QtWidgets.QWidget):
             QLabel:disabled {
                 color: %(disabled_text_rgb)s;
             }
-        """ % dict(
-            disabled_text_rgb=disabled_text_rgb,
-            text_rgb=text_rgb,
-            highlight_text_rgb=highlight_text_rgb,
-            highlight_rgb=highlight_rgb,
-        )
+        """ % {
+            'disabled_text_rgb': disabled_text_rgb,
+            'text_rgb': text_rgb,
+            'highlight_text_rgb': highlight_text_rgb,
+            'highlight_rgb': highlight_rgb,
+        }
 
         self.setStyleSheet(stylesheet)
 

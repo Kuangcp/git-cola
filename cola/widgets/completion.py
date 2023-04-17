@@ -91,13 +91,16 @@ class CompletionLineEdit(HintedLineEdit):
         Qt.Key_Down: 'down',
     }
 
-    def __init__(self, context, model_factory, hint='', parent=None):
+    def __init__(
+        self, context, model_factory, hint='', show_all_completions=False, parent=None
+    ):
         HintedLineEdit.__init__(self, context, hint, parent=parent)
         # Tracks when the completion popup was active during key events
 
         self.context = context
         # The most recently selected completion item
         self._selection = None
+        self._show_all_completions = show_all_completions
 
         # Create a completion model
         completion_model = model_factory(context, self)
@@ -208,7 +211,9 @@ class CompletionLineEdit(HintedLineEdit):
     def _completions_updated(self):
         popup = self.popup()
         if not popup.isVisible():
-            return
+            if not self.hasFocus() or not self._show_all_completions:
+                return
+            popup.show()
         # Select the first item
         idx = self._completion_model.index(0, 0)
         selection = QtCore.QItemSelection(idx, idx)
@@ -301,7 +306,7 @@ class GatherCompletionsThread(QtCore.QThread):
         utils.catch_runtime_error(self.wait)
 
     def run(self):
-        text = ''
+        text = None
         items = []
         self.running = True
         # Loop when the matched text changes between the start and end time.
@@ -426,7 +431,7 @@ class CompletionModel(QtGui.QStandardItemModel):
         if not self.update_thread.isRunning():
             self.update_thread.start()
 
-    # pylint: disable=unused-argument,no-self-use
+    # pylint: disable=unused-argument
     def gather_matches(self, case_sensitive):
         return ((), (), set())
 
@@ -473,12 +478,12 @@ class CompletionModel(QtGui.QStandardItemModel):
         self.update_thread.dispose()
 
 
-def _identity(x):
-    return x
+def _identity(value):
+    return value
 
 
-def _lower(x):
-    return x.lower()
+def _lower(value):
+    return value.lower()
 
 
 def filter_matches(match_text, candidates, case_sensitive, sort_key=None):
@@ -523,6 +528,7 @@ class Completer(QtWidgets.QCompleter):
         self._model = model
         self.setCompletionMode(QtWidgets.QCompleter.UnfilteredPopupCompletion)
         self.setCaseSensitivity(Qt.CaseInsensitive)
+        self.setFilterMode(QtCore.Qt.MatchContains)
 
         model.model_updated.connect(self.update, type=Qt.QueuedConnection)
         self.setModel(model)
@@ -549,7 +555,6 @@ class GitCompletionModel(CompletionModel):
         )
         return (refs, (), set())
 
-    # pylint: disable=no-self-use
     def matches(self):
         return []
 
@@ -637,7 +642,6 @@ class GitPathCompletionModel(GitCompletionModel):
     def __init__(self, context, parent):
         GitCompletionModel.__init__(self, context, parent)
 
-    # pylint: disable=no-self-use
     def candidate_paths(self):
         return []
 
@@ -730,12 +734,19 @@ class GitLogCompletionModel(GitRefCompletionModel):
         return (refs, paths, dirs)
 
 
-def bind_lineedit(model, hint=''):
+def bind_lineedit(model, hint='', show_all_completions=False):
     """Create a line edit bound against a specific model"""
 
     class BoundLineEdit(CompletionLineEdit):
         def __init__(self, context, hint=hint, parent=None):
-            CompletionLineEdit.__init__(self, context, model, hint=hint, parent=parent)
+            CompletionLineEdit.__init__(
+                self,
+                context,
+                model,
+                hint=hint,
+                show_all_completions=show_all_completions,
+                parent=parent,
+            )
             self.context = context
 
     return BoundLineEdit
@@ -745,7 +756,9 @@ def bind_lineedit(model, hint=''):
 GitLogLineEdit = bind_lineedit(GitLogCompletionModel, hint='<ref>')
 GitRefLineEdit = bind_lineedit(GitRefCompletionModel, hint='<ref>')
 GitCheckoutBranchLineEdit = bind_lineedit(
-    GitCheckoutBranchCompletionModel, hint='<branch>'
+    GitCheckoutBranchCompletionModel,
+    hint='<branch>',
+    show_all_completions=True,
 )
 GitCreateBranchLineEdit = bind_lineedit(GitCreateBranchCompletionModel, hint='<branch>')
 GitBranchLineEdit = bind_lineedit(GitBranchCompletionModel, hint='<branch>')
@@ -810,9 +823,9 @@ class GitDialog(QtWidgets.QDialog):
         dlg.show()
 
         def show_popup():
-            x = dlg.lineedit.x()
-            y = dlg.lineedit.y() + dlg.lineedit.height()
-            point = QtCore.QPoint(x, y)
+            x_val = dlg.lineedit.x()
+            y_val = dlg.lineedit.y() + dlg.lineedit.height()
+            point = QtCore.QPoint(x_val, y_val)
             mapped = dlg.mapToGlobal(point)
             dlg.lineedit.popup().move(mapped.x(), mapped.y())
             dlg.lineedit.popup().show()

@@ -94,7 +94,6 @@ class _BaseThread(QtCore.QThread):
     def _pending(self):
         return self._force_notify or self._file_paths or self._force_config
 
-    # pylint: disable=no-self-use
     def refresh(self):
         """Do any housekeeping necessary in response to repository changes."""
         return
@@ -312,9 +311,8 @@ if AVAILABLE == 'inotify':
                         # simply ignore them.
                         continue
                     raise e
-                else:
-                    wd_to_path_map[wd] = path
-                    path_to_wd_map[path] = wd
+                wd_to_path_map[wd] = path
+                path_to_wd_map[path] = wd
 
         def _check_event(self, wd, mask, name):
             if mask & inotify.IN_Q_OVERFLOW:
@@ -455,10 +453,10 @@ if AVAILABLE == 'pywin32':
                         timeout = self._NOTIFICATION_DELAY
                     else:
                         timeout = win32event.INFINITE
-                    rc = win32event.WaitForMultipleObjects(events, False, timeout)
+                    status = win32event.WaitForMultipleObjects(events, False, timeout)
                     if not self._running:
                         break
-                    if rc == win32event.WAIT_TIMEOUT:
+                    if status == win32event.WAIT_TIMEOUT:
                         self.notify()
                     else:
                         self._handle_results()

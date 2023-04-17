@@ -18,7 +18,7 @@ from .interaction import Interaction
 def add(context, items, u=False):
     """Run "git add" while preventing argument overflow"""
     git_add = context.git.add
-    return utils.slice_fn(
+    return utils.slice_func(
         items, lambda paths: git_add('--', force=True, verbose=True, u=u, *paths)
     )
 
@@ -361,6 +361,7 @@ def common_diff_opts(context):
         'no_ext_diff': True,
         'unified': config.get('gui.diffcontext', default=3),
         '_raw': True,
+        '_readonly': True,
     }
     opts.update(_diff_overrides)
     return opts
@@ -391,7 +392,7 @@ def oid_diff_range(context, start, end, filename=None):
         # "git show" is clever enough to handle the root commit.
         args = [end + '^!']
         _add_filename(args, filename)
-        _, out, _ = git.show(pretty='format:', _readonly=True, *args, **opts)
+        _, out, _ = git.show(pretty='format:', *args, **opts)
         out = out.lstrip()
     return out
 
@@ -583,8 +584,8 @@ def export_patchset(context, start, end, output='patches', **kwargs):
 def reset_paths(context, head, items):
     """Run "git reset" while preventing argument overflow"""
     items = list(set(items))
-    fn = context.git.reset
-    status, out, err = utils.slice_fn(items, lambda paths: fn(head, '--', *paths))
+    func = context.git.reset
+    status, out, err = utils.slice_func(items, lambda paths: func(head, '--', *paths))
     return (status, out, err)
 
 
@@ -733,7 +734,6 @@ def list_submodule(context):
     if status == 0 and data:
         data = data.splitlines()
         # see git submodule status
-        # TODO better separation
         for line in data:
             state = line[0].strip()
             sha1 = line[1 : OID_LENGTH + 1]
@@ -759,32 +759,6 @@ def merge_base_parent(context, branch):
     return 'HEAD'
 
 
-# TODO Unused?
-def parse_ls_tree(context, rev):
-    """Return a list of (mode, type, oid, path) tuples."""
-    output = []
-    git = context.git
-    lines = git.ls_tree(rev, r=True, _readonly=True)[STDOUT].splitlines()
-    regex = re.compile(r'^(\d+)\W(\w+)\W(\w+)[ \t]+(.*)$')
-    for line in lines:
-        match = regex.match(line)
-        if match:
-            mode = match.group(1)
-            objtype = match.group(2)
-            oid = match.group(3)
-            filename = match.group(4)
-            output.append(
-                (
-                    mode,
-                    objtype,
-                    oid,
-                    filename,
-                )
-            )
-    return output
-
-
-# TODO unused?
 def ls_tree(context, path, ref='HEAD'):
     """Return a parsed git ls-tree result for a single directory"""
     git = context.git

@@ -72,11 +72,11 @@ class FocusRedirectProxy(object):
         """Forward the captured action to the focused or default widget"""
         widget = QtWidgets.QApplication.focusWidget()
         if widget in self.widgets and hasattr(widget, name):
-            fn = getattr(widget, name)
+            func = getattr(widget, name)
         else:
-            fn = getattr(self.default, name)
+            func = getattr(self.default, name)
 
-        return fn(*args, **kwargs)
+        return func(*args, **kwargs)
 
 
 class ViewerMixin(object):
@@ -114,20 +114,20 @@ class ViewerMixin(object):
             return self.clicked.oid
         return self.selected_oid()
 
-    def with_oid(self, fn):
+    def with_oid(self, func):
         """Run an operation with a commit object ID"""
         oid = self.clicked_oid()
         if oid:
-            result = fn(oid)
+            result = func(oid)
         else:
             result = None
         return result
 
-    def with_selected_oid(self, fn):
+    def with_selected_oid(self, func):
         """Run an operation with a commit object ID"""
         oid = self.selected_oid()
         if oid:
-            result = fn(oid)
+            result = func(oid)
         else:
             result = None
         return result
@@ -264,18 +264,16 @@ class ViewerMixin(object):
         has_single_selection_or_clicked = bool(has_single_selection or commit)
         has_selection = bool(selected_items)
         can_diff = bool(
-            commit and
-            has_single_selection and
-            selected_items and
-            commit is not selected_items[0].commit
+            commit
+            and has_single_selection
+            and selected_items
+            and commit is not selected_items[0].commit
         )
         has_branches = (
-            has_single_selection and
-            selected_item and
-            bool(selected_item.commit.branches)
-        ) or (
-            self.clicked and bool(self.clicked.branches)
-        )
+            has_single_selection
+            and selected_item
+            and bool(selected_item.commit.branches)
+        ) or (self.clicked and bool(self.clicked.branches))
 
         if can_diff:
             self.selected = selected_items[0].commit
@@ -757,13 +755,14 @@ class GitDAG(standard.MainWindow):
         self.file_dock = qtutils.create_dock('Files', N_('Files'), self)
         self.file_dock.setWidget(self.filewidget)
 
+        self.diff_panel = diff.DiffPanel(self.diffwidget, self.diffwidget.diff, self)
         self.diff_options = diff.Options(self.diffwidget)
         self.diffwidget.set_options(self.diff_options)
         self.diff_options.hide_advanced_options()
         self.diff_options.set_diff_type(main.Types.TEXT)
 
         self.diff_dock = qtutils.create_dock('Diff', N_('Diff'), self)
-        self.diff_dock.setWidget(self.diffwidget)
+        self.diff_dock.setWidget(self.diff_panel)
 
         diff_titlebar = self.diff_dock.titleBarWidget()
         diff_titlebar.add_corner_widget(self.diff_options)
@@ -886,7 +885,10 @@ class GitDAG(standard.MainWindow):
         if self.params.ref:
             self.setWindowTitle(
                 N_('%(project)s: %(ref)s - DAG')
-                % dict(project=project, ref=self.params.ref)
+                % {
+                    'project': project,
+                    'ref': self.params.ref,
+                }
             )
         else:
             self.setWindowTitle(project + N_(' - DAG'))
@@ -1015,12 +1017,12 @@ class GitDAG(standard.MainWindow):
 
         self.graphview.set_initial_view()
 
-    def diff_commits(self, a, b):
+    def diff_commits(self, left, right):
         paths = self.params.paths()
         if paths:
-            cmds.difftool_launch(self.context, left=a, right=b, paths=paths)
+            cmds.difftool_launch(self.context, left=left, right=right, paths=paths)
         else:
-            difftool.diff_commits(self.context, self, a, b)
+            difftool.diff_commits(self.context, self, left, right)
 
     # Qt overrides
     def closeEvent(self, event):
@@ -1031,8 +1033,8 @@ class GitDAG(standard.MainWindow):
     def histories_selected(self, histories):
         argv = [self.model.currentbranch, '--']
         argv.extend(histories)
-        text = core.list2cmdline(argv)
-        self.revtext.setText(text)
+        rev_text = core.list2cmdline(argv)
+        self.revtext.setText(rev_text)
         self.display()
 
     def difftool_selected(self, files):
@@ -1071,7 +1073,7 @@ class ReaderThread(QtCore.QThread):
         repo.reset()
         self.begin.emit()
         commits = []
-        for c in repo.get():
+        for commit in repo.get():
             self._mutex.lock()
             if self._stop:
                 self._condition.wait(self._mutex)
@@ -1079,7 +1081,7 @@ class ReaderThread(QtCore.QThread):
             if self._abort:
                 repo.reset()
                 return
-            commits.append(c)
+            commits.append(commit)
             if len(commits) >= 512:
                 self.add.emit(commits)
                 commits = []
@@ -1151,7 +1153,7 @@ class Edge(QtWidgets.QGraphicsItem):
             color = EdgeColor.current()
             line = Qt.SolidLine
 
-        self.pen = QtGui.QPen(color, 4.0, line, Qt.SquareCap, Qt.RoundJoin)
+        self.pen = QtGui.QPen(color, 2.0, line, Qt.SquareCap, Qt.RoundJoin)
 
     def recompute_bound(self):
         dest_pt = Commit.item_bbox.center()
@@ -1252,23 +1254,27 @@ class EdgeColor(object):
     def update_colors(cls, theme):
         """Update the colors based on the color theme"""
         if theme.is_dark or theme.is_palette_dark:
-            cls.colors.extend([
-                QtGui.QColor(Qt.red).lighter(),
-                QtGui.QColor(Qt.cyan).lighter(),
-                QtGui.QColor(Qt.magenta).lighter(),
-                QtGui.QColor(Qt.green).lighter(),
-                QtGui.QColor(Qt.yellow).lighter(),
-            ])
+            cls.colors.extend(
+                [
+                    QtGui.QColor(Qt.red).lighter(),
+                    QtGui.QColor(Qt.cyan).lighter(),
+                    QtGui.QColor(Qt.magenta).lighter(),
+                    QtGui.QColor(Qt.green).lighter(),
+                    QtGui.QColor(Qt.yellow).lighter(),
+                ]
+            )
         else:
-            cls.colors.extend([
-                QtGui.QColor(Qt.blue),
-                QtGui.QColor(Qt.darkRed),
-                QtGui.QColor(Qt.darkCyan),
-                QtGui.QColor(Qt.darkMagenta),
-                QtGui.QColor(Qt.darkGreen),
-                QtGui.QColor(Qt.darkYellow),
-                QtGui.QColor(Qt.darkBlue),
-            ])
+            cls.colors.extend(
+                [
+                    QtGui.QColor(Qt.blue),
+                    QtGui.QColor(Qt.darkRed),
+                    QtGui.QColor(Qt.darkCyan),
+                    QtGui.QColor(Qt.darkMagenta),
+                    QtGui.QColor(Qt.darkGreen),
+                    QtGui.QColor(Qt.darkYellow),
+                    QtGui.QColor(Qt.darkBlue),
+                ]
+            )
 
     @classmethod
     def cycle(cls):
@@ -1418,21 +1424,17 @@ class Label(QtWidgets.QGraphicsItem):
     remote_color = QtGui.QColor(Qt.yellow)
 
     head_pen = QtGui.QPen()
-    head_pen.setColor(head_color.darker().darker())
+    head_pen.setColor(QtGui.QColor(Qt.black))
     head_pen.setWidth(1)
 
     text_pen = QtGui.QPen()
     text_pen.setColor(QtGui.QColor(Qt.black))
     text_pen.setWidth(1)
 
-    alpha = 200
-    head_color.setAlpha(alpha)
-    other_color.setAlpha(alpha)
-    remote_color.setAlpha(alpha)
-
-    border = 2
-    item_spacing = 5
-    text_offset = 1
+    border = 1
+    item_spacing = 8
+    text_x_offset = 3
+    text_y_offset = 0
 
     def __init__(self, commit):
         QtWidgets.QGraphicsItem.__init__(self)
@@ -1450,20 +1452,21 @@ class Label(QtWidgets.QGraphicsItem):
         height = 18
         current_width = 0
         spacing = self.item_spacing
-        border = self.border + self.text_offset  # text offset=1 in paint()
+        border_x = self.border + self.text_x_offset
+        border_y = self.border + self.text_y_offset
 
         font = cache.label_font()
         item_shape = QPainterPath()
 
         base_rect = QRectF(0, 0, width, height)
-        base_rect = base_rect.adjusted(-border, -border, border, border)
+        base_rect = base_rect.adjusted(-border_x, -border_y, border_x, border_y)
         item_shape.addRect(base_rect)
 
         for tag in self.commit.tags:
             text_shape = QPainterPath()
             text_shape.addText(current_width, 0, font, tag)
             text_rect = text_shape.boundingRect()
-            box_rect = text_rect.adjusted(-border, -border, border, border)
+            box_rect = text_rect.adjusted(-border_x, -border_y, border_x, border_y)
             item_shape.addRect(box_rect)
             current_width = item_shape.boundingRect().width() + spacing
 
@@ -1474,9 +1477,10 @@ class Label(QtWidgets.QGraphicsItem):
         font = cache.label_font()
         painter.setFont(font)
 
-        current_width = 0
+        current_width = 3
         border = self.border
-        offset = self.text_offset
+        x_offset = self.text_x_offset
+        y_offset = self.text_y_offset
         spacing = self.item_spacing
         QRectF = QtCore.QRectF
 
@@ -1511,7 +1515,7 @@ class Label(QtWidgets.QGraphicsItem):
             text_rect = painter.boundingRect(
                 QRectF(current_width, 0, 0, 0), Qt.TextSingleLine, tag
             )
-            box_rect = text_rect.adjusted(-offset, -offset, offset, offset)
+            box_rect = text_rect.adjusted(-x_offset, -y_offset, x_offset, y_offset)
 
             painter.drawRoundedRect(box_rect, border, border)
             painter.drawText(text_rect, Qt.TextSingleLine, tag)
@@ -1528,7 +1532,7 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
     y_adjust = int(Commit.commit_radius * 4 / 3)
 
     x_off = -18
-    y_off = -24
+    y_off = -20
 
     def __init__(self, context, parent):
         QtWidgets.QGraphicsView.__init__(self, parent)
@@ -1655,13 +1659,13 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
             item_rect = item.sceneTransform().mapRect(item.boundingRect())
             self.ensureVisible(item_rect)
 
-    def _get_item_by_generation(self, commits, criteria_fn):
+    def _get_item_by_generation(self, commits, criteria_func):
         """Return the item for the commit matching criteria"""
         if not commits:
             return None
         generation = None
         for commit in commits:
-            if generation is None or criteria_fn(generation, commit.generation):
+            if generation is None or criteria_func(generation, commit.generation):
                 oid = commit.oid
                 generation = commit.generation
         try:
@@ -1769,12 +1773,12 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
 
             for item in items:
                 pos = item.pos()
-                x = pos.x()
-                y = pos.y()
-                x_min = min(x_min, x)
-                x_max = max(x_max, x)
-                y_min = min(y_min, y)
-                y_max = max(y_max, y)
+                x_val = pos.x()
+                y_val = pos.y()
+                x_min = min(x_min, x_val)
+                x_max = max(x_max, x_val)
+                y_min = min(y_min, y_val)
+                y_max = max(y_max, y_val)
 
             rect = QtCore.QRectF(x_min, y_min, abs(x_max - x_min), abs(y_max - y_min))
 
@@ -1802,27 +1806,27 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
 
     def pan(self, event):
         pos = event.pos()
-        dx = pos.x() - self.mouse_start[0]
-        dy = pos.y() - self.mouse_start[1]
+        x_offset = pos.x() - self.mouse_start[0]
+        y_offset = pos.y() - self.mouse_start[1]
 
-        if dx == 0 and dy == 0:
+        if x_offset == 0 and y_offset == 0:
             return
 
-        rect = QtCore.QRect(0, 0, abs(dx), abs(dy))
+        rect = QtCore.QRect(0, 0, abs(x_offset), abs(y_offset))
         delta = self.mapToScene(rect).boundingRect()
 
-        tx = delta.width()
-        if dx < 0.0:
-            tx = -tx
+        x_translate = delta.width()
+        if x_offset < 0.0:
+            x_translate = -x_translate
 
-        ty = delta.height()
-        if dy < 0.0:
-            ty = -ty
+        y_translate = delta.height()
+        if y_offset < 0.0:
+            y_translate = -y_translate
 
         matrix = self.transform()
         matrix.reset()
         matrix *= self.saved_matrix
-        matrix.translate(tx, ty)
+        matrix.translate(x_translate, y_translate)
 
         self.setTransformationAnchor(QtWidgets.QGraphicsView.NoAnchor)
         self.setTransform(matrix)
@@ -1910,14 +1914,12 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
             try:
                 commit_item = self.items[commit.oid]
             except KeyError:
-                # TODO - Handle truncated history viewing
-                continue
+                continue  # The history is truncated.
             for parent in reversed(commit.parents):
                 try:
                     parent_item = self.items[parent.oid]
                 except KeyError:
-                    # TODO - Handle truncated history viewing
-                    continue
+                    continue  # The history is truncated.
                 try:
                     edge = parent_item.edges[commit.oid]
                 except KeyError:
@@ -1935,12 +1937,12 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
         # edges to prevent double edge invalidation.
         invalid_edges = set()
 
-        for oid, (x, y) in positions.items():
+        for oid, (x_val, y_val) in positions.items():
             item = self.items[oid]
 
             pos = item.pos()
-            if pos != (x, y):
-                item.setPos(x, y)
+            if pos != (x_val, y_val):
+                item.setPos(x_val, y_val)
 
                 for edge in item.edges.values():
                     invalid_edges.add(edge)
@@ -2051,12 +2053,12 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
             # frontier values for fork children will be overridden in course of
             # propagate_frontier.
             for offset in itertools.count(1):
-                for c in [column + offset, column - offset]:
-                    if c not in self.columns:
-                        # Column 'c' is not occupied.
+                for value in (column + offset, column - offset):
+                    if value not in self.columns:
+                        # Column is not occupied.
                         continue
                     try:
-                        frontier = self.frontier[c]
+                        frontier = self.frontier[value]
                     except KeyError:
                         # Column 'c' was never allocated.
                         continue
@@ -2118,8 +2120,8 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
                 can_overlap = list(range(column + 1, self.max_column + 1))
             else:
                 can_overlap = list(range(column - 1, self.min_column - 1, -1))
-            for c in can_overlap:
-                frontier = self.frontier[c]
+            for value in can_overlap:
+                frontier = self.frontier[value]
                 if frontier > cell_row:
                     cell_row = frontier
 
@@ -2129,8 +2131,8 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
         else:
             can_overlap = list(range(self.max_column, column, -1))
         for cell_row in itertools.count(cell_row):
-            for c in can_overlap:
-                if (c, cell_row) in self.tagged_cells:
+            for value in can_overlap:
+                if (value, cell_row) in self.tagged_cells:
                     # Overlapping. Try next row.
                     break
             else:
@@ -2222,11 +2224,11 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
         positions = {}
 
         for node in self.commits:
-            x_pos = x_start + node.column * x_off
-            y_pos = y_off + node.row * y_off
+            x_val = x_start + node.column * x_off
+            y_val = y_off + node.row * y_off
 
-            positions[node.oid] = (x_pos, y_pos)
-            x_min = min(x_min, x_pos)
+            positions[node.oid] = (x_val, y_val)
+            x_min = min(x_min, x_val)
 
         self.x_min = x_min
 

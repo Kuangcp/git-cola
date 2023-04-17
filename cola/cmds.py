@@ -79,32 +79,26 @@ class EditModel(ContextCommand):
 class ConfirmAction(ContextCommand):
     """Confirm an action before running it"""
 
-    # pylint: disable=no-self-use
     def ok_to_run(self):
         """Return True when the command is ok to run"""
         return True
 
-    # pylint: disable=no-self-use
     def confirm(self):
         """Prompt for confirmation"""
         return True
 
-    # pylint: disable=no-self-use
     def action(self):
         """Run the command and return (status, out, err)"""
         return (-1, '', '')
 
-    # pylint: disable=no-self-use
     def success(self):
         """Callback run on success"""
         return
 
-    # pylint: disable=no-self-use
     def command(self):
         """Command name, for error messages"""
         return 'git'
 
-    # pylint: disable=no-self-use
     def error_message(self):
         """Command error message"""
         return ''
@@ -2248,7 +2242,6 @@ class RevertEditsCommand(ConfirmAction):
     def ok_to_run(self):
         return self.model.is_undoable()
 
-    # pylint: disable=no-self-use
     def checkout_from_head(self):
         return False
 
@@ -2675,7 +2668,6 @@ class StageCarefully(Stage):
         super(StageCarefully, self).__init__(context, None)
         self.init_paths()
 
-    # pylint: disable=no-self-use
     def init_paths(self):
         """Initialize path data"""
         return
@@ -2934,19 +2926,33 @@ class Untrack(ContextCommand):
         Interaction.log_status(status, out, err)
 
 
+class UnmergedSummary(EditModel):
+    """List unmerged files in the diff text."""
+
+    def __init__(self, context):
+        super(UnmergedSummary, self).__init__(context)
+        unmerged = self.model.unmerged
+        io = StringIO()
+        io.write('# %s unmerged  file(s)\n' % len(unmerged))
+        if unmerged:
+            io.write('\n'.join(unmerged) + '\n')
+        self.new_diff_text = io.getvalue()
+        self.new_diff_type = main.Types.TEXT
+        self.new_file_type = main.Types.TEXT
+        self.new_mode = self.model.mode_display
+
+
 class UntrackedSummary(EditModel):
     """List possible .gitignore rules as the diff text."""
 
     def __init__(self, context):
         super(UntrackedSummary, self).__init__(context)
         untracked = self.model.untracked
-        suffix = 's' if untracked else ''
         io = StringIO()
-        io.write('# %s untracked file%s\n' % (len(untracked), suffix))
+        io.write('# %s untracked file(s)\n' % len(untracked))
         if untracked:
-            io.write('# possible .gitignore rule%s:\n' % suffix)
-            for u in untracked:
-                io.write('/' + u + '\n')
+            io.write('# Add these lines to ".gitignore" to ignore these files:\n')
+            io.write('\n'.join('/' + filename for filename in untracked) + '\n')
         self.new_diff_text = io.getvalue()
         self.new_diff_type = main.Types.TEXT
         self.new_file_type = main.Types.TEXT
@@ -3228,7 +3234,7 @@ def difftool_launch(
             suffix = '^!' if left_take_magic else '~'
             # Check root commit (no parents and thus cannot execute '~')
             git = context.git
-            status, out, err = git.rev_list(left, parents=True, n=1)
+            status, out, err = git.rev_list(left, parents=True, n=1, _readonly=True)
             Interaction.log_status(status, out, err)
             if status:
                 raise OSError('git rev-list command failed')

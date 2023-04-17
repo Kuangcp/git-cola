@@ -22,8 +22,8 @@ def create(context):
 class MainModel(QtCore.QObject):
     """Repository status model"""
 
-    # TODO this class can probably be split apart into a DiffModel,
-    # CommitMessageModel, StatusModel, and an AppStatusStateMachine.
+    # Refactor: split this class apart into separate DiffModel, CommitMessageModel,
+    # StatusModel, and an DiffEditorState.
 
     # Signals
     about_to_update = Signal()
@@ -444,7 +444,12 @@ class MainModel(QtCore.QObject):
 
     def push(self, remote, remote_branch='', local_branch='', **opts):
         # Swap the branches in push mode (reverse of fetch)
-        opts.update(dict(local_branch=remote_branch, remote_branch=local_branch))
+        opts.update(
+            {
+                'local_branch': remote_branch,
+                'remote_branch': local_branch,
+            }
+        )
         result = run_remote_action(
             self.context, self.git.push, remote, push=True, **opts
         )
