@@ -30,6 +30,7 @@ HIDPI = 'cola.hidpi'
 HISTORY_BROWSER = 'gui.historybrowser'
 ICON_THEME = 'cola.icontheme'
 LINEBREAK = 'cola.linebreak'
+LOGDATE = 'cola.logdate'
 MAXRECENT = 'cola.maxrecent'
 MERGE_DIFFSTAT = 'merge.diffstat'
 MERGE_KEEPBACKUP = 'merge.keepbackup'
@@ -37,6 +38,7 @@ MERGE_SUMMARY = 'merge.summary'
 MERGE_VERBOSITY = 'merge.verbosity'
 MERGETOOL = 'merge.tool'
 MOUSE_ZOOM = 'cola.mousezoom'
+PATCHES_DIRECTORY = 'cola.patchesdirectory'
 RESIZE_BROWSER_COLUMNS = 'cola.resizebrowsercolumns'
 SAFE_MODE = 'cola.safemode'
 SAVEWINDOWSETTINGS = 'cola.savewindowsettings'
@@ -50,6 +52,34 @@ TABWIDTH = 'cola.tabwidth'
 TEXTWIDTH = 'cola.textwidth'
 USER_EMAIL = 'user.email'
 USER_NAME = 'user.name'
+
+
+class DateFormat(object):
+    DEFAULT = 'default'
+    RELATIVE = 'relative'
+    LOCAL = 'local'
+    ISO = 'iso8601'
+    ISO_STRICT = 'iso8601-strict'
+    RFC = 'rfc2822'
+    SHORT = 'short'
+    RAW = 'raw'
+    HUMAN = 'human'
+    UNIX = 'unix'
+
+
+def date_formats():
+    return [
+        DateFormat.DEFAULT,
+        DateFormat.RELATIVE,
+        DateFormat.LOCAL,
+        DateFormat.ISO,
+        DateFormat.ISO_STRICT,
+        DateFormat.RFC,
+        DateFormat.SHORT,
+        DateFormat.RAW,
+        DateFormat.HUMAN,
+        DateFormat.UNIX,
+    ]
 
 
 class Defaults(object):
@@ -90,8 +120,10 @@ class Defaults(object):
     textwidth = 72
     theme = 'default'
     hidpi = hidpi.Option.AUTO
+    patches_directory = 'patches'
     status_indent = False
     status_show_totals = False
+    logdate = DateFormat.DEFAULT
 
 
 def blame_viewer(context):
@@ -208,6 +240,11 @@ def linebreak(context):
     return context.cfg.get(LINEBREAK, default=Defaults.linebreak)
 
 
+def logdate(context):
+    """Return the configured log date format"""
+    return context.cfg.get(LOGDATE, default=Defaults.logdate)
+
+
 def maxrecent(context):
     """Return the configured maximum number of Recent Repositories"""
     value = Defaults.maxrecent
@@ -229,6 +266,11 @@ def spellcheck(context):
 def expandtab(context):
     """Should we expand tabs in commit messages?"""
     return context.cfg.get(EXPANDTAB, default=Defaults.expandtab)
+
+
+def patches_directory(context):
+    """Return the patches output directory"""
+    return context.cfg.get(PATCHES_DIRECTORY, default=Defaults.patches_directory)
 
 
 def sort_bookmarks(context):

@@ -29,6 +29,7 @@ from .text import TextDecorator
 from .text import VimHintedPlainTextEdit
 from .text import TextSearchWidget
 from . import defs
+from . import patch as patch_mod
 from . import imageview
 
 
@@ -483,6 +484,10 @@ class Viewer(QtWidgets.QFrame):
         self.image.setFocusPolicy(Qt.NoFocus)
         self.search_widget = TextSearchWidget(self.text, self)
         self.search_widget.hide()
+        self._drag_has_patches = False
+
+        self.setAcceptDrops(True)
+        self.setFocusProxy(self.text)
 
         stack = self.stack = QtWidgets.QStackedWidget(self)
         stack.addWidget(self.text)
@@ -509,14 +514,44 @@ class Viewer(QtWidgets.QFrame):
         options.image_mode.currentIndexChanged.connect(lambda _: self.render())
         options.zoom_mode.currentIndexChanged.connect(lambda _: self.render())
 
-        self.setFocusProxy(self.text)
-
         self.search_action = qtutils.add_action(
             self,
             N_('Search in Diff'),
             self.show_search_diff,
             hotkeys.SEARCH,
         )
+
+    def dragEnterEvent(self, event):
+        """Accepts drops if the mimedata contains patches"""
+        super(Viewer, self).dragEnterEvent(event)
+        patches = patch_mod.get_patches_from_mimedata(event.mimeData())
+        if patches:
+            event.acceptProposedAction()
+            self._drag_has_patches = True
+
+    def dragLeaveEvent(self, event):
+        """End the drag+drop interaction"""
+        super(Viewer, self).dragLeaveEvent(event)
+        if self._drag_has_patches:
+            event.accept()
+        else:
+            event.ignore()
+        self._drag_has_patches = False
+
+    def dropEvent(self, event):
+        """Apply patches when dropped onto the widget"""
+        if not self._drag_has_patches:
+            event.ignore()
+            return
+        event.setDropAction(Qt.CopyAction)
+        super(Viewer, self).dropEvent(event)
+        self._drag_has_patches = False
+
+        patches = patch_mod.get_patches_from_mimedata(event.mimeData())
+        if patches:
+            patch_mod.apply_patches(self.context, patches=patches)
+
+        event.accept()  # must be called after dropEvent()
 
     def show_search_diff(self):
         """Show a dialog for searching diffs"""
@@ -581,7 +616,7 @@ class Viewer(QtWidgets.QFrame):
         self.cleanup()
 
     def cleanup(self):
-        for (image, unlink) in self.images:
+        for image, unlink in self.images:
             if unlink and core.exists(image):
                 os.unlink(image)
         self.images = []
@@ -840,7 +875,6 @@ class Options(QtWidgets.QWidget):
 
 # pylint: disable=too-many-ancestors
 class DiffEditor(DiffTextEdit):
-
     up = Signal()
     down = Signal()
     options_changed = Signal()
@@ -1044,6 +1078,9 @@ class DiffEditor(DiffTextEdit):
             # Removed files can still be diffed.
             add_action(self.launch_difftool)
 
+        add_action(qtutils.menu_separator(menu))
+        _add_patch_actions(self, self.context, menu)
+
         # Add the Previous/Next File actions, which improves discoverability
         # of their associated shortcuts
         add_action(qtutils.menu_separator(menu))
@@ -1176,6 +1213,122 @@ class DiffEditor(DiffTextEdit):
         self.selection_model.line_number = self.numbers.current_line()
 
 
+def _add_patch_actions(widget, context, menu):
+    """Add actions for manipulating patch files"""
+    patches_menu = menu.addMenu(N_('Patches'))
+    patches_menu.setIcon(icons.diff())
+    export_action = qtutils.add_action(
+        patches_menu,
+        N_('Export Patch'),
+        lambda: _export_patch(widget, context),
+    )
+    export_action.setIcon(icons.save())
+    patches_menu.addAction(export_action)
+
+    # Build the "Append Patch" menu dynamically.
+    append_menu = patches_menu.addMenu(N_('Append Patch'))
+    append_menu.setIcon(icons.add())
+    append_menu.aboutToShow.connect(
+        lambda: _build_patch_append_menu(widget, context, append_menu)
+    )
+
+
+def _build_patch_append_menu(widget, context, menu):
+    """Build the "Append Patch" submenu"""
+    # Build the menu when first displayed only. This initial check avoids
+    # re-populating the menu with duplicate actions.
+    menu_actions = menu.actions()
+    if menu_actions:
+        return
+
+    choose_patch_action = qtutils.add_action(
+        menu,
+        N_('Choose Patch...'),
+        lambda: _export_patch(widget, context, append=True),
+    )
+    choose_patch_action.setIcon(icons.diff())
+    menu.addAction(choose_patch_action)
+
+    subdir_menus = {}
+    path = prefs.patches_directory(context)
+    patches = patch_mod.get_patches_from_dir(path)
+    for patch in patches:
+        relpath = os.path.relpath(patch, start=path)
+        sub_menu = _add_patch_subdirs(menu, subdir_menus, relpath)
+        patch_basename = os.path.basename(relpath)
+        append_action = qtutils.add_action(
+            sub_menu,
+            patch_basename,
+            lambda patch_file=patch: _append_patch(widget, patch_file),
+        )
+        append_action.setIcon(icons.save())
+        sub_menu.addAction(append_action)
+
+
+def _add_patch_subdirs(menu, subdir_menus, relpath):
+    """Build menu leading up to the patch"""
+    # If the path contains no directory separators then add it to the
+    # root of the menu.
+    if os.sep not in relpath:
+        return menu
+
+    # Loop over each directory component and build a menu if it doesn't already exist.
+    components = []
+    for dirname in os.path.dirname(relpath).split(os.sep):
+        components.append(dirname)
+        current_dir = os.sep.join(components)
+        try:
+            menu = subdir_menus[current_dir]
+        except KeyError:
+            menu = subdir_menus[current_dir] = menu.addMenu(dirname)
+            menu.setIcon(icons.folder())
+
+    return menu
+
+
+def _export_patch(diff_editor, context, append=False):
+    """Export the selected diff to a patch file"""
+    if diff_editor.selection_model.is_empty():
+        return
+    patch = diff_editor.extract_patch(reverse=False)
+    if not patch.has_changes():
+        return
+    directory = prefs.patches_directory(context)
+    if append:
+        filename = qtutils.existing_file(directory, title=N_('Append Patch...'))
+    else:
+        default_filename = os.path.join(directory, 'diff.patch')
+        filename = qtutils.save_as(default_filename)
+    if not filename:
+        return
+    _write_patch_to_file(diff_editor, patch, filename, append=append)
+
+
+def _append_patch(diff_editor, filename):
+    """Append diffs to the specified patch file"""
+    if diff_editor.selection_model.is_empty():
+        return
+    patch = diff_editor.extract_patch(reverse=False)
+    if not patch.has_changes():
+        return
+    _write_patch_to_file(diff_editor, patch, filename, append=True)
+
+
+def _write_patch_to_file(diff_editor, patch, filename, append=False):
+    """Write diffs from the Diff Editor to the specified patch file"""
+    encoding = diff_editor.patch_encoding()
+    content = patch.as_text()
+    try:
+        core.write(filename, content, encoding=encoding, append=append)
+    except (IOError, OSError) as exc:
+        _, details = utils.format_exception(exc)
+        title = N_('Error writing patch')
+        msg = N_('Unable to write patch to "%s". Check permissions?' % filename)
+        Interaction.critical(title, message=msg, details=details)
+        return
+    Interaction.log('Patch written to "%s"' % filename)
+
+
 class DiffWidget(QtWidgets.QWidget):
     """Display commit metadata and text diffs"""
 
@@ -1200,18 +1353,24 @@ class DiffWidget(QtWidgets.QWidget):
 
         self.gravatar_label = gravatar.GravatarLabel(self.context, parent=self)
 
+        self.oid_label = TextLabel()
+        self.oid_label.setTextFormat(Qt.PlainText)
+        self.oid_label.setSizePolicy(policy)
+        self.oid_label.setAlignment(Qt.AlignBottom)
+        self.oid_label.elide()
+
         self.author_label = TextLabel()
         self.author_label.setTextFormat(Qt.RichText)
         self.author_label.setFont(author_font)
         self.author_label.setSizePolicy(policy)
-        self.author_label.setAlignment(Qt.AlignBottom)
+        self.author_label.setAlignment(Qt.AlignTop)
         self.author_label.elide()
 
         self.date_label = TextLabel()
         self.date_label.setTextFormat(Qt.PlainText)
         self.date_label.setSizePolicy(policy)
         self.date_label.setAlignment(Qt.AlignTop)
-        self.date_label.hide()
+        self.date_label.elide()
 
         self.summary_label = TextLabel()
         self.summary_label.setTextFormat(Qt.PlainText)
@@ -1220,22 +1379,16 @@ class DiffWidget(QtWidgets.QWidget):
         self.summary_label.setAlignment(Qt.AlignTop)
         self.summary_label.elide()
 
-        self.oid_label = TextLabel()
-        self.oid_label.setTextFormat(Qt.PlainText)
-        self.oid_label.setSizePolicy(policy)
-        self.oid_label.setAlignment(Qt.AlignTop)
-        self.oid_label.elide()
-
         self.diff = DiffTextEdit(context, self, is_commit=is_commit, whitespace=False)
         self.setFocusProxy(self.diff)
 
         self.info_layout = qtutils.vbox(
             defs.no_margin,
             defs.no_spacing,
+            self.oid_label,
             self.author_label,
             self.date_label,
             self.summary_label,
-            self.oid_label,
         )
 
         self.logo_layout = qtutils.hbox(
@@ -1284,10 +1437,11 @@ class DiffWidget(QtWidgets.QWidget):
             return
         commit = commits[-1]
         oid = commit.oid
-        email = commit.email or ''
-        summary = commit.summary or ''
         author = commit.author or ''
-        self.set_details(oid, author, email, '', summary)
+        email = commit.email or ''
+        date = commit.authdate or ''
+        summary = commit.summary or ''
+        self.set_details(oid, author, email, date, summary)
         self.oid = oid
 
         if len(commits) > 1:

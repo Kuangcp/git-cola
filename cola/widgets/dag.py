@@ -1113,7 +1113,6 @@ class ReaderThread(QtCore.QThread):
 
 
 class Cache(object):
-
     _label_font = None
 
     @classmethod
@@ -1129,7 +1128,6 @@ class Edge(QtWidgets.QGraphicsItem):
     item_type = qtutils.standard_item_type_value(1)
 
     def __init__(self, source, dest):
-
         QtWidgets.QGraphicsItem.__init__(self)
 
         self.setAcceptedMouseButtons(Qt.NoButton)
@@ -1388,7 +1386,6 @@ class Commit(QtWidgets.QGraphicsItem):
         return self.item_shape
 
     def paint(self, painter, option, _widget):
-
         # Do not draw outside the exposed rect
         painter.setClipRect(option.exposedRect)
 
@@ -1416,7 +1413,6 @@ class Commit(QtWidgets.QGraphicsItem):
 
 
 class Label(QtWidgets.QGraphicsItem):
-
     item_type = qtutils.graphics_item_type_value(3)
 
     head_color = QtGui.QColor(Qt.green)
@@ -1524,7 +1520,6 @@ class Label(QtWidgets.QGraphicsItem):
 
 # pylint: disable=too-many-ancestors
 class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
-
     commits_selected = Signal(object)
     diff_commits = Signal(object, object)
 
@@ -1868,29 +1863,29 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
             return
         self.zoom = scale
 
-        adjust_scrollbars = True
+        adjust_scrollbars = False
         scrollbar = self.verticalScrollBar()
+        scrollbar_offset = 1.0
         if scrollbar:
             value = get(scrollbar)
-            min_ = scrollbar.minimum()
-            max_ = scrollbar.maximum()
-            range_ = max_ - min_
-            distance = value - min_
-            nonzero_range = range_ > 0.1
+            minimum = scrollbar.minimum()
+            maximum = scrollbar.maximum()
+            scrollbar_range = maximum - minimum
+            distance = value - minimum
+            nonzero_range = scrollbar_range > 0.1
             if nonzero_range:
-                scrolloffset = distance / range_
-            else:
-                adjust_scrollbars = False
+                scrollbar_offset = distance / scrollbar_range
+                adjust_scrollbars = True
 
         self.setTransformationAnchor(QtWidgets.QGraphicsView.NoAnchor)
         self.scale(scale, scale)
 
         scrollbar = self.verticalScrollBar()
         if scrollbar and adjust_scrollbars:
-            min_ = scrollbar.minimum()
-            max_ = scrollbar.maximum()
-            range_ = max_ - min_
-            value = min_ + int(float(range_) * scrolloffset)
+            minimum = scrollbar.minimum()
+            maximum = scrollbar.maximum()
+            scrollbar_range = maximum - minimum
+            value = minimum + int(float(scrollbar_range) * scrollbar_offset)
             scrollbar.setValue(value)
 
     def add_commits(self, commits):
@@ -2165,7 +2160,7 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
 
         for node in sort_by_generation(list(self.commits)):
             if node.column is None:
-                # Node is either root or its parent is not in items. The last
+                # Node is either root or its parent is not in items. This
                 # happens when tree loading is in progress. Allocate new
                 # columns for such nodes.
                 node.column = self.alloc_column()

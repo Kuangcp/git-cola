@@ -18,15 +18,17 @@ from . import defs
 from . import diff
 
 
-def apply_patches(context):
+def apply_patches(context, patches=None):
+    """Open the ApplyPatches dialog"""
     parent = qtutils.active_window()
-    dlg = new_apply_patches(context, parent=parent)
+    dlg = new_apply_patches(context, patches=patches, parent=parent)
     dlg.show()
     dlg.raise_()
     return dlg
 
 
 def new_apply_patches(context, patches=None, parent=None):
+    """Create a new instances of the ApplyPatches dialog"""
     dlg = ApplyPatches(context, parent=parent)
     if patches:
         dlg.add_paths(patches)
@@ -34,12 +36,9 @@ def new_apply_patches(context, patches=None, parent=None):
 
 
 def get_patches_from_paths(paths):
+    """Returns all patches benath a given path"""
     paths = [core.decode(p) for p in paths]
-    patches = [
-        p
-        for p in paths
-        if core.isfile(p) and (p.endswith('.patch') or p.endswith('.mbox'))
-    ]
+    patches = [p for p in paths if core.isfile(p) and p.endswith(('.patch', '.mbox'))]
     dirs = [p for p in paths if core.isdir(p)]
     dirs.sort()
     for d in dirs:
@@ -48,6 +47,7 @@ def get_patches_from_paths(paths):
 
 
 def get_patches_from_mimedata(mimedata):
+    """Extract path files from a QMimeData payload"""
     urls = mimedata.urls()
     if not urls:
         return []
@@ -59,7 +59,7 @@ def get_patches_from_dir(path):
     """Find patches in a subdirectory"""
     patches = []
     for root, _, files in core.walk(path):
-        for name in [f for f in files if f.endswith('.patch')]:
+        for name in [f for f in files if f.endswith(('.patch', '.mbox'))]:
             patches.append(core.decode(os.path.join(root, name)))
     return patches
 

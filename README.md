@@ -272,6 +272,14 @@ Once these are installed you can run Git Cola from the Start menu.
 
 See "Windows (Continued)" below for more details.
 
+If you'd like to install Git Cola with
+[winget](https://github.com/microsoft/winget-cli) run the following command:
+
+    winget install git-cola.git-cola
+
+As there is no dependency resolution yet you have to install Git as well with:
+
+    winget install Git.Git
 
 # Goodies
 
@@ -288,6 +296,15 @@ environment variable:
 
     export GIT_SEQUENCE_EDITOR="$HOME/git-cola/bin/git-cola-sequence-editor"
     git rebase -i @{upstream}
+
+## Shell Completions
+
+Shell completion scripts are available for bash and zsh.
+Each script contains instructions on how to install and activate the completions.
+
+* [bash completion script](contrib/git-cola-completion.bash)
+
+* [zsh completion script](contrib/_git-cola)
 
 
 # Git Cola Sub-commands
@@ -347,7 +364,7 @@ The following commands should be run during development:
     # Run the unit tests
     $ make test
 
-    # Run tests and longer-running pylint and flake8 checks
+    # Run tests and longer-running pylint checks
     $ make check
 
     # Run tests against multiple python interpreters using tox

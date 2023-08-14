@@ -112,7 +112,7 @@ def set_widget_value(widget, value):
             widget.setText(value)
         elif isinstance(widget, QtWidgets.QCheckBox):
             widget.setChecked(value)
-        elif isinstance(widget, qtutils.ComboBox):
+        elif hasattr(widget, 'set_value'):
             widget.set_value(value)
 
 
@@ -121,6 +121,15 @@ class RepoFormWidget(FormWidget):
         FormWidget.__init__(self, context, model, parent, source=source)
         self.name = QtWidgets.QLineEdit()
         self.email = QtWidgets.QLineEdit()
+
+        tooltip = N_(
+            'Default directory when exporting patches.\n'
+            'Relative paths are relative to the current repository.\n'
+            'Absolute path are used as-is.'
+        )
+        patches_directory = prefs.patches_directory(context)
+        self.patches_directory = standard.DirectoryPathLineEdit(patches_directory, self)
+        self.patches_directory.setToolTip(tooltip)
 
         self.diff_context = standard.SpinBox(value=5, mini=2, maxi=9995)
         self.merge_verbosity = standard.SpinBox(value=5, maxi=5)
@@ -131,6 +140,13 @@ class RepoFormWidget(FormWidget):
         self.show_path = qtutils.checkbox(checked=True)
         self.tabwidth = standard.SpinBox(value=8, maxi=42)
         self.textwidth = standard.SpinBox(value=72, maxi=150)
+
+        self.logdate = qtutils.combo(prefs.date_formats())
+        tooltip = N_(
+            'The date-time format used when displaying dates in Git DAG.\n'
+            'This value is passed to git log --date=<format>'
+        )
+        self.logdate.setToolTip(tooltip)
 
         tooltip = N_('Detect conflict markers in unmerged files')
         self.check_conflicts = qtutils.checkbox(checked=True, tooltip=tooltip)
@@ -151,8 +167,10 @@ class RepoFormWidget(FormWidget):
         self.add_row(N_('Email Address'), self.email)
         self.add_row(N_('Tab Width'), self.tabwidth)
         self.add_row(N_('Text Width'), self.textwidth)
+        self.add_row(N_('Log Date Format'), self.logdate)
         self.add_row(N_('Merge Verbosity'), self.merge_verbosity)
         self.add_row(N_('Number of Diff Context Lines'), self.diff_context)
+        self.add_row(N_('Patches Directory'), self.patches_directory)
         self.add_row(N_('Summarize Merge Commits'), self.merge_summary)
         self.add_row(
             N_('Automatically Load Commit Message Template'), self.autotemplate
@@ -171,8 +189,11 @@ class RepoFormWidget(FormWidget):
         self.set_config(
             {
                 prefs.AUTOTEMPLATE: (self.autotemplate, Defaults.autotemplate),
+                prefs.AUTOCOMPLETE_PATHS: (
+                    self.autocomplete_paths,
+                    Defaults.autocomplete_paths,
+                ),
                 prefs.CHECK_CONFLICTS: (self.check_conflicts, Defaults.check_conflicts),
-                prefs.ENABLE_GRAVATAR: (self.enable_gravatar, Defaults.enable_gravatar),
                 prefs.CHECK_PUBLISHED_COMMITS: (
                     self.check_published_commits,
                     Defaults.check_published_commits,
@@ -182,19 +203,21 @@ class RepoFormWidget(FormWidget):
                     self.display_untracked,
                     Defaults.display_untracked,
                 ),
-                prefs.USER_NAME: (self.name, ''),
-                prefs.USER_EMAIL: (self.email, ''),
+                prefs.ENABLE_GRAVATAR: (self.enable_gravatar, Defaults.enable_gravatar),
+                prefs.LOGDATE: (self.logdate, Defaults.logdate),
                 prefs.MERGE_DIFFSTAT: (self.merge_diffstat, Defaults.merge_diffstat),
                 prefs.MERGE_SUMMARY: (self.merge_summary, Defaults.merge_summary),
                 prefs.MERGE_VERBOSITY: (self.merge_verbosity, Defaults.merge_verbosity),
-                prefs.SAFE_MODE: (self.safe_mode, Defaults.safe_mode),
-                prefs.AUTOCOMPLETE_PATHS: (
-                    self.autocomplete_paths,
-                    Defaults.autocomplete_paths,
+                prefs.PATCHES_DIRECTORY: (
+                    self.patches_directory,
+                    Defaults.patches_directory,
                 ),
+                prefs.SAFE_MODE: (self.safe_mode, Defaults.safe_mode),
                 prefs.SHOW_PATH: (self.show_path, Defaults.show_path),
                 prefs.TABWIDTH: (self.tabwidth, Defaults.tabwidth),
                 prefs.TEXTWIDTH: (self.textwidth, Defaults.textwidth),
+                prefs.USER_NAME: (self.name, ''),
+                prefs.USER_EMAIL: (self.email, ''),
             }
         )
 

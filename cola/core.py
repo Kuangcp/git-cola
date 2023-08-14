@@ -60,7 +60,6 @@ class UStr(ustr):
     """
 
     def __new__(cls, string, encoding):
-
         if isinstance(string, UStr):
             if encoding != string.encoding:
                 raise ValueError(
@@ -142,9 +141,13 @@ def read(filename, size=-1, encoding=None, errors='strict'):
         return xread(fh, size=size, encoding=encoding, errors=errors)
 
 
-def write(path, contents, encoding=None):
+def write(path, contents, encoding=None, append=False):
     """Writes a unicode string to a file"""
-    with xopen(path, 'wb') as fh:
+    if append:
+        mode = 'ab'
+    else:
+        mode = 'wb'
+    with xopen(path, mode) as fh:
         return xwrite(fh, contents, encoding=encoding)
 
 
@@ -519,4 +522,7 @@ relpath = wrap(mkpath, os.path.relpath, decorator=decode)
 remove = wrap(mkpath, os.remove)
 stat = wrap(mkpath, os.stat)
 unlink = wrap(mkpath, os.unlink)
-walk = wrap(mkpath, os.walk)
+if PY2:
+    walk = wrap(mkpath, os.walk)
+else:
+    walk = os.walk
