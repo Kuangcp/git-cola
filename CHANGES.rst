@@ -1,3 +1,104 @@
+.. _v4.4.0:
+
+v4.4.0
+======
+
+Usability, bells and whistles
+-----------------------------
+* Git Cola now preserves `# commentary` in commit messages by default.
+  The `commit.cleanup` Git configuration variable can be used to
+  customize this behavior. For example, if you want Git Cola to
+  strip comments (the old behavior before v4.4.0) then
+  you can run `git config --global commit.cleanup strip` or configure
+  the "Commit Message Cleanup" setting in the Preferences window.
+  (`#1330 <https://github.com/git-cola/git-cola/issues/1330>`_)
+
+* `git dag` now includes completions for `git log` options in the text input field.
+
+* `git dag` now provides convenient search filters when right-clicking in the
+  text input field.
+
+* A `1.25 x` Hi-DPI magnification option mode is now available in the Appearance settings.
+  (`#1313 <https://github.com/git-cola/git-cola/issues/1313>`_)
+
+* MacOS-specific application themes are now available in the Appearance settings
+  when the pyobjc module is installed.
+  (`#905 <https://github.com/git-cola/git-cola/issues/905>`_)
+
+* Git Cola now runs `git commit` in the background and feedback is provided while
+  the commit is running. This prevents the UI from freezing when running pre-commit
+  hooks that can make `git commit` take a long time to run.
+  (`#1320 <https://github.com/git-cola/git-cola/issues/1320>`_)
+
+* The Diff context menu was reworked to reduce visual clutter and better match
+  the Status context menu.
+  (`#1347 <https://github.com/git-cola/git-cola/issues/1347>`_)
+
+* The standalone `git cola tag` tool now autocompletes the tag name field.
+  (`#706 <https://github.com/git-cola/git-cola/pull/706>`_)
+  (`#691 <https://github.com/git-cola/git-cola/issues/691>`_)
+
+Fixes
+-----
+* `git dag` was not displaying history when refspecs were specified.
+  (`#1334 <https://github.com/git-cola/git-cola/issues/1334>`_)
+
+Development
+-----------
+* `cercis <https://pypi.org/project/cercis/>`_ is now being used to enforce
+  Git Cola's python code style. We were previously disabling quote normalization
+  when using `black`. Use of `cercis` allows us to enable quote normalization
+  under its default single-quote settings.
+
+* The test suite now works on Windows.
+  (`#1331 <https://github.com/git-cola/git-cola/issues/1331>`_)
+  (`#1332 <https://github.com/git-cola/git-cola/pull/1332>`_)
+
+* Pre-commits hooks and code modernization.
+  (`#1333 <https://github.com/git-cola/git-cola/pull/1333>`_)
+
+* Compatibility with Sphinx 7.2.0 was added to the `sphinxtogithub`
+  sphinx documentation plugin.
+  (`#1336 <https://github.com/git-cola/git-cola/pull/1336>`_)
+
+
+.. _v4.3.2:
+
+v4.3.2
+======
+
+Usability, bells and whistles
+-----------------------------
+* The minimum font size can now be set lower, which is helpful for Hi-DPI displays.
+  (`#1342 <https://github.com/git-cola/git-cola/pull/1342>`_)
+
+Fixes
+-----
+* Flashing windows during startup on Windows has been fixed.
+  (`#1329 <https://github.com/git-cola/git-cola/issues/1329>`_)
+
+* `git dag` was not displaying history when refspecs were specified.
+  (`#1334 <https://github.com/git-cola/git-cola/issues/1334>`_)
+
+Development
+-----------
+* Compatibility with Sphinx 7.2.0 was added to the `sphinxtogithub`
+  sphinx documentation plugin.
+  (`#1336 <https://github.com/git-cola/git-cola/pull/1336>`_)
+
+
+.. _v4.3.1:
+
+v4.3.1
+======
+
+Fixes
+-----
+* The pypi wheel was fixed to include `entry_points.txt`.
+
+* The "Revert" command was throwing an exception after succesfully completing.
+
+
 .. _v4.3.0:
 
 v4.3.0
@@ -3225,7 +3326,7 @@ Usability, bells and whistles
 
 * The commit message editor was redesigned to have a more compact
   and keyboard-convenient user interface.
-  
+
 * Keyboard shortcuts for adding a Signed-off-by (`Ctrl + i`)
   and creating a commit (`Ctrl + m`) were added.
 

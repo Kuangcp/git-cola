@@ -1,5 +1,4 @@
 """Launcher and command line interface to git-cola"""
-from __future__ import absolute_import, division, print_function, unicode_literals
 import argparse
 import sys
 
@@ -143,12 +142,16 @@ def add_dag_command(subparser):
         help='visualize all branches',
         default=False,
     )
-    parser.add_argument('args', nargs='*', metavar='<args>', help='git log arguments')
+    parser.add_argument(
+        'args', nargs=argparse.REMAINDER, metavar='<args>', help='git log arguments'
+    )
 
 
 def add_diff_command(subparser):
     parser = add_command(subparser, 'diff', 'view diffs', cmd_diff)
-    parser.add_argument('args', nargs='*', metavar='<args>', help='git diff arguments')
+    parser.add_argument(
+        'args', nargs=argparse.REMAINDER, metavar='<args>', help='git diff arguments'
+    )
 
 
 def add_fetch_command(subparser):
@@ -705,6 +708,7 @@ def cmd_tag(args):
     from .widgets.createtag import new_create_tag  # pylint: disable=all
 
     context = app.application_init(args)
+    context.model.update_status()
     view = new_create_tag(context, name=args.name, ref=args.ref, sign=args.sign)
     return app.application_start(context, view)
 

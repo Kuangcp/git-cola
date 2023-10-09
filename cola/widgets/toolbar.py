@@ -1,4 +1,3 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
 from functools import partial
 
 from qtpy import QtGui
@@ -97,7 +96,7 @@ def add_toolbar(context, widget):
     configure(toolbar)
 
 
-class ToolBarState(object):
+class ToolBarState:
     """export_state() and apply_state() providers for toolbars"""
 
     def __init__(self, context, widget):
@@ -146,22 +145,20 @@ class ToolBarState(object):
             items = [x.data() for x in toolbar.actions()]
             # show_icons is for backwards compatibility with git-cola <= 3.11.0
             show_icons = toolbar.toolbar_style() != ToolBar.STYLE_TEXT_ONLY
-            result.append(
-                {
-                    'name': toolbar.windowTitle(),
-                    'area': encode_toolbar_area(toolbar_area),
-                    'break': widget.toolBarBreak(toolbar),
-                    'float': toolbar.isFloating(),
-                    'x': toolbar.pos().x(),
-                    'y': toolbar.pos().y(),
-                    'width': toolbar.width(),
-                    'height': toolbar.height(),
-                    'show_icons': show_icons,
-                    'toolbar_style': toolbar.toolbar_style(),
-                    'visible': toolbar.isVisible(),
-                    'items': items,
-                }
-            )
+            result.append({
+                'name': toolbar.windowTitle(),
+                'area': encode_toolbar_area(toolbar_area),
+                'break': widget.toolBarBreak(toolbar),
+                'float': toolbar.isFloating(),
+                'x': toolbar.pos().x(),
+                'y': toolbar.pos().y(),
+                'width': toolbar.width(),
+                'height': toolbar.height(),
+                'show_icons': show_icons,
+                'toolbar_style': toolbar.toolbar_style(),
+                'visible': toolbar.isVisible(),
+                'items': items,
+            })
 
         return result
 
@@ -259,7 +256,7 @@ class ToolBar(QtWidgets.QToolBar):
 
             tooltip = command.get('tooltip', None)
             if tooltip:
-                toolbar_action.setToolTip('%s\n%s' % (title, tooltip))
+                toolbar_action.setToolTip(f'{title}\n{tooltip}')
 
     def delete_toolbar(self):
         self.parent().removeToolBar(self)
@@ -429,7 +426,7 @@ def get_index_from_style(style):
     return ToolBar.STYLE_SYMBOLS.index(style)
 
 
-class DraggableListMixin(object):
+class DraggableListMixin:
     items = []
 
     def __init__(self, widget, Base):

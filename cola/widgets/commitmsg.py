@@ -1,4 +1,3 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
 from functools import partial
 
 from qtpy import QtCore
@@ -24,12 +23,14 @@ from ..models import prefs
 from ..qtutils import get
 from ..utils import Group
 from . import defs
+from . import standard
 from .selectcommits import select_commits
 from .spellcheck import SpellCheckLineEdit, SpellCheckTextEdit
 from .text import anchor_mode
 
 
 class CommitMessageEditor(QtWidgets.QFrame):
+    commit_finished = Signal(object)
     cursor_changed = Signal(int, int)
     down = Signal()
     up = Signal()
@@ -95,6 +96,11 @@ class CommitMessageEditor(QtWidgets.QFrame):
             text=N_('Commit@@verb'), tooltip=commit_button_tooltip, icon=icons.commit()
         )
         self.commit_group = Group(self.commit_action, self.commit_button)
+        self.commit_progress_bar = standard.progress_bar(
+            self,
+            hide=(self.commit_button,),
+            disable=(self.commit_button, self.summary, self.description),
+        )
 
         self.actions_menu = qtutils.create_menu(N_('Actions'), self)
         self.actions_button = qtutils.create_toolbutton(
@@ -154,6 +160,7 @@ class CommitMessageEditor(QtWidgets.QFrame):
             self.actions_button,
             self.summary,
             self.commit_button,
+            self.commit_progress_bar,
         )
         self.toplayout.setContentsMargins(
             defs.margin, defs.no_margin, defs.no_margin, defs.no_margin
@@ -183,6 +190,7 @@ class CommitMessageEditor(QtWidgets.QFrame):
         self.model.commit_message_changed.connect(
             self.set_commit_message, type=Qt.QueuedConnection
         )
+        self.commit_finished.connect(self._commit_finished, type=Qt.QueuedConnection)
 
         self.summary.cursor_changed.connect(self.cursor_changed.emit)
         self.description.cursor_changed.connect(
@@ -457,7 +465,7 @@ class CommitMessageEditor(QtWidgets.QFrame):
                 N_(
                     'This commit has already been published.\n'
                     'This operation will rewrite published history.\n'
-                    'You probably don\'t want to do this.'
+                    "You probably don't want to do this."
                 ),
                 N_('Amend the published commit?'),
                 N_('Amend Commit'),
@@ -468,8 +476,26 @@ class CommitMessageEditor(QtWidgets.QFrame):
             return
         no_verify = get(self.bypass_commit_hooks_action)
         sign = get(self.sign_action)
-        cmds.do(cmds.Commit, context, amend, msg, sign, no_verify=no_verify)
         self.bypass_commit_hooks_action.setChecked(False)
+
+        self.commit_progress_bar.setMaximumWidth(self.commit_button.width())
+        self.commit_progress_bar.setMinimumHeight(self.commit_button.height() - 2)
+
+        task = qtutils.SimpleTask(
+            cmds.run(cmds.Commit, context, amend, msg, sign, no_verify=no_verify)
+        )
+        self.context.runtask.start(
+            task,
+            finish=self.commit_finished.emit,
+            progress=self.commit_progress_bar,
+        )
+
+    def _commit_finished(self, task):
+        """Reset widget state on completion of the commit task"""
+        title = N_('Commit failed')
+        status, out, err = task.result
+        Interaction.command(title, 'git commit', status, out, err)
+        self.setFocus(True)
 
     def build_fixup_menu(self):
         self.build_commits_menu(

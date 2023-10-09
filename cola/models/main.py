@@ -1,5 +1,4 @@
 """The central cola model"""
-from __future__ import absolute_import, division, print_function, unicode_literals
 import os
 
 from qtpy import QtCore
@@ -54,22 +53,25 @@ class MainModel(QtCore.QObject):
     mode_diff = 'diff'  # Diffing against an arbitrary commit
 
     # Modes where we can checkout files from the $head
-    modes_undoable = set((mode_amend, mode_diff, mode_index, mode_worktree))
+    modes_undoable = {mode_amend, mode_diff, mode_index, mode_worktree}
 
     # Modes where we can partially stage files
-    modes_partially_stageable = set(
-        (mode_amend, mode_diff, mode_worktree, mode_untracked_diff)
-    )
+    modes_partially_stageable = {
+        mode_amend,
+        mode_diff,
+        mode_worktree,
+        mode_untracked_diff,
+    }
 
     # Modes where we can partially unstage files
-    modes_unstageable = set((mode_amend, mode_diff, mode_index))
+    modes_unstageable = {mode_amend, mode_diff, mode_index}
 
     unstaged = property(lambda self: self.modified + self.unmerged + self.untracked)
     """An aggregate of the modified, unmerged, and untracked file lists."""
 
     def __init__(self, context, cwd=None):
         """Interface to the main repository status"""
-        super(MainModel, self).__init__()
+        super().__init__()
 
         self.context = context
         self.git = context.git
@@ -207,7 +209,7 @@ class MainModel(QtCore.QObject):
             if not msg.endswith('\n'):
                 msg += '\n'
             core.write(path, msg)
-        except (OSError, IOError):
+        except OSError:
             pass
         return path
 
@@ -399,7 +401,7 @@ class MainModel(QtCore.QObject):
         context = self.context
         merge_msg_path = gitcmds.merge_message_path(context)
         if merge_msg_path:
-            msg = core.read(merge_msg_path)
+            msg = gitcmds.read_merge_commit_message(context, merge_msg_path)
             if msg != self._auto_commitmsg:
                 self._auto_commitmsg = msg
                 self._prev_commitmsg = self.commitmsg
@@ -444,12 +446,10 @@ class MainModel(QtCore.QObject):
 
     def push(self, remote, remote_branch='', local_branch='', **opts):
         # Swap the branches in push mode (reverse of fetch)
-        opts.update(
-            {
-                'local_branch': remote_branch,
-                'remote_branch': local_branch,
-            }
-        )
+        opts.update({
+            'local_branch': remote_branch,
+            'remote_branch': local_branch,
+        })
         result = run_remote_action(
             self.context, self.git.push, remote, push=True, **opts
         )
@@ -500,7 +500,7 @@ class MainModel(QtCore.QObject):
         self.update_refs()
 
 
-class Types(object):
+class Types:
     """File types (used for image diff modes)"""
 
     IMAGE = 'image'
@@ -562,7 +562,7 @@ def refspec(src, dst, push=False):
     if push and src == dst:
         spec = src
     else:
-        spec = '%s:%s' % (src, dst)
+        spec = f'{src}:{dst}'
     return spec
 
 

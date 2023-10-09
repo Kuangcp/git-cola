@@ -7,7 +7,7 @@ to this software.
 
 ## Run the pre-commit checks before committing
 
-* `make check`
+* `garden check`
 
 ## Write tests
 
@@ -22,13 +22,13 @@ The style here is the standard Python PEP-8 style:
 
 http://www.python.org/dev/peps/pep-0008/
 
-* Use the `make format` command to format the source code using `black`.
+* Use the `garden fmt` command to format the source code using `cercis`.
 
 * Follow the same style as the existing code.
 
 * Use 4-space indents.
 
-* Use `variable_names_with_underscores`, AKA "snake case" naming.
+* Use `variable_names_with_underscores` AKA "snake case" naming.
   No camelCase.  The only exception is when overriding Qt functions.
 
 * Do not introduce trailing whitespace.  The "Diff" viewer displays
@@ -36,7 +36,8 @@ http://www.python.org/dev/peps/pep-0008/
 
 * If you use SublimeText, configure `newline_at_eof_on_save` to true.
 
-https://robots.thoughtbot.com/no-newline-at-end-of-file
+* Avoid "No newline at end of file"
+  [in your diffs](https://robots.thoughtbot.com/no-newline-at-end-of-file).
 
 ## Describe your changes well.
 
@@ -158,13 +159,15 @@ translated into a localized string.
 The translation message files are the `*.po` files in the `cola/i18n/` directory.
 Adding a new translation entails creating a new language-specific `.po` file.
 
+Please note - it is preferred that git command jargon will be left untranslated.
+
 When new (untranslated) strings are added to the project, the `git-cola.pot`
 base template and the language-specific message files need to be updated with
 the new strings.
 
 To regenerate `git-cola.pot` and update `.po` files with new strings run:
 
-    make pot
+    garden pot
 
 This will update `.po` files with untranslated strings which translators can
 use to translate `git-cola`.

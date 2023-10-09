@@ -1,4 +1,3 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
 import argparse
 import sys
 
@@ -35,7 +34,9 @@ def parse_args(argv=None):
         default=1000,
         help='number of commits to display',
     )
-    parser.add_argument('args', nargs='*', metavar='<args>', help='git log arguments')
+    parser.add_argument(
+        'args', nargs=argparse.REMAINDER, metavar='<args>', help='git log arguments'
+    )
     args, rest = parser.parse_known_args(args=argv)
     if rest:
         # splice unknown arguments to the beginning ~

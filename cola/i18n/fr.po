@@ -417,7 +417,7 @@ msgstr "Un crochet doit être spécifié à « %s »"
 #: cola/widgets/stash.py:236
 #, python-format
 msgid "A stash named \"%s\" already exists"
-msgstr "Un remisage nommé « %s » existe déjà"
+msgstr "Un stash nommé « %s » existe déjà"
 
 #: cola/widgets/cfgactions.py:82 cola/widgets/main.py:622
 msgid "Abort"
@@ -1651,7 +1651,7 @@ msgstr "Erreur lors de la création de l'élément distant « %s »"
 
 #: cola/models/stash.py:197
 msgid "Error creating stash"
-msgstr "Erreur lors de la création du rétablissement"
+msgstr "Erreur lors de la création du stash"
 
 #: cola/cmds.py:1126
 #, python-format
@@ -1691,7 +1691,7 @@ msgstr "Erreur : impossible de trouver un modèle de commit"
 
 #: cola/widgets/stash.py:235
 msgid "Error: Stash exists"
-msgstr "Erreur : le remisage existe"
+msgstr "Erreur : le stash existe"
 
 #: cola/cmds.py:1732
 msgid "Error: Unconfigured commit template"

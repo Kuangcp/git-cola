@@ -1,6 +1,5 @@
 """Test the cola.gitcmds module"""
 # pylint: disable=redefined-outer-name
-from __future__ import absolute_import, division, print_function, unicode_literals
 import os
 
 from cola import core
@@ -218,6 +217,7 @@ def test_diff_helper(app_context):
         f.write('A change\n')
     helper.run_git('add', 'A')
 
-    expect = '+A change\n'
+    expect_n = '+A change\n'
+    expect_rn = '+A change\r\n'
     actual = gitcmds.diff_helper(app_context, ref='HEAD', cached=True)
-    assert expect in actual
+    assert expect_n in actual or expect_rn in actual

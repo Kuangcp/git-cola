@@ -1,4 +1,3 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
 import shlex
 
 from qtpy.QtCore import Qt
@@ -14,6 +13,7 @@ from ..i18n import N_
 from ..interaction import Interaction
 from .. import cmds
 from .. import core
+from .. import difftool
 from .. import gitcmds
 from .. import hotkeys
 from .. import icons
@@ -132,7 +132,7 @@ class RepoTreeView(standard.TreeView):
         queued = Qt.QueuedConnection
         self.index_about_to_change.connect(self.sync_selection, type=queued)
 
-        self.action_history = qtutils.add_action_with_status_tip(
+        self.action_history = qtutils.add_action_with_tooltip(
             self,
             N_('View History...'),
             N_('View history for selected paths'),
@@ -140,7 +140,7 @@ class RepoTreeView(standard.TreeView):
             hotkeys.HISTORY,
         )
 
-        self.action_stage = qtutils.add_action_with_status_tip(
+        self.action_stage = qtutils.add_action_with_tooltip(
             self,
             cmds.StageOrUnstage.name(),
             N_('Stage/unstage selected paths for commit'),
@@ -148,26 +148,26 @@ class RepoTreeView(standard.TreeView):
             hotkeys.STAGE_SELECTION,
         )
 
-        self.action_untrack = qtutils.add_action_with_status_tip(
+        self.action_untrack = qtutils.add_action_with_tooltip(
             self,
             N_('Untrack Selected'),
             N_('Stop tracking paths'),
             self.untrack_selected,
         )
 
-        self.action_rename = qtutils.add_action_with_status_tip(
+        self.action_rename = qtutils.add_action_with_tooltip(
             self, N_('Rename'), N_('Rename selected paths'), self.rename_selected
         )
 
-        self.action_difftool = qtutils.add_action_with_status_tip(
+        self.action_difftool = qtutils.add_action_with_tooltip(
             self,
-            cmds.LaunchDifftool.name(),
+            difftool.LaunchDifftool.name(),
             N_('Launch git-difftool on the current path'),
-            cmds.run(cmds.LaunchDifftool, context),
+            cmds.run(difftool.LaunchDifftool, context),
             hotkeys.DIFF,
         )
 
-        self.action_difftool_predecessor = qtutils.add_action_with_status_tip(
+        self.action_difftool_predecessor = qtutils.add_action_with_tooltip(
             self,
             N_('Diff Against Predecessor...'),
             N_('Launch git-difftool against previous versions'),
@@ -175,15 +175,16 @@ class RepoTreeView(standard.TreeView):
             hotkeys.DIFF_SECONDARY,
         )
 
-        self.action_revert_unstaged = qtutils.add_action_with_status_tip(
+        self.action_revert_unstaged = qtutils.add_action_with_tooltip(
             self,
             cmds.RevertUnstagedEdits.name(),
             N_('Revert unstaged changes to selected paths'),
             cmds.run(cmds.RevertUnstagedEdits, context),
             hotkeys.REVERT,
+            hotkeys.REVERT_ALT,
         )
 
-        self.action_revert_uncommitted = qtutils.add_action_with_status_tip(
+        self.action_revert_uncommitted = qtutils.add_action_with_tooltip(
             self,
             cmds.RevertUncommittedEdits.name(),
             N_('Revert uncommitted changes to selected paths'),
@@ -191,7 +192,7 @@ class RepoTreeView(standard.TreeView):
             hotkeys.UNDO,
         )
 
-        self.action_editor = qtutils.add_action_with_status_tip(
+        self.action_editor = qtutils.add_action_with_tooltip(
             self,
             cmds.LaunchEditor.name(),
             N_('Edit selected paths'),
@@ -199,7 +200,7 @@ class RepoTreeView(standard.TreeView):
             hotkeys.EDIT,
         )
 
-        self.action_blame = qtutils.add_action_with_status_tip(
+        self.action_blame = qtutils.add_action_with_tooltip(
             self,
             cmds.BlamePaths.name(),
             N_('Blame selected paths'),
@@ -281,7 +282,7 @@ class RepoTreeView(standard.TreeView):
             size = x_width * 16
         else:
             # Filename and others use the actual content
-            size = super(RepoTreeView, self).sizeHintForColumn(column)
+            size = super().sizeHintForColumn(column)
         return size
 
     def save_selection(self):
@@ -527,7 +528,7 @@ class RepoTreeView(standard.TreeView):
         if not commits:
             return
         commit = commits[0]
-        cmds.difftool_launch(context, left=commit, paths=paths)
+        difftool.difftool_launch(context, left=commit, paths=paths)
 
     def current_path(self):
         """Return the path for the current item."""
@@ -537,7 +538,7 @@ class RepoTreeView(standard.TreeView):
         return self.name_item_from_index(index).path
 
 
-class BrowseModel(object):
+class BrowseModel:
     """Context data used for browsing branches via git-ls-tree"""
 
     def __init__(self, ref, filename=None):
@@ -548,17 +549,17 @@ class BrowseModel(object):
 
 class SaveBlob(cmds.ContextCommand):
     def __init__(self, context, model):
-        super(SaveBlob, self).__init__(context)
+        super().__init__(context)
         self.browse_model = model
 
     def do(self):
         git = self.context.git
         model = self.browse_model
-        ref = '%s:%s' % (model.ref, model.relpath)
+        ref = f'{model.ref}:{model.relpath}'
         with core.xopen(model.filename, 'wb') as fp:
             status, output, err = git.show(ref, _stdout=fp)
 
-        out = '# git show %s >%s\n%s' % (
+        out = '# git show {} >{}\n{}'.format(
             shlex.quote(ref),
             shlex.quote(model.filename),
             output,

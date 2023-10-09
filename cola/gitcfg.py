@@ -1,10 +1,17 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
 from binascii import unhexlify
 import collections
 import copy
 import fnmatch
 import os
 import struct
+
+try:
+    import pwd
+
+    _use_pwd = True
+except ImportError:
+    _use_pwd = False
+
 
 from qtpy import QtCore
 from qtpy.QtCore import Signal
@@ -85,7 +92,7 @@ class GitConfig(QtCore.QObject):
     updated = Signal()
 
     def __init__(self, context):
-        super(GitConfig, self).__init__()
+        super().__init__()
         self.context = context
         self.git = context.git
         self._system = {}
@@ -354,10 +361,21 @@ class GitConfig(QtCore.QObject):
         value = None
         status, out, _ = self.git.check_attr(attr, '--', path, _readonly=True)
         if status == 0:
-            header = '%s: %s: ' % (path, attr)
+            header = f'{path}: {attr}: '
             if out.startswith(header):
                 value = out[len(header) :].strip()
         return value
+
+    def get_author(self):
+        """Return (name, email) for authoring commits"""
+        if _use_pwd:
+            user = pwd.getpwuid(os.getuid()).pw_name
+        else:
+            user = os.getenv('USER', 'unknown')
+
+        name = self.get('user.name', user)
+        email = self.get('user.email', f'{user}@{core.node()}')
+        return (name, email)
 
     def get_guitool_opts(self, name):
         """Return the guitool.<name> namespace as a dict
@@ -608,7 +626,7 @@ def _read_config_fallback(context, cache_paths, renamed_keys):
                 yield global_scope, key, value, False
 
     local_config = context.git.git_path('config')
-    if os.path.exists(local_config):
+    if local_config and os.path.exists(local_config):
         cache_paths.add(gitconfig)
         status, config_output, _ = context.git.config(
             z=True,

@@ -1,5 +1,4 @@
 """Text wrapping and filling"""
-from __future__ import absolute_import, division, print_function, unicode_literals
 import re
 
 from .compat import ustr
@@ -11,7 +10,7 @@ from .compat import ustr
 # Simplified for git-cola by David Aguilar <davvid@gmail.com>
 
 
-class TextWrapper(object):
+class TextWrapper:
     """
     Object for wrapping/filling text.  The public interface consists of
     the wrap() and fill() methods; the other methods are just there for
@@ -195,7 +194,7 @@ class TextWrapper(object):
         more than 'self.width' columns, and return a new string
         containing the entire wrapped paragraph.
         """
-        return "\n".join(self.wrap(text))
+        return '\n'.join(self.wrap(text))
 
 
 def word_wrap(text, tabwidth, limit, break_on_hyphens=False):

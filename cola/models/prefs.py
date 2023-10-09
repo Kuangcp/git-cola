@@ -1,4 +1,3 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
 import sys
 
 from qtpy import QtCore
@@ -19,6 +18,7 @@ BOLD_HEADERS = 'cola.boldheaders'
 CHECK_CONFLICTS = 'cola.checkconflicts'
 CHECK_PUBLISHED_COMMITS = 'cola.checkpublishedcommits'
 COMMENT_CHAR = 'core.commentchar'
+COMMIT_CLEANUP = 'commit.cleanup'
 DIFFCONTEXT = 'gui.diffcontext'
 DIFFTOOL = 'diff.tool'
 DISPLAY_UNTRACKED = 'gui.displayuntracked'
@@ -54,7 +54,7 @@ USER_EMAIL = 'user.email'
 USER_NAME = 'user.name'
 
 
-class DateFormat(object):
+class DateFormat:
     DEFAULT = 'default'
     RELATIVE = 'relative'
     LOCAL = 'local'
@@ -68,6 +68,7 @@ class DateFormat(object):
 
 
 def date_formats():
+    """Return valid values for git config cola.logdate"""
     return [
         DateFormat.DEFAULT,
         DateFormat.RELATIVE,
@@ -82,7 +83,18 @@ def date_formats():
     ]
 
 
-class Defaults(object):
+def commit_cleanup_modes():
+    """Return valid values for the git config commit.cleanup"""
+    return [
+        'default',
+        'whitespace',
+        'strip',
+        'scissors',
+        'verbatim',
+    ]
+
+
+class Defaults:
     """Read-only class for holding defaults that get overridden"""
 
     # These should match Git's defaults for git-defined values.
@@ -93,6 +105,7 @@ class Defaults(object):
     check_conflicts = True
     check_published_commits = True
     comment_char = '#'
+    commit_cleanup = 'default'
     display_untracked = True
     diff_context = 5
     difftool = 'xxdiff'
@@ -206,6 +219,11 @@ def comment_char(context):
     return context.cfg.get(COMMENT_CHAR, default=Defaults.comment_char)
 
 
+def commit_cleanup(context):
+    """Return the configured git commit cleanup mode"""
+    return context.cfg.get(COMMIT_CLEANUP, default=Defaults.commit_cleanup)
+
+
 def enable_gravatar(context):
     """Is gravatar enabled?"""
     return context.cfg.get(ENABLE_GRAVATAR, default=Defaults.enable_gravatar)
@@ -304,7 +322,7 @@ class PreferencesModel(QtCore.QObject):
     config_updated = Signal(str, str, object)
 
     def __init__(self, context):
-        super(PreferencesModel, self).__init__()
+        super().__init__()
         self.context = context
         self.config = context.cfg
 

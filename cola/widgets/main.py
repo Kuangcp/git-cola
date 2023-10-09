@@ -1,5 +1,4 @@
 """Main UI for authoring commits and other Git Cola interactions"""
-from __future__ import absolute_import, division, print_function, unicode_literals
 import os
 from functools import partial
 
@@ -240,31 +239,27 @@ class MainView(standard.MainWindow):
         )
         self.apply_patches_action.setIcon(icons.diff())
 
-        self.apply_patches_abort_action = add_action(
+        self.apply_patches_abort_action = qtutils.add_action_with_tooltip(
             self,
             N_('Abort Applying Patches...'),
+            N_('Abort the current "git am" patch session'),
             cmds.run(cmds.AbortApplyPatch, context),
         )
         self.apply_patches_abort_action.setIcon(icons.style_dialog_discard())
-        self.apply_patches_abort_action.setToolTip(
-            N_('Abort the current "git am" patch session')
-        )
 
-        self.apply_patches_continue_action = add_action(
+        self.apply_patches_continue_action = qtutils.add_action_with_tooltip(
             self,
             N_('Continue Applying Patches'),
+            N_('Commit the current state and continue applying patches'),
             cmds.run(cmds.ApplyPatchesContinue, context),
-        )
-        self.apply_patches_continue_action.setToolTip(
-            N_('Commit the current state and continue applying patches')
         )
         self.apply_patches_continue_action.setIcon(icons.commit())
 
-        self.apply_patches_skip_action = add_action(
-            self, N_('Skip Current Patch'), cmds.run(cmds.ApplyPatchesContinue, context)
-        )
-        self.apply_patches_skip_action.setToolTip(
-            N_('Skip applying the current patch and continue applying patches')
+        self.apply_patches_skip_action = qtutils.add_action_with_tooltip(
+            self,
+            N_('Skip Current Patch'),
+            N_('Skip applying the current patch and continue applying patches'),
+            cmds.run(cmds.ApplyPatchesContinue, context),
         )
         self.apply_patches_skip_action.setIcon(icons.discard())
 
@@ -303,7 +298,7 @@ class MainView(standard.MainWindow):
             self,
             cmds.Refresh.name(),
             cmds.run(cmds.Refresh, context),
-            *hotkeys.REFRESH_HOTKEYS
+            *hotkeys.REFRESH_HOTKEYS,
         )
         self.rescan_action.setIcon(icons.sync())
 
@@ -383,18 +378,30 @@ class MainView(standard.MainWindow):
         )
         self.add_submodule_action.setIcon(icons.add())
 
-        self.fetch_action = add_action(
-            self, N_('Fetch...'), partial(remote.fetch, context), hotkeys.FETCH
+        self.fetch_action = qtutils.add_action_with_tooltip(
+            self,
+            N_('Fetch...'),
+            N_('Fetch from one or more remotes using "git fetch"'),
+            partial(remote.fetch, context),
+            hotkeys.FETCH,
         )
         self.fetch_action.setIcon(icons.download())
 
-        self.push_action = add_action(
-            self, N_('Push...'), partial(remote.push, context), hotkeys.PUSH
+        self.push_action = qtutils.add_action_with_tooltip(
+            self,
+            N_('Push...'),
+            N_('Push to one or more remotes using "git push"'),
+            partial(remote.push, context),
+            hotkeys.PUSH,
         )
         self.push_action.setIcon(icons.push())
 
-        self.pull_action = add_action(
-            self, N_('Pull...'), partial(remote.pull, context), hotkeys.PULL
+        self.pull_action = qtutils.add_action_with_tooltip(
+            self,
+            N_('Pull...'),
+            N_('Integrate changes using "git pull"'),
+            partial(remote.pull, context),
+            hotkeys.PULL,
         )
         self.pull_action.setIcon(icons.pull())
 
@@ -410,56 +417,62 @@ class MainView(standard.MainWindow):
         )
         self.open_repo_new_action.setIcon(icons.folder())
 
-        self.stash_action = add_action(
-            self, N_('Stash...'), partial(stash.view, context), hotkeys.STASH
+        self.stash_action = qtutils.add_action_with_tooltip(
+            self,
+            N_('Stash...'),
+            N_('Temporarily stash away uncommitted changes using "git stash"'),
+            partial(stash.view, context),
+            hotkeys.STASH,
         )
         self.stash_action.setIcon(icons.commit())
 
-        self.reset_soft_action = add_action(
-            self, N_('Reset Branch (Soft)'), partial(guicmds.reset_soft, context)
+        self.reset_soft_action = qtutils.add_action_with_tooltip(
+            self,
+            N_('Reset Branch (Soft)'),
+            cmds.ResetSoft.tooltip('<commit>'),
+            partial(guicmds.reset_soft, context),
         )
         self.reset_soft_action.setIcon(icons.style_dialog_reset())
-        self.reset_soft_action.setToolTip(cmds.ResetSoft.tooltip('<commit>'))
 
-        self.reset_mixed_action = add_action(
+        self.reset_mixed_action = qtutils.add_action_with_tooltip(
             self,
             N_('Reset Branch and Stage (Mixed)'),
+            cmds.ResetMixed.tooltip('<commit>'),
             partial(guicmds.reset_mixed, context),
         )
         self.reset_mixed_action.setIcon(icons.style_dialog_reset())
-        self.reset_mixed_action.setToolTip(cmds.ResetMixed.tooltip('<commit>'))
 
-        self.reset_keep_action = add_action(
+        self.reset_keep_action = qtutils.add_action_with_tooltip(
             self,
             N_('Restore Worktree and Reset All (Keep Unstaged Changes)'),
+            cmds.ResetKeep.tooltip('<commit>'),
             partial(guicmds.reset_keep, context),
         )
         self.reset_keep_action.setIcon(icons.style_dialog_reset())
-        self.reset_keep_action.setToolTip(cmds.ResetKeep.tooltip('<commit>'))
 
-        self.reset_merge_action = add_action(
+        self.reset_merge_action = qtutils.add_action_with_tooltip(
             self,
             N_('Restore Worktree and Reset All (Merge)'),
+            cmds.ResetMerge.tooltip('<commit>'),
             partial(guicmds.reset_merge, context),
         )
         self.reset_merge_action.setIcon(icons.style_dialog_reset())
-        self.reset_merge_action.setToolTip(cmds.ResetMerge.tooltip('<commit>'))
 
-        self.reset_hard_action = add_action(
+        self.reset_hard_action = qtutils.add_action_with_tooltip(
             self,
             N_('Restore Worktree and Reset All (Hard)'),
+            cmds.ResetHard.tooltip('<commit>'),
             partial(guicmds.reset_hard, context),
         )
         self.reset_hard_action.setIcon(icons.style_dialog_reset())
-        self.reset_hard_action.setToolTip(cmds.ResetHard.tooltip('<commit>'))
 
-        self.restore_worktree_action = add_action(
-            self, N_('Restore Worktree'), partial(guicmds.restore_worktree, context)
+        self.restore_worktree_action = qtutils.add_action_with_tooltip(
+            self,
+            N_('Restore Worktree'),
+            cmds.RestoreWorktree.tooltip('<commit>'),
+            partial(guicmds.restore_worktree, context),
         )
         self.restore_worktree_action.setIcon(icons.edit())
-        self.restore_worktree_action.setToolTip(
-            cmds.RestoreWorktree.tooltip('<commit>')
-        )
 
         self.clone_repo_action = add_action(
             self, N_('Clone...'), partial(clone.clone, context)
@@ -1029,7 +1042,7 @@ class MainView(standard.MainWindow):
                 # Omit the current worktree from the "Open Recent" menu.
                 continue
             name = entry['name']
-            text = '%s %s %s' % (name, uchr(0x2192), directory)
+            text = f'{name} {uchr(0x2192)} {directory}'
             menu.addAction(text, cmds.run(cmd, context, directory))
 
     # Accessors
@@ -1176,7 +1189,7 @@ class MainView(standard.MainWindow):
         else:
             path_text = ''
 
-        title = '%s: %s %s%s' % (project, curbranch, alert_text, path_text)
+        title = f'{project}: {curbranch} {alert_text}{path_text}'
         self.setWindowTitle(title)
 
     def update_actions(self):
@@ -1328,11 +1341,11 @@ class MainView(standard.MainWindow):
             cls = 'first-warning'
         else:
             cls = 'good'
-        div = '<div class="%s">%s</div>' % (cls, display_content)
+        div = f'<div class="{cls}">{display_content}</div>'
         self.position_label.setText(css + div)
 
 
-class FocusProxy(object):
+class FocusProxy:
     """Proxy over child widgets and operate on the focused widget"""
 
     def __init__(self, *widgets):

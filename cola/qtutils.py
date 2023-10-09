@@ -1,5 +1,4 @@
 """Miscellaneous Qt utility functions."""
-from __future__ import absolute_import, division, print_function, unicode_literals
 import os
 
 from qtpy import compat
@@ -228,7 +227,7 @@ class ComboBox(QtWidgets.QComboBox):
     """Custom read-only combobox with a convenient API"""
 
     def __init__(self, items=None, editable=False, parent=None, transform=None):
-        super(ComboBox, self).__init__(parent)
+        super().__init__(parent)
         self.setEditable(editable)
         self.transform = transform
         self.item_data = []
@@ -257,9 +256,12 @@ class ComboBox(QtWidgets.QComboBox):
         self.setCurrentIndex(index)
 
 
-def combo(items, editable=False, parent=None):
+def combo(items, editable=False, tooltip='', parent=None):
     """Create a readonly (by default) combobox from a list of items"""
-    return ComboBox(editable=editable, items=items, parent=parent)
+    combobox = ComboBox(editable=editable, items=items, parent=parent)
+    if tooltip:
+        combobox.setToolTip(tooltip)
+    return combobox
 
 
 def combo_mapped(data, editable=False, transform=None, parent=None):
@@ -557,13 +559,14 @@ def add_action_with_icon(widget, icon, text, func, *shortcuts):
     return action
 
 
-def add_action_with_status_tip(widget, text, tip, func, *shortcuts):
+def add_action_with_tooltip(widget, text, tip, func, *shortcuts):
+    """Create an action with a tooltip"""
     return _add_action(widget, text, tip, func, connect_action, *shortcuts)
 
 
-def menu_separator(widget):
+def menu_separator(widget, text=''):
     """Return a QAction whose isSeparator() returns true. Used in context menus"""
-    action = QtWidgets.QAction('', widget)
+    action = QtWidgets.QAction(text, widget)
     action.setSeparator(True)
     return action
 
@@ -734,7 +737,7 @@ def tool_button():
     return button
 
 
-def create_action_button(tooltip=None, icon=None, visible=True):
+def create_action_button(tooltip=None, icon=None, visible=None):
     """Create a small toolbutton for use in dock title widgets"""
     button = tool_button()
     if tooltip is not None:
@@ -742,7 +745,8 @@ def create_action_button(tooltip=None, icon=None, visible=True):
     if icon is not None:
         button.setIcon(icon)
         button.setIconSize(QtCore.QSize(defs.small_icon, defs.small_icon))
-    button.setVisible(visible)
+    if visible is not None:
+        button.setVisible(visible)
     return button
 
 
@@ -984,7 +988,7 @@ def path_mimetypes(include_urls=True):
     return mime_types
 
 
-class BlockSignals(object):
+class BlockSignals:
     """Context manager for blocking a signals on a widget"""
 
     def __init__(self, *widgets):
@@ -1060,7 +1064,6 @@ class RunTask(QtCore.QObject):
         """Start the task and register a callback"""
         self.result_func = result
         if progress is not None:
-            progress.show()
             if hasattr(progress, 'start'):
                 progress.start()
 
@@ -1125,7 +1128,7 @@ def rgb_css(color):
 
 def rgb_hex(color):
     """Convert a QColor into a hex aabbcc string"""
-    return '%02x%02x%02x' % (color.red(), color.green(), color.blue())
+    return f'{color.red():02x}{color.green():02x}{color.blue():02x}'
 
 
 def clamp_color(value):
@@ -1178,7 +1181,7 @@ def make_format(foreground=None, background=None, bold=False):
     return fmt
 
 
-class ImageFormats(object):
+class ImageFormats:
     def __init__(self):
         # returns a list of QByteArray objects
         formats_qba = QtGui.QImageReader.supportedImageFormats()

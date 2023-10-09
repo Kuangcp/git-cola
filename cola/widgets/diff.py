@@ -1,4 +1,3 @@
-from __future__ import absolute_import, division, print_function, unicode_literals
 from functools import partial
 import os
 import re
@@ -219,7 +218,7 @@ class DiffTextEdit(VimHintedPlainTextEdit):
 
     def setFont(self, font):
         """Override setFont() so that we can use a custom "block" cursor"""
-        super(DiffTextEdit, self).setFont(font)
+        super().setFont(font)
         if prefs.block_cursor(self.context):
             metrics = QtGui.QFontMetrics(font)
             width = metrics.width('M')
@@ -237,7 +236,7 @@ class DiffTextEdit(VimHintedPlainTextEdit):
         self.copy_diff_action.setEnabled(selected)
 
     def resizeEvent(self, event):
-        super(DiffTextEdit, self).resizeEvent(event)
+        super().resizeEvent(event)
         if self.numbers:
             self.numbers.refresh_size()
 
@@ -472,7 +471,7 @@ class Viewer(QtWidgets.QFrame):
     INDEX_IMAGE = 1
 
     def __init__(self, context, parent=None):
-        super(Viewer, self).__init__(parent)
+        super().__init__(parent)
 
         self.context = context
         self.model = model = context.model
@@ -523,7 +522,7 @@ class Viewer(QtWidgets.QFrame):
 
     def dragEnterEvent(self, event):
         """Accepts drops if the mimedata contains patches"""
-        super(Viewer, self).dragEnterEvent(event)
+        super().dragEnterEvent(event)
         patches = patch_mod.get_patches_from_mimedata(event.mimeData())
         if patches:
             event.acceptProposedAction()
@@ -531,7 +530,7 @@ class Viewer(QtWidgets.QFrame):
 
     def dragLeaveEvent(self, event):
         """End the drag+drop interaction"""
-        super(Viewer, self).dragLeaveEvent(event)
+        super().dragLeaveEvent(event)
         if self._drag_has_patches:
             event.accept()
         else:
@@ -544,7 +543,7 @@ class Viewer(QtWidgets.QFrame):
             event.ignore()
             return
         event.setDropAction(Qt.CopyAction)
-        super(Viewer, self).dropEvent(event)
+        super().dropEvent(event)
         self._drag_has_patches = False
 
         patches = patch_mod.get_patches_from_mimedata(event.mimeData())
@@ -744,7 +743,7 @@ class Options(QtWidgets.QWidget):
     PIXEL_XOR = 3
 
     def __init__(self, parent):
-        super(Options, self).__init__(parent)
+        super().__init__(parent)
         # Create widgets
         self.widget = parent
         self.ignore_space_at_eol = self.add_option(
@@ -897,7 +896,7 @@ class DiffEditor(DiffTextEdit):
         )
 
         self.action_revert_selection = qtutils.add_action(
-            self, 'Revert', self.revert_selection, hotkeys.REVERT
+            self, 'Revert', self.revert_selection, hotkeys.REVERT, hotkeys.REVERT_ALT
         )
         self.action_revert_selection.setIcon(icons.undo())
 
@@ -965,7 +964,7 @@ class DiffEditor(DiffTextEdit):
 
     def create_context_menu(self, event_pos):
         """Override create_context_menu() to display a completely custom menu"""
-        menu = super(DiffEditor, self).create_context_menu(event_pos)
+        menu = super().create_context_menu(event_pos)
         context = self.context
         model = self.model
         s = self.selection_model.selection()
@@ -975,15 +974,27 @@ class DiffEditor(DiffTextEdit):
         current_actions = menu.actions()
         menu_actions = []
         add_action = menu_actions.append
+        edit_actions_added = False
 
         if model.is_stageable() or model.is_unstageable():
-            if model.is_stageable():
-                self.stage_or_unstage.setText(N_('Stage'))
-                self.stage_or_unstage.setIcon(icons.add())
-            else:
+            if (model.is_amend_mode() and s.staged) or not self.model.is_stageable():
                 self.stage_or_unstage.setText(N_('Unstage'))
                 self.stage_or_unstage.setIcon(icons.remove())
+            else:
+                self.stage_or_unstage.setText(N_('Stage'))
+                self.stage_or_unstage.setIcon(icons.add())
             add_action(self.stage_or_unstage)
+
+        if s.staged and model.is_unstageable():
+            item = s.staged[0]
+            if item not in model.submodules and item not in model.staged_deleted:
+                if self.has_selection():
+                    apply_text = N_('Unstage Selected Lines')
+                else:
+                    apply_text = N_('Unstage Diff Hunk')
+                self.action_apply_selection.setText(apply_text)
+                self.action_apply_selection.setIcon(icons.remove())
+                add_action(self.action_apply_selection)
 
         if model.is_partially_stageable():
             item = s.modified[0] if s.modified else None
@@ -1005,7 +1016,7 @@ class DiffEditor(DiffTextEdit):
                     cmds.run(cmds.OpenRepo, context, path),
                 )
                 add_action(action)
-            elif item not in model.unstaged_deleted:
+            elif item and item not in model.unstaged_deleted:
                 if self.has_selection():
                     apply_text = N_('Stage Selected Lines')
                     edit_and_apply_text = N_('Edit Selected Lines to Stage...')
@@ -1021,12 +1032,21 @@ class DiffEditor(DiffTextEdit):
                 self.action_apply_selection.setIcon(icons.add())
                 add_action(self.action_apply_selection)
 
+                self.action_revert_selection.setText(revert_text)
+                add_action(self.action_revert_selection)
+
+                # Do not show the "edit" action when the file does not exist.
+                add_action(qtutils.menu_separator(menu))
+                if filename and core.exists(filename):
+                    add_action(self.launch_editor)
+                # Removed files can still be diffed.
+                add_action(self.launch_difftool)
+                edit_actions_added = True
+
+                add_action(qtutils.menu_separator(menu))
                 self.action_edit_and_apply_selection.setText(edit_and_apply_text)
                 self.action_edit_and_apply_selection.setIcon(icons.add())
                 add_action(self.action_edit_and_apply_selection)
-
-                self.action_revert_selection.setText(revert_text)
-                add_action(self.action_revert_selection)
 
                 self.action_edit_and_revert_selection.setText(edit_and_revert_text)
                 add_action(self.action_edit_and_revert_selection)
@@ -1053,26 +1073,28 @@ class DiffEditor(DiffTextEdit):
                 add_action(action)
 
             elif item not in model.staged_deleted:
+                # Do not show the "edit" action when the file does not exist.
+                add_action(qtutils.menu_separator(menu))
+                if filename and core.exists(filename):
+                    add_action(self.launch_editor)
+                # Removed files can still be diffed.
+                add_action(self.launch_difftool)
+                add_action(qtutils.menu_separator(menu))
+                edit_actions_added = True
+
                 if self.has_selection():
-                    apply_text = N_('Unstage Selected Lines')
                     edit_and_apply_text = N_('Edit Selected Lines to Unstage...')
                 else:
-                    apply_text = N_('Unstage Diff Hunk')
                     edit_and_apply_text = N_('Edit Diff Hunk to Unstage...')
-
-                self.action_apply_selection.setText(apply_text)
-                self.action_apply_selection.setIcon(icons.remove())
-                add_action(self.action_apply_selection)
-
                 self.action_edit_and_apply_selection.setText(edit_and_apply_text)
                 self.action_edit_and_apply_selection.setIcon(icons.remove())
                 add_action(self.action_edit_and_apply_selection)
 
-        if model.is_stageable() or model.is_unstageable():
+        if not edit_actions_added and (model.is_stageable() or model.is_unstageable()):
+            add_action(qtutils.menu_separator(menu))
             # Do not show the "edit" action when the file does not exist.
             # Untracked files exist by definition.
             if filename and core.exists(filename):
-                add_action(qtutils.menu_separator(menu))
                 add_action(self.launch_editor)
 
             # Removed files can still be diffed.
@@ -1105,7 +1127,7 @@ class DiffEditor(DiffTextEdit):
                 cursor = self.cursorForPosition(event.pos())
                 self.setTextCursor(cursor)
 
-        return super(DiffEditor, self).mousePressEvent(event)
+        return super().mousePressEvent(event)
 
     def setPlainText(self, text):
         """setPlainText(str) while retaining scrollbar positions"""
@@ -1320,7 +1342,7 @@ def _write_patch_to_file(diff_editor, patch, filename, append=False):
     content = patch.as_text()
     try:
         core.write(filename, content, encoding=encoding, append=append)
-    except (IOError, OSError) as exc:
+    except OSError as exc:
         _, details = utils.format_exception(exc)
         title = N_('Error writing patch')
         msg = N_('Unable to write patch to "%s". Check permissions?' % filename)
@@ -1498,7 +1520,7 @@ class DiffPanel(QtWidgets.QWidget):
     """A combined diff + search panel"""
 
     def __init__(self, diff_widget, text_widget, parent):
-        super(DiffPanel, self).__init__(parent)
+        super().__init__(parent)
         self.diff_widget = diff_widget
         self.search_widget = TextSearchWidget(text_widget, self)
         self.search_widget.hide()

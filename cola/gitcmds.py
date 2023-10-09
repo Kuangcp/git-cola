@@ -1,5 +1,4 @@
 """Git commands and queries for Git"""
-from __future__ import absolute_import, division, print_function, unicode_literals
 import json
 import os
 import re
@@ -13,6 +12,7 @@ from .git import EMPTY_TREE_OID
 from .git import OID_LENGTH
 from .i18n import N_
 from .interaction import Interaction
+from .models import prefs
 
 
 def add(context, items, u=False):
@@ -145,12 +145,12 @@ def all_files(context, *args):
         cached=True,
         others=True,
         exclude_standard=True,
-        _readonly=True
+        _readonly=True,
     )[STDOUT]
     return sorted([f for f in ls_files.split('\0') if f])
 
 
-class CurrentBranchCache(object):
+class CurrentBranchCache:
     """Cache for current_branch()"""
 
     key = None
@@ -330,7 +330,7 @@ def log(git, *args, **kwargs):
         no_ext_diff=True,
         _readonly=True,
         *args,
-        **kwargs
+        **kwargs,
     )[STDOUT]
 
 
@@ -427,14 +427,14 @@ def diff_helper(
     reverse=False,
     untracked=False,
 ):
-    "Invokes git diff on a filepath."
+    'Invokes git diff on a filepath.'
     git = context.git
     cfg = context.cfg
     if commit:
         ref, endref = commit + '^', commit
     argv = []
     if ref and endref:
-        argv.append('%s..%s' % (ref, endref))
+        argv.append(f'{ref}..{endref}')
     elif ref:
         argv.extend(utils.shell_split(ref.strip()))
     elif head and amending and cached:
@@ -459,7 +459,7 @@ def diff_helper(
         cached=cached,
         _encoding=encoding,
         *argv,
-        **common_diff_opts(context)
+        **common_diff_opts(context),
     )
 
     success = status == 0
@@ -794,12 +794,10 @@ def parse_rev_list(raw_revs):
         if match:
             rev_id = match.group(1)
             summary = match.group(2)
-            revs.append(
-                (
-                    rev_id,
-                    summary,
-                )
-            )
+            revs.append((
+                rev_id,
+                summary,
+            ))
     return revs
 
 
@@ -824,7 +822,7 @@ def log_helper(context, all=False, extra_args=None):
 def rev_list_range(context, start, end):
     """Return (oid, summary) pairs between start and end."""
     git = context.git
-    revrange = '%s..%s' % (start, end)
+    revrange = f'{start}..{end}'
     out = git.rev_list(revrange, pretty='oneline', _readonly=True)[STDOUT]
     return parse_rev_list(out)
 
@@ -846,6 +844,18 @@ def merge_message_path(context):
         if core.exists(path):
             return path
     return None
+
+
+def read_merge_commit_message(context, path):
+    """Read a merge commit message from disk while stripping commentary"""
+    content = core.read(path)
+    cleanup_mode = prefs.commit_cleanup(context)
+    if cleanup_mode in ('verbatim', 'scissors', 'whitespace'):
+        return content
+    comment_char = prefs.comment_char(context)
+    return '\n'.join(
+        line for line in content.splitlines() if not line.startswith(comment_char)
+    )
 
 
 def prepare_commit_message_hook(context):
@@ -876,7 +886,7 @@ def cherry_pick(context, revs):
                 'Hint: The "Actions > Abort Cherry-Pick" menu action can be used to '
                 'cancel the current cherry-pick.'
             )
-            output = '# git cherry-pick %s\n# %s\n\n%s' % (rev, details, out)
+            output = f'# git cherry-pick {rev}\n# {details}\n\n{out}'
             return (status, output, err)
         outs.append(out)
         errs.append(err)
@@ -1034,7 +1044,7 @@ def is_binary(context, filename):
     size = 8000
     try:
         result = core.read(filename, size=size, encoding='bytes')
-    except (IOError, OSError):
+    except OSError:
         result = b''
 
     return b'\0' in result
