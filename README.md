@@ -200,6 +200,14 @@ managers:
 
     garden -D DESTDIR=/tmp/stage -D prefix=/usr/local install
 
+If you do not have `garden` available then `make` can be used instead.
+The `Makefile` supports staged installs using the conventional
+[DESTDIR](https://www.gnu.org/software/make/manual/html_node/DESTDIR.html) and
+[prefix](https://www.gnu.org/software/make/manual/html_node/Directory-Variables.html)
+variables.
+
+    make DESTDIR=/tmp/stage prefix=/usr/local install
+
 
 ## macOS
 

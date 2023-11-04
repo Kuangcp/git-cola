@@ -15,6 +15,7 @@ from .. import qtutils
 from .. import utils
 from . import defs
 from . import standard
+from . import remotemessage
 
 
 FETCH = 'FETCH'
@@ -173,6 +174,12 @@ class RemoteActionDialog(standard.Dialog):
             checked=True, text=text, tooltip=tooltip
         )
 
+        text = N_('Show remote messages')
+        tooltip = N_('Display remote messages in a separate dialog')
+        self.remote_messages_checkbox = qtutils.checkbox(
+            checked=False, text=text, tooltip=tooltip
+        )
+
         text = N_('Fast-forward only')
         tooltip = N_(
             'Refuse to merge unless the current HEAD is already up-'
@@ -244,6 +251,7 @@ class RemoteActionDialog(standard.Dialog):
             self.rebase_checkbox,
             self.upstream_checkbox,
             self.prompt_checkbox,
+            self.remote_messages_checkbox,
             qtutils.STRETCH,
             self.close_button,
             self.action_button,
@@ -564,6 +572,7 @@ class RemoteActionDialog(standard.Dialog):
     def action_callback(self):
         """Perform the actual fetch/push/pull operation"""
         action = self.action
+        remote_messages = get(self.remote_messages_checkbox)
         if action == FETCH:
             model_action = self.model.fetch
         elif action == PUSH:
@@ -634,7 +643,16 @@ class RemoteActionDialog(standard.Dialog):
 
         # Use a thread to update in the background
         task = ActionTask(model_action, remote, kwargs)
-        self.runtask.start(task, progress=self.progress, finish=self.action_completed)
+        if remote_messages:
+            result = remotemessage.with_context(self.context)
+        else:
+            result = None
+        self.runtask.start(
+            task,
+            progress=self.progress,
+            finish=self.action_completed,
+            result=result,
+        )
 
     def action_completed(self, task):
         """Grab the results of the action and finish up"""
@@ -661,6 +679,20 @@ class RemoteActionDialog(standard.Dialog):
             message += N_('Have you rebased/pulled lately?')
 
         Interaction.critical(self.windowTitle(), message=message, details=details)
+
+    def export_state(self):
+        """Export persistent settings"""
+        state = standard.Dialog.export_state(self)
+        state['remote_messages'] = get(self.remote_messages_checkbox)
+        return state
+
+    def apply_state(self, state):
+        """Apply persistent settings"""
+        result = standard.Dialog.apply_state(self, state)
+        # Restore the "show remote messages" checkbox
+        remote_messages = bool(state.get('remote_messages', False))
+        self.remote_messages_checkbox.setChecked(remote_messages)
+        return result
 
 
 # Use distinct classes so that each saves its own set of preferences
@@ -697,21 +729,19 @@ class Push(RemoteActionDialog):
         """Export persistent settings"""
         state = RemoteActionDialog.export_state(self)
         state['prompt'] = get(self.prompt_checkbox)
+        state['remote_messages'] = get(self.remote_messages_checkbox)
         state['tags'] = get(self.tags_checkbox)
         return state
 
     def apply_state(self, state):
         """Apply persistent settings"""
         result = RemoteActionDialog.apply_state(self, state)
-
         # Restore the "prompt on creation" checkbox
         prompt = bool(state.get('prompt', True))
         self.prompt_checkbox.setChecked(prompt)
-
         # Restore the "tags" checkbox
         tags = bool(state.get('tags', False))
         self.tags_checkbox.setChecked(tags)
-
         return result
 
 
@@ -726,26 +756,22 @@ class Pull(RemoteActionDialog):
         result = RemoteActionDialog.apply_state(self, state)
         # Rebase has the highest priority
         rebase = bool(state.get('rebase', False))
+        self.rebase_checkbox.setChecked(rebase)
+
         ff_only = not rebase and bool(state.get('ff_only', False))
         no_ff = not rebase and not ff_only and bool(state.get('no_ff', False))
-
-        self.rebase_checkbox.setChecked(rebase)
         self.no_ff_checkbox.setChecked(no_ff)
-
         # Allow users coming from older versions that have rebase=False to
         # pickup the new ff_only=True default by only setting ff_only False
         # when it either exists in the config or when rebase=True.
         if 'ff_only' in state or rebase:
             self.ff_only_checkbox.setChecked(ff_only)
-
         return result
 
     def export_state(self):
         """Export persistent settings"""
         state = RemoteActionDialog.export_state(self)
-
         state['ff_only'] = get(self.ff_only_checkbox)
         state['no_ff'] = get(self.no_ff_checkbox)
         state['rebase'] = get(self.rebase_checkbox)
-
         return state

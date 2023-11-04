@@ -1208,6 +1208,15 @@ Avoid creating shortcuts that conflict with existing built-in `git cola`
 shortcuts.  Creating a conflict will result in no action when the shortcut
 is used.
 
+SETTING UP CREDENTIAL HELPERS
+=============================
+Git has robust support for automatically handling credentials.
+
+The recommended approach is to use SSH keys and an SSH agent, but any of the core Git
+Credentials helpers will get used automatically by Git Cola.
+
+See https://git-scm.com/doc/credential-helpers for more details.
+
 SETTING UP GPG FOR SIGNED COMMITS
 =================================
 When creating signed commits, `gpg` will attempt to read your password from the
@@ -1310,7 +1319,7 @@ Please see the following links for more details.
 
 https://stackoverflow.com/questions/18683092/how-to-run-ssh-add-on-windows
 
-FIPS Security Mode
+FIPS SECURITY MODE
 ==================
 `FIPS Security Mode <https://developer.mozilla.org/en-US/docs/Mozilla/Projects/NSS/FIPS_Mode_-_an_explanation>`_
 is available in newer versions of Python. These include Python 3.9+ and the

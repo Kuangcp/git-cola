@@ -38,10 +38,26 @@ Usability, bells and whistles
   (`#706 <https://github.com/git-cola/git-cola/pull/706>`_)
   (`#691 <https://github.com/git-cola/git-cola/issues/691>`_)
 
+* The "Branches" dock widget now has a "Visualize" right-click menu option.
+  (`#1061 <https://github.com/git-cola/git-cola/issues/1061>`_)
+
+* The "Stash" dialog learned to rename stashes.
+  (`#558 <https://github.com/git-cola/git-cola/issues/558>`_)
+
+* The "Fetch", "Push" and "Pull" dialogs can now display remote messages from the server.
+  (`#951 <https://github.com/git-cola/git-cola/issues/951>`_)
+
 Fixes
 -----
-* `git dag` was not displaying history when refspecs were specified.
+* `git dag` fixed how it was handling refspec arguments.
   (`#1334 <https://github.com/git-cola/git-cola/issues/1334>`_)
+
+* `git dag` will now properly refresh itself when remote branches are updated.
+  (`#1063 <https://github.com/git-cola/git-cola/issues/1063>`_)
+
+* The `cola.inotify` feature no longer runs into issues when accessing WSL2
+  filesystems from Windows 11+.
+  (`#1194 <https://github.com/git-cola/git-cola/issues/1194>`_)
 
 Development
 -----------

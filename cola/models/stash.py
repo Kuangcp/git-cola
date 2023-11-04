@@ -1,3 +1,5 @@
+import re
+
 from .. import cmds
 from .. import core
 from .. import gitcmds
@@ -27,7 +29,7 @@ class StashModel:
 
     def stash_info(self, revids=False, names=False):
         """Parses "git stash list" and returns a list of stashes."""
-        stashes = self.stash_list(r'--format=%gd/%aD/%s')
+        stashes = self.stash_list(r'--format=%gd/%aD/%gs')
         split_stashes = [s.split('/', 2) for s in stashes if s]
         stashes = [f'{s[0]}: {s[2]}' for s in split_stashes]
         revids = [s[0] for s in split_stashes]
@@ -81,11 +83,15 @@ class DropStash(cmds.ContextCommand):
         status, out, err = git.stash('drop', self.stash_ref)
         if status == 0:
             Interaction.log_status(status, out, err)
-        else:
-            title = N_('Error')
-            Interaction.command_error(
-                title, 'git stash drop ' + self.stash_ref, status, out, err
-            )
+            match = re.search(r'\((.*)\)', out)
+            if match:
+                return match.group(1)
+            return ''
+        title = N_('Error')
+        Interaction.command_error(
+            title, 'git stash drop ' + self.stash_ref, status, out, err
+        )
+        return ''
 
 
 class SaveStash(cmds.ContextCommand):
@@ -96,9 +102,9 @@ class SaveStash(cmds.ContextCommand):
 
     def do(self):
         if self.keep_index:
-            args = ['save', '--keep-index', self.stash_name]
+            args = ['push', '--keep-index', '-m', self.stash_name]
         else:
-            args = ['save', self.stash_name]
+            args = ['push', '-m', self.stash_name]
         status, out, err = self.git.stash(*args)
         if status == 0:
             Interaction.log_status(status, out, err)
@@ -106,6 +112,38 @@ class SaveStash(cmds.ContextCommand):
             title = N_('Error')
             cmdargs = core.list2cmdline(args)
             Interaction.command_error(title, 'git stash ' + cmdargs, status, out, err)
+
+        self.model.update_status()
+
+
+class RenameStash(cmds.ContextCommand):
+    """Rename the stash"""
+
+    def __init__(self, context, stash_index, stash_name):
+        super(RenameStash, self).__init__(context)
+        self.context = context
+        self.stash_index = stash_index
+        self.stash_name = stash_name
+
+    def do(self):
+        # Drop the stash first and get the returned ref
+        ref = DropStash(self.context, self.stash_index).do()
+        # Store the stash with a new name
+        if ref:
+            args = ['store', '-m', self.stash_name, ref]
+            status, out, err = self.git.stash(*args)
+            if status == 0:
+                Interaction.log_status(status, out, err)
+            else:
+                title = N_('Error')
+                cmdargs = core.list2cmdline(args)
+                Interaction.command_error(
+                    title, 'git stash ' + cmdargs, status, out, err
+                )
+        else:
+            title = N_('Error Renaming Stash')
+            msg = N_('"git stash drop" did not return a ref to rename.')
+            Interaction.critical(title, message=msg)
 
         self.model.update_status()
 

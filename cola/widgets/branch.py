@@ -18,6 +18,7 @@ from .. import hotkeys
 from .. import icons
 from .. import qtutils
 from .text import LineEdit
+from . import remotemessage
 
 
 def defer_func(parent, title, func, *args, **kwargs):
@@ -55,6 +56,8 @@ class AsyncGitActionTask(qtutils.Task):
 
 
 class BranchesWidget(QtWidgets.QFrame):
+    """A widget for displaying and performing operations on branches"""
+
     def __init__(self, context, parent):
         QtWidgets.QFrame.__init__(self, parent)
         self.model = model = context.model
@@ -116,6 +119,8 @@ class BranchesWidget(QtWidgets.QFrame):
 
 # pylint: disable=too-many-ancestors
 class BranchesTreeWidget(standard.TreeWidget):
+    """A tree widget for displaying branches"""
+
     updated = Signal()
 
     def __init__(self, context, parent=None):
@@ -215,6 +220,13 @@ class BranchesTreeWidget(standard.TreeWidget):
         full_name = selected.refname
         menu = qtutils.create_menu(N_('Actions'), self)
 
+        visualize_action = qtutils.add_action(
+            menu, N_('Visualize'), self.visualize_branch_action
+        )
+        visualize_action.setIcon(icons.visualize())
+        menu.addAction(visualize_action)
+        menu.addSeparator()
+
         # all branches except current the current branch
         if full_name != self.current_branch:
             menu.addAction(
@@ -230,7 +242,6 @@ class BranchesTreeWidget(standard.TreeWidget):
                 menu, N_('Merge into current branch'), self.merge_action
             )
             merge_menu_action.setIcon(icons.merge())
-
             menu.addAction(merge_menu_action)
 
         # local and remote branch
@@ -412,21 +423,29 @@ class BranchesTreeWidget(standard.TreeWidget):
                 item.setText(0, f'{item.text(0)}\t{status_str}')
 
     def git_action_async(self, action, args, kwarg=None, update_refs=False):
+        """Execute a git action in a background task"""
         if kwarg is None:
             kwarg = {}
         task = AsyncGitActionTask(self.git_helper, action, args, kwarg, update_refs)
         progress = standard.progress(
             N_('Executing action %s') % action, N_('Updating'), self
         )
-        self.runtask.start(task, progress=progress, finish=self.git_action_completed)
+        self.runtask.start(
+            task,
+            progress=progress,
+            finish=self.git_action_completed,
+            result=remotemessage.with_context(self.context),
+        )
 
     def git_action_completed(self, task):
+        """Update the with the results of an async git action"""
         status, out, err = task.result
         self.git_helper.show_result(task.action, status, out, err)
         if task.update_refs:
             self.context.model.update_refs()
 
     def push_action(self):
+        """Push the selected branch to its upstream remote"""
         context = self.context
         branch = self.selected_refname()
         remote_branch = gitcmds.tracked_branch(context, branch)
@@ -438,6 +457,7 @@ class BranchesTreeWidget(standard.TreeWidget):
                 self.git_action_async('push', [remote, branch_name], update_refs=True)
 
     def rename_action(self):
+        """Rename the selected branch"""
         branch = self.selected_refname()
         new_branch, ok = qtutils.prompt(
             N_('Enter New Branch Name'), title=N_('Rename branch'), text=branch
@@ -446,6 +466,7 @@ class BranchesTreeWidget(standard.TreeWidget):
             self.git_action_async('rename', [branch, new_branch], update_refs=True)
 
     def pull_action(self):
+        """Pull the selected branch into the current branch"""
         context = self.context
         branch = self.selected_refname()
         if not branch:
@@ -457,6 +478,7 @@ class BranchesTreeWidget(standard.TreeWidget):
                 self.git_action_async('pull', [remote, branch_name], update_refs=True)
 
     def delete_action(self):
+        """Delete the selected branch"""
         branch = self.selected_refname()
         if not branch or branch == self.current_branch:
             return
@@ -476,22 +498,31 @@ class BranchesTreeWidget(standard.TreeWidget):
             cmds.do(cmds.DeleteBranch, self.context, branch)
 
     def merge_action(self):
+        """Merge the selected branch into the current branch"""
         branch = self.selected_refname()
         if branch and branch != self.current_branch:
             self.git_action_async('merge', [branch])
 
     def checkout_action(self):
+        """Checkout the selected branch"""
         branch = self.selected_refname()
         if branch and branch != self.current_branch:
             self.git_action_async('checkout', [branch], update_refs=True)
 
     def checkout_new_branch_action(self):
+        """Checkout a new branch"""
         branch = self.selected_refname()
         if branch and branch != self.current_branch:
             _, new_branch = gitcmds.parse_remote_branch(branch)
             self.git_action_async(
                 'checkout', ['-b', new_branch, branch], update_refs=True
             )
+
+    def visualize_branch_action(self):
+        """Visualize the selected branch"""
+        branch = self.selected_refname()
+        if branch:
+            cmds.do(cmds.VisualizeRevision, self.context, branch)
 
     def selected_refname(self):
         return getattr(self.selected_item(), 'refname', None)

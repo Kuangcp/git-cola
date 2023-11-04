@@ -25,16 +25,21 @@ from .interaction import Interaction
 
 AVAILABLE = None
 
+pywintypes = None
+win32file = None
+win32con = None
+win32event = None
 if utils.is_win32():
     try:
         import pywintypes
         import win32con
         import win32event
         import win32file
+
+        AVAILABLE = 'pywin32'
     except ImportError:
         pass
-    else:
-        AVAILABLE = 'pywin32'
+
 elif utils.is_linux():
     try:
         from . import inotify
@@ -376,16 +381,24 @@ if AVAILABLE == 'pywin32':
                 self.overlapped = pywintypes.OVERLAPPED()
                 self.overlapped.hEvent = self.event
                 self._start()
-            except Exception:
+            except Exception:  # pylint: disable=broad-exception-caught,broad-except
                 self.close()
-                raise
+
+        def append(self, events):
+            """Append our event to the events list when valid"""
+            if self.event is not None:
+                events.append(self.event)
 
         def _start(self):
+            if self.handle is None:
+                return
             win32file.ReadDirectoryChangesW(
                 self.handle, self.buffer, True, self.flags, self.overlapped
             )
 
         def read(self):
+            if self.handle is None or self.event is None:
+                return []
             if win32event.WaitForSingleObject(self.event, 0) == win32event.WAIT_TIMEOUT:
                 result = []
             else:
@@ -439,10 +452,10 @@ if AVAILABLE == 'pywin32':
 
                 if self._worktree is not None:
                     self._worktree_watch = _Win32Watch(self._worktree, self._FLAGS)
-                    events.append(self._worktree_watch.event)
+                    self._worktree_watch.append(events)
 
                 self._git_dir_watch = _Win32Watch(self._git_dir, self._FLAGS)
-                events.append(self._git_dir_watch.event)
+                self._git_dir_watch.append(events)
 
                 self._log_enabled_message()
 
