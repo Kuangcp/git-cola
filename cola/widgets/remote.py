@@ -644,7 +644,7 @@ class RemoteActionDialog(standard.Dialog):
         # Use a thread to update in the background
         task = ActionTask(model_action, remote, kwargs)
         if remote_messages:
-            result = remotemessage.with_context(self.context)
+            result = remotemessage.from_context(self.context)
         else:
             result = None
         self.runtask.start(
@@ -729,7 +729,6 @@ class Push(RemoteActionDialog):
         """Export persistent settings"""
         state = RemoteActionDialog.export_state(self)
         state['prompt'] = get(self.prompt_checkbox)
-        state['remote_messages'] = get(self.remote_messages_checkbox)
         state['tags'] = get(self.tags_checkbox)
         return state
 

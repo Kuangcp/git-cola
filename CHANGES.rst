@@ -1,3 +1,20 @@
+.. _v4.4.1:
+
+v4.4.1
+======
+
+Usability, bells and whistles
+-----------------------------
+* The remote messages dialog is now displayed for the Pull and Push actions in the
+  Branches widget only. This dialog is disabled by default and enabled in the
+  main Push and Pull dialog settings.
+  (`#1363 <https://github.com/git-cola/git-cola/issues/1363>`_)
+
+* The whole-file staging actions in the Diff widget's right-click menu are now listed
+  after the selection and hunk staging actions. This helps prevent accidental clicks
+  from clobbering the index for the entire file.
+  (`#1362 <https://github.com/git-cola/git-cola/issues/1362>`_)
+
 .. _v4.4.0:
 
 v4.4.0
