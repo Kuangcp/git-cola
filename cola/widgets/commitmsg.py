@@ -68,7 +68,7 @@ class CommitMessageEditor(QtWidgets.QFrame):
         self.move_up = actions.move_up(self)
         self.move_down = actions.move_down(self)
 
-        # Menu acctions
+        # Menu actions
         self.menu_actions = menu_actions = [
             self.signoff_action,
             self.commit_action,
@@ -98,9 +98,9 @@ class CommitMessageEditor(QtWidgets.QFrame):
         self.commit_group = Group(self.commit_action, self.commit_button)
         self.commit_progress_bar = standard.progress_bar(
             self,
-            hide=(self.commit_button,),
             disable=(self.commit_button, self.summary, self.description),
         )
+        self.commit_progress_bar.setMaximumHeight(defs.small_icon)
 
         self.actions_menu = qtutils.create_menu(N_('Actions'), self)
         self.actions_button = qtutils.create_toolbutton(
@@ -160,7 +160,6 @@ class CommitMessageEditor(QtWidgets.QFrame):
             self.actions_button,
             self.summary,
             self.commit_button,
-            self.commit_progress_bar,
         )
         self.toplayout.setContentsMargins(
             defs.margin, defs.no_margin, defs.no_margin, defs.no_margin
@@ -181,7 +180,7 @@ class CommitMessageEditor(QtWidgets.QFrame):
             self.check_spelling_action, self.toggle_check_spelling
         )
 
-        # Handle the one-off autowrapping
+        # Handle the one-off auto-wrapping
         qtutils.connect_action_bool(self.autowrap_action, self.set_linebreak)
 
         self.summary.accepted.connect(self.focus_description)
@@ -197,8 +196,6 @@ class CommitMessageEditor(QtWidgets.QFrame):
             # description starts at line 2
             lambda row, col: self.cursor_changed.emit(row + 2, col)
         )
-
-        # pylint: disable=no-member
         self.summary.textChanged.connect(self.commit_summary_changed)
         self.description.textChanged.connect(self._commit_message_changed)
         self.description.leave.connect(self.focus_summary)
@@ -256,7 +253,7 @@ class CommitMessageEditor(QtWidgets.QFrame):
         self.focus_description()
 
     def commit_message(self, raw=True):
-        """Return the commit message as a unicode string"""
+        """Return the commit message as a Unicode string"""
         summary = get(self.summary)
         if raw:
             description = get(self.description)
@@ -478,9 +475,6 @@ class CommitMessageEditor(QtWidgets.QFrame):
         sign = get(self.sign_action)
         self.bypass_commit_hooks_action.setChecked(False)
 
-        self.commit_progress_bar.setMaximumWidth(self.commit_button.width())
-        self.commit_progress_bar.setMinimumHeight(self.commit_button.height() - 2)
-
         task = qtutils.SimpleTask(
             cmds.run(cmds.Commit, context, amend, msg, sign, no_verify=no_verify)
         )
@@ -495,7 +489,7 @@ class CommitMessageEditor(QtWidgets.QFrame):
         title = N_('Commit failed')
         status, out, err = task.result
         Interaction.command(title, 'git commit', status, out, err)
-        self.setFocus(True)
+        self.setFocus()
 
     def build_fixup_menu(self):
         self.build_commits_menu(
@@ -579,7 +573,6 @@ class CommitMessageEditor(QtWidgets.QFrame):
         self.description.highlighter.enable(enabled)
 
 
-# pylint: disable=too-many-ancestors
 class CommitSummaryLineEdit(SpellCheckLineEdit):
     """Text input field for the commit summary"""
 
@@ -630,7 +623,6 @@ class CommitSummaryLineEdit(SpellCheckLineEdit):
         SpellCheckLineEdit.keyPressEvent(self, event)
 
 
-# pylint: disable=too-many-ancestors
 class CommitMessageTextEdit(SpellCheckTextEdit):
     leave = Signal()
 
@@ -688,5 +680,5 @@ class CommitMessageTextEdit(SpellCheckTextEdit):
 
     def setFont(self, font):
         SpellCheckTextEdit.setFont(self, font)
-        metrics = self.fontMetrics()
-        self.setMinimumSize(QtCore.QSize(metrics.width('MMMM'), metrics.height() * 2))
+        width, height = qtutils.text_size(font, 'MMMM')
+        self.setMinimumSize(QtCore.QSize(width, height * 2))

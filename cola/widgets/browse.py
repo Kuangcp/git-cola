@@ -99,7 +99,6 @@ class Browser(standard.Widget):
         self.setWindowTitle(title)
 
 
-# pylint: disable=too-many-ancestors
 class RepoTreeView(standard.TreeView):
     """Provides a filesystem-like view of a git repository."""
 
@@ -221,7 +220,7 @@ class RepoTreeView(standard.TreeView):
             context, self, func=self.selected_paths
         )
 
-        self.x_width = QtGui.QFontMetrics(self.font()).width('x')
+        self.x_width = qtutils.text_width(self.font(), 'x')
         self.size_columns(force=True)
 
     def index_expanded(self, index):
@@ -507,12 +506,12 @@ class RepoTreeView(standard.TreeView):
         cmds.do(cmds.VisualizePaths, self.context, paths)
 
     def untrack_selected(self):
-        """untrack selected paths."""
+        """Untrack selected paths."""
         context = self.context
         cmds.do(cmds.Untrack, context, self.selected_tracked_paths())
 
     def rename_selected(self):
-        """untrack selected paths."""
+        """Untrack selected paths."""
         context = self.context
         cmds.do(cmds.Rename, context, self.selected_tracked_paths())
 
@@ -662,7 +661,6 @@ class BrowseBranch(standard.Dialog):
         self.save.setEnabled(bool(filenames))
 
 
-# pylint: disable=too-many-ancestors
 class GitTreeWidget(standard.TreeView):
     selection_changed = Signal()
     path_chosen = Signal(object)
@@ -670,7 +668,6 @@ class GitTreeWidget(standard.TreeView):
     def __init__(self, parent=None):
         standard.TreeView.__init__(self, parent)
         self.setHeaderHidden(True)
-        # pylint: disable=no-member
         self.doubleClicked.connect(self.double_clicked)
 
     def double_clicked(self, index):
@@ -818,7 +815,7 @@ class GitTreeModel(GitFileTreeModel):
 
 class GitTreeItem(QtGui.QStandardItem):
     """
-    Represents a cell in a treeview.
+    Represents a cell in a tree view.
 
     Many GitRepoItems could map to a single repository path,
     but this tree only has a single column.

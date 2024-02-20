@@ -15,7 +15,6 @@ def decorator(caller, func=None):
     """
     if func is None:
         # return a decorator
-        # pylint: disable=unused-argument
         @functools.wraps(caller)
         def _decorator(func, *dummy_args, **dummy_opts):
             @functools.wraps(func)
@@ -40,7 +39,7 @@ def memoize(func):
     """
     A decorator for memoizing function calls
 
-    http://en.wikipedia.org/wiki/Memoization
+    https://en.wikipedia.org/wiki/Memoization
 
     """
     func.cache = {}
@@ -65,9 +64,9 @@ def _memoize(func, *args, **opts):
 def interruptable(func, *args, **opts):
     """Handle interruptible system calls
 
-    OSX and others are known to interrupt system calls
+    macOS and others are known to interrupt system calls
 
-        http://en.wikipedia.org/wiki/PCLSRing
+        https://en.wikipedia.org/wiki/PCLSRing
         http://en.wikipedia.org/wiki/Unix_philosophy#Worse_is_better
 
     The @interruptable decorator handles this situation

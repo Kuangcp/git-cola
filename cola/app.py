@@ -1,15 +1,10 @@
 """Provides the main() routine and ColaApplication"""
-# pylint: disable=unused-import
 from functools import partial
 import argparse
 import os
 import signal
 import sys
 import time
-
-__copyright__ = """
-Copyright (C) 2007-2022 David Aguilar and contributors
-"""
 
 try:
     from qtpy import QtCore
@@ -202,7 +197,7 @@ class ColaApplication:
             self._app.setPalette(theme.build_palette(self._app.palette()))
 
     def _install_hidpi_config(self):
-        """Sets QT HIDPI scalling (requires Qt 5.6)"""
+        """Sets QT HiDPI scaling (requires Qt 5.6)"""
         value = self.context.cfg.get('cola.hidpi', default=hidpi.Option.AUTO)
         hidpi.apply_choice(value)
 
@@ -511,7 +506,6 @@ def async_update(context):
     """Update the model in the background
 
     git-cola should startup as quickly as possible.
-
     """
     update_status = partial(context.model.update_status, update_index=True)
     task = qtutils.SimpleTask(update_status)
@@ -589,8 +583,13 @@ class NullArgs:
 
     def __init__(self):
         self.icon_themes = []
-        self.theme = None
+        self.perf = False
+        self.prompt = False
+        self.repo = core.getcwd()
+        self.session = None
         self.settings = None
+        self.theme = None
+        self.version = False
 
 
 def null_args():

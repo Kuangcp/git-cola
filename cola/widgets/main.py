@@ -61,7 +61,6 @@ class MainView(standard.MainWindow):
     config_actions_changed = Signal(object)
 
     def __init__(self, context, parent=None):
-        # pylint: disable=too-many-statements,too-many-locals
         standard.MainWindow.__init__(self, parent)
         self.setAttribute(Qt.WA_DeleteOnClose)
 
@@ -152,14 +151,15 @@ class MainView(standard.MainWindow):
         self.position_label.setFont(font)
 
         # make the position label fixed size to avoid layout issues
-        metrics = self.position_label.fontMetrics()
-        width = metrics.width('99:999') + defs.spacing
+        text_width = qtutils.text_width(font, '99:999')
+        width = text_width + defs.spacing
         self.position_label.setMinimumWidth(width)
 
         editor = commitmsg.CommitMessageEditor(context, self)
         self.commiteditor = editor
         self.commitdock = create_dock('Commit', N_('Commit'), self, widget=editor)
         titlebar = self.commitdock.titleBarWidget()
+        titlebar.add_title_widget(self.commiteditor.commit_progress_bar)
         titlebar.add_corner_widget(self.position_label)
 
         # "Console" widget
@@ -178,9 +178,10 @@ class MainView(standard.MainWindow):
         )
         self.diffviewer = self.diffdock.widget()
         self.diffviewer.set_diff_type(self.model.diff_type)
-
+        self.diffviewer.enable_filename_tracking()
         self.diffeditor = self.diffviewer.text
         titlebar = self.diffdock.titleBarWidget()
+        titlebar.add_title_widget(self.diffviewer.filename)
         titlebar.add_corner_widget(self.diffviewer.options)
 
         # All Actions
@@ -208,7 +209,7 @@ class MainView(standard.MainWindow):
         self.undo_commit_action.setIcon(icons.style_dialog_discard())
 
         self.unstage_selected_action = add_action(
-            self, N_('Unstage From Commit'), cmds.run(cmds.UnstageSelected, context)
+            self, N_('Unstage'), cmds.run(cmds.UnstageSelected, context)
         )
         self.unstage_selected_action.setIcon(icons.remove())
 
@@ -219,7 +220,7 @@ class MainView(standard.MainWindow):
 
         self.stage_modified_action = add_action(
             self,
-            N_('Stage Changed Files To Commit'),
+            cmds.StageModified.name(),
             cmds.run(cmds.StageModified, context),
             hotkeys.STAGE_MODIFIED,
         )
@@ -227,7 +228,7 @@ class MainView(standard.MainWindow):
 
         self.stage_untracked_action = add_action(
             self,
-            N_('Stage All Untracked'),
+            cmds.StageUntracked.name(),
             cmds.run(cmds.StageUntracked, context),
             hotkeys.STAGE_UNTRACKED,
         )
@@ -855,7 +856,6 @@ class MainView(standard.MainWindow):
 
         # View Menu
         self.view_menu = add_menu(N_('View'), self.menubar)
-        # pylint: disable=no-member
         self.view_menu.aboutToShow.connect(lambda: self.build_view_menu(self.view_menu))
         self.setup_dockwidget_view_menu()
         if utils.is_darwin():
@@ -1381,7 +1381,7 @@ class FocusProxy:
         return callback
 
     def delete(self):
-        """Specialized delete() to deal with QLineEdit vs QTextEdit"""
+        """Specialized delete() to deal with QLineEdit vs. QTextEdit"""
         focus = self.focus('delete')
         if hasattr(focus, 'del_'):
             focus.del_()

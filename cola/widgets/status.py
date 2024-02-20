@@ -125,7 +125,6 @@ class StatusWidget(QtWidgets.QFrame):
         self.tree.select_header()
 
 
-# pylint: disable=too-many-ancestors
 class StatusTreeWidget(QtWidgets.QTreeWidget):
     # Read-only access to the mode state
     mode = property(lambda self: self._model.mode)
@@ -326,7 +325,6 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
         self._model.diff_text_changed.connect(
             self._make_current_item_visible, type=Qt.QueuedConnection
         )
-        # pylint: disable=no-member
         self.itemSelectionChanged.connect(self.show_selection)
         self.itemDoubleClicked.connect(cmds.run(cmds.StageOrUnstage, self.context))
         self.itemCollapsed.connect(lambda x: self._update_column_widths())
@@ -505,7 +503,7 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
                 cmds.do(cmds.StageModifiedAndUntracked, context)
                 return  # Nothing more to do.
             # At this point we may stage all modified and untracked, and then
-            # possibly a subset of the other category (eg. all modified and
+            # possibly a subset of the other category (e.g. all modified and
             # some untracked).  We don't return here so that StageOrUnstage
             # gets a chance to run below.
             if is_modified:
@@ -613,7 +611,7 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
         self.copy_basename_action.setEnabled(enabled)
 
     def _set_staged(self, items):
-        """Adds items to the 'Staged' subtree."""
+        """Adds items to the 'Staged' sub-tree."""
         with qtutils.BlockSignals(self):
             self._set_subtree(
                 items,
@@ -624,7 +622,7 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
             )
 
     def _set_modified(self, items):
-        """Adds items to the 'Modified' subtree."""
+        """Adds items to the 'Modified' sub-tree."""
         with qtutils.BlockSignals(self):
             self._set_subtree(
                 items,
@@ -634,7 +632,7 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
             )
 
     def _set_unmerged(self, items):
-        """Adds items to the 'Unmerged' subtree."""
+        """Adds items to the 'Unmerged' sub-tree."""
         deleted_set = {path for path in items if not core.exists(path)}
         with qtutils.BlockSignals(self):
             self._set_subtree(
@@ -642,7 +640,7 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
             )
 
     def _set_untracked(self, items):
-        """Adds items to the 'Untracked' subtree."""
+        """Adds items to the 'Untracked' sub-tree."""
         with qtutils.BlockSignals(self):
             self._set_subtree(items, UNTRACKED_IDX, N_('Untracked'), untracked=True)
 
@@ -745,9 +743,8 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
         widget = CopyLeadingPathWidget(
             N_('Copy Leading Path to Clipboard'), self.context, copy_menu
         )
-
-        # Store the value of the leading paths spinbox so that the value does not reset
-        # everytime the menu is shown and recreated.
+        # Store the value of the leading paths spin-box so that the value does not reset
+        # every time the menu is shown and recreated.
         widget.set_value(self.copy_leading_paths_value)
         widget.spinbox.valueChanged.connect(
             partial(setattr, self, 'copy_leading_paths_value')
@@ -1026,7 +1023,7 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
         )
 
     def all_files(self):
-        """Return all of the current active files as a flast list"""
+        """Return all of the current active files as a flat list"""
         c = self.contents()
         return c.staged + c.unmerged + c.modified + c.untracked
 
@@ -1248,7 +1245,7 @@ class StatusTreeWidget(QtWidgets.QTreeWidget):
         return qtutils.mimedata_from_paths(context, paths, include_urls=include_urls)
 
     def mimeTypes(self):
-        """Return the mimetypes that this widget generates"""
+        """Return the mime types that this widget generates"""
         return qtutils.path_mimetypes(include_urls=not self._alt_drag)
 
 
@@ -1341,7 +1338,6 @@ class StatusFilterWidget(QtWidgets.QWidget):
         self.setLayout(self.main_layout)
 
         widget = self.text
-        # pylint: disable=no-member
         widget.changed.connect(self.apply_filter)
         widget.cleared.connect(self.apply_filter)
         widget.enter.connect(self.apply_filter)
@@ -1408,7 +1404,6 @@ class CustomizeCopyActions(standard.Dialog):
         qtutils.connect_button(self.close_button, self.reject)
         qtutils.connect_button(self.save_button, self.save)
         qtutils.add_close_action(self)
-        # pylint: disable=no-member
         self.table.itemSelectionChanged.connect(self.table_selection_changed)
 
         self.init_size(parent=parent)
@@ -1572,7 +1567,7 @@ def _transplant_selection_across_sections(
     modified_paths = modified[NEW_PATHS_IDX]
     untracked_paths = untracked[NEW_PATHS_IDX]
 
-    # These callbacks select a path in the corresponding widget subtree lists.
+    # These callbacks select a path in the corresponding widget sub-tree lists.
     select_staged = staged[SELECT_FN_IDX]
     select_unmerged = unmerged[SELECT_FN_IDX]
     select_modified = modified[SELECT_FN_IDX]
@@ -1636,7 +1631,7 @@ def _transplant_selection_across_sections(
 
 
 class CopyLeadingPathWidget(QtWidgets.QWidget):
-    """A widget that holds a label and a spinbox for the number of paths to strip"""
+    """A widget that holds a label and a spin-box for the number of paths to strip"""
 
     def __init__(self, title, context, parent):
         QtWidgets.QWidget.__init__(self, parent)
@@ -1693,9 +1688,9 @@ class CopyLeadingPathWidget(QtWidgets.QWidget):
         self.setStyleSheet(stylesheet)
 
     def value(self):
-        """Return the current value of the spinbox"""
+        """Return the current value of the spin-box"""
         return self.spinbox.value()
 
     def set_value(self, value):
-        """Set the spinbox value"""
+        """Set the spin-box value"""
         self.spinbox.setValue(value)

@@ -30,7 +30,6 @@ class ExpandingTabBar(QtWidgets.QTabBar):
     The setExpanding(True) method does not work in practice because
     it respects the OS style.  We override the style by implementing
     tabSizeHint() so that we can specify the size explicitly.
-
     """
 
     def tabSizeHint(self, tab_index):
@@ -124,7 +123,7 @@ def copyright_text():
     return """
 Git Cola: The highly caffeinated Git GUI
 
-Copyright (C) 2007-2023 David Aguilar and contributors
+Copyright (C) 2007-2024 David Aguilar and contributors
 
 This program is free software: you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -152,7 +151,11 @@ def version_text(context):
     qt_version = qtpy.QT_VERSION
     qtpy_version = qtpy.__version__
     pyqt_api_name = qtpy.API_NAME
-    if qtpy.PYQT5 or qtpy.PYQT4:
+    if (
+        getattr(qtpy, 'PYQT6', False)
+        or getattr(qtpy, 'PYQT5', False)
+        or getattr(qtpy, 'PYQT4', False)
+    ):
         pyqt_api_version = qtpy.PYQT_VERSION
     elif qtpy.PYSIDE:
         pyqt_api_version = qtpy.PYSIDE_VERSION
@@ -197,7 +200,7 @@ def mailto(email, text, palette):
 
 
 def render_authors(authors):
-    """Render a list of author details into richtext html"""
+    """Render a list of author details into rich text html"""
     for x in authors:
         x.setdefault('email', '')
 
@@ -464,9 +467,9 @@ def translators_text():
 def show_shortcuts():
     hotkeys_html = resources.doc(N_('hotkeys.html'))
     try:
-        from qtpy import QtWebEngineWidgets  # pylint: disable=all
+        from qtpy import QtWebEngineWidgets
     except (ImportError, qtpy.PythonQtError):
-        # redhat disabled QtWebKit in their qt build but don't punish the users
+        # Redhat disabled QtWebKit in their Qt build but don't punish the users
         webbrowser.open_new_tab('file://' + hotkeys_html)
         return
 

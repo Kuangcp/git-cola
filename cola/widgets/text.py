@@ -1,5 +1,4 @@
 """Text widgets"""
-# pylint: disable=unexpected-keyword-arg
 from functools import partial
 import math
 
@@ -40,7 +39,7 @@ class LineEdit(QtWidgets.QLineEdit):
             self.setClearButtonEnabled(True)
 
     def get(self):
-        """Return the raw unicode value from Qt"""
+        """Return the raw Unicode value from Qt"""
         return self.text()
 
     def value(self):
@@ -115,7 +114,7 @@ class BaseTextEditExtension(QtCore.QObject):
             )
 
     def get(self):
-        """Return the raw unicode value from Qt"""
+        """Return the raw Unicode value from Qt"""
         return self.widget.toPlainText()
 
     def value(self):
@@ -174,9 +173,7 @@ class BaseTextEditExtension(QtCore.QObject):
 
     def set_tabwidth(self, width):
         self._tabwidth = width
-        font = self.widget.font()
-        metrics = QtGui.QFontMetrics(font)
-        pixels = metrics.width('M' * width)
+        pixels = qtutils.text_width(self.widget.font(), 'M') * width
         self.widget.setTabStopWidth(pixels)
 
     def selected_line(self):
@@ -263,12 +260,10 @@ class BaseTextEditExtension(QtCore.QObject):
         """Called during init for class-specific settings"""
         return
 
-    # pylint: disable=unused-argument
     def set_textwidth(self, width):
         """Set the text width"""
         return
 
-    # pylint: disable=unused-argument
     def set_linebreak(self, brk):
         """Enable word wrapping"""
         return
@@ -296,7 +291,7 @@ class PlainTextEdit(QtWidgets.QPlainTextEdit):
         self.menu_actions = []
 
     def get(self):
-        """Return the raw unicode value from Qt"""
+        """Return the raw Unicode value from Qt"""
         return self.ext.get()
 
     # For compatibility with QTextEdit
@@ -447,11 +442,11 @@ class TextSearchWidget(QtWidgets.QWidget):
     def hide_search(self):
         """Hide the search window"""
         self.hide()
-        self._parent.setFocus(True)
+        self._parent.setFocus()
 
     def find_flags(self, backwards):
         """Return QTextDocument.FindFlags for the current search options"""
-        flags = QtGui.QTextDocument.FindFlags()
+        flags = QtGui.QTextDocument.FindFlag(0)
         if backwards:
             flags = flags | QtGui.QTextDocument.FindBackward
         if self.match_case_checkbox.isChecked():
@@ -530,7 +525,7 @@ class TextEdit(QtWidgets.QTextEdit):
         self.menu_actions = []
 
     def get(self):
-        """Return the raw unicode value from Qt"""
+        """Return the raw Unicode value from Qt"""
         return self.ext.get()
 
     def value(self):
@@ -709,7 +704,7 @@ class HintWidget(QtCore.QObject):
         )
 
     def init(self):
-        """Defered initialization"""
+        """Deferred initialization"""
         if self.modern:
             self.widget().setPlaceholderText(self.value())
         else:
@@ -813,7 +808,6 @@ class HintedPlainTextEdit(PlainTextEdit):
         self.setFont(qtutils.diff_font(context))
         self.set_tabwidth(prefs.tabwidth(context))
         # Refresh palettes when text changes
-        # pylint: disable=no-member
         self.textChanged.connect(self.hint.refresh)
         self.set_mouse_zoom(context.cfg.get(prefs.MOUSE_ZOOM, default=True))
 
@@ -836,7 +830,6 @@ class HintedTextEdit(TextEdit):
         self.hint = HintWidget(self, hint)
         self.hint.init()
         # Refresh palettes when text changes
-        # pylint: disable=no-member
         self.textChanged.connect(self.hint.refresh)
         self.setFont(qtutils.diff_font(context))
 
@@ -864,7 +857,7 @@ class VimMixin:
     def __init__(self, widget):
         self.widget = widget
         self.Base = widget.Base
-        # Common vim/unix-ish keyboard actions
+        # Common vim/Unix-ish keyboard actions
         self.add_navigation('End', hotkeys.GOTO_END)
         self.add_navigation('Up', hotkeys.MOVE_UP, shift=hotkeys.MOVE_UP_SHIFT)
         self.add_navigation('Down', hotkeys.MOVE_DOWN, shift=hotkeys.MOVE_DOWN_SHIFT)
@@ -982,12 +975,10 @@ class VimMixin:
         return self.Base.keyPressEvent(widget, event)
 
 
-# pylint: disable=too-many-ancestors
 class VimHintedPlainTextEdit(HintedPlainTextEdit):
     """HintedPlainTextEdit with vim hotkeys
 
     This can only be used in read-only mode.
-
     """
 
     Base = HintedPlainTextEdit
@@ -1013,7 +1004,6 @@ class VimHintedPlainTextEdit(HintedPlainTextEdit):
         return self._mixin.keyPressEvent(event)
 
 
-# pylint: disable=too-many-ancestors
 class VimTextEdit(MonoTextEdit):
     """Text viewer with vim-like hotkeys
 
@@ -1053,7 +1043,6 @@ class HintedDefaultLineEdit(LineEdit):
             self.setToolTip(tooltip)
         self.hint = HintWidget(self, hint)
         self.hint.init()
-        # pylint: disable=no-member
         self.textChanged.connect(lambda text: self.hint.refresh())
 
 
@@ -1152,7 +1141,8 @@ class LineNumbers(TextDecorator):
     def width_hint(self):
         document = self.editor.document()
         digits = int(math.log(max(1, document.blockCount()), 10)) + 2
-        return defs.large_margin + self.fontMetrics().width('0') * digits
+        text_width = qtutils.text_width(self.font(), '0')
+        return defs.large_margin + (text_width * digits)
 
     def set_highlighted(self, line_number):
         """Set the line to highlight"""
@@ -1200,3 +1190,72 @@ class LineNumbers(TextDecorator):
                 number,
             )
             block = block.next()
+
+
+class TextLabel(QtWidgets.QLabel):
+    """A text label that elides its display"""
+
+    def __init__(self, parent=None, open_external_links=True):
+        QtWidgets.QLabel.__init__(self, parent)
+        self._display = ''
+        self._template = ''
+        self._text = ''
+        self._elide = False
+        self._metrics = QtGui.QFontMetrics(self.font())
+        policy = QtWidgets.QSizePolicy(
+            QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum
+        )
+        self.setSizePolicy(policy)
+        self.setTextInteractionFlags(
+            Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse
+        )
+        self.setOpenExternalLinks(open_external_links)
+
+    def elide(self):
+        self._elide = True
+
+    def set_text(self, text):
+        self.set_template(text, text)
+
+    def set_template(self, text, template):
+        self._display = text
+        self._text = text
+        self._template = template
+        self.update_text(self.width())
+        self.setText(self._display)
+
+    def update_text(self, width):
+        self._display = self._text
+        if not self._elide:
+            return
+        text = self._metrics.elidedText(self._template, Qt.ElideRight, width - 2)
+        if text != self._template:
+            self._display = text
+
+    # Qt overrides
+    def setFont(self, font):
+        self._metrics = QtGui.QFontMetrics(font)
+        QtWidgets.QLabel.setFont(self, font)
+
+    def resizeEvent(self, event):
+        if self._elide:
+            self.update_text(event.size().width())
+            with qtutils.BlockSignals(self):
+                self.setText(self._display)
+        QtWidgets.QLabel.resizeEvent(self, event)
+
+
+class PlainTextLabel(TextLabel):
+    """A plaintext label that elides its display"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent, open_external_links=False)
+        self.setTextFormat(Qt.PlainText)
+
+
+class RichTextLabel(TextLabel):
+    """A richtext label that elides its display"""
+
+    def __init__(self, parent=None):
+        super().__init__(parent=parent, open_external_links=True)
+        self.setTextFormat(Qt.RichText)

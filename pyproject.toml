@@ -4,13 +4,13 @@ authors = [
     {name = "David Aguilar", email = "davvid@gmail.com"}
 ]
 classifiers = [
-	"Development Status :: 6 - Mature",
-	"Intended Audience :: Developers",
-	"Intended Audience :: End Users/Desktop",
-	"License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
-	"Programming Language :: Python :: 3",
-	"Topic :: Software Development :: Libraries :: Python Modules",
-	"Topic :: Software Development :: Version Control :: Git",
+    "Development Status :: 6 - Mature",
+    "Intended Audience :: Developers",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: GNU General Public License v2 (GPLv2)",
+    "Programming Language :: Python :: 3",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Topic :: Software Development :: Version Control :: Git",
 ]
 description = "A sleek and powerful Git GUI"
 dynamic = ["dependencies", "optional-dependencies", "version"]
@@ -31,8 +31,8 @@ build-backend = "setuptools.build_meta"
 function-definition-extra-indent = false
 line-length = 88
 
+[tool.pytest-enabler.ruff]
+addopts = "--ruff"
+
 [tool.setuptools_scm]
-# "fallback_version" does not (currently) work when building from tarballs.
-# "fallback_version" should start working once this upstream issue is resolved:
-# https://github.com/pypa/setuptools_scm/issues/549
-fallback_version = "4.4.0"
+fallback_version = "4.5.0"

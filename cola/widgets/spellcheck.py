@@ -11,7 +11,6 @@ from ..i18n import N_
 from .text import HintedTextEdit
 
 
-# pylint: disable=too-many-ancestors
 class SpellCheckTextEdit(HintedTextEdit):
     def __init__(self, context, hint, check=None, parent=None):
         HintedTextEdit.__init__(self, context, hint, parent)
@@ -181,7 +180,7 @@ class SpellCheckLineEdit(SpellCheckTextEdit):
         return self.minimumSizeHint()
 
     def _trim_changed_text_lines(self):
-        """Trim the document to a single line to enforce a maximum of line line"""
+        """Trim the document to a single line to enforce a maximum of one line"""
         # self.setMaximumBlockCount(1) Undo/Redo.
         if self.document().blockCount() > 1:
             self.document().setPlainText(self.document().firstBlock().text())
@@ -220,7 +219,6 @@ class SpellAction(QtWidgets.QAction):
 
     def __init__(self, *args):
         QtWidgets.QAction.__init__(self, *args)
-        # pylint: disable=no-member
         self.triggered.connect(self.correct)
 
     def correct(self):

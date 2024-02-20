@@ -187,7 +187,7 @@ def grid(margin, spacing, *widgets):
 
 
 def splitter(orientation, *widgets):
-    """Create a spliter over the specified widgets
+    """Create a splitter over the specified widgets
 
     :param orientation: Qt.Horizontal or Qt.Vertical
 
@@ -224,7 +224,7 @@ def label(text=None, align=None, fmt=None, selectable=True):
 
 
 class ComboBox(QtWidgets.QComboBox):
-    """Custom read-only combobox with a convenient API"""
+    """Custom read-only combo box with a convenient API"""
 
     def __init__(self, items=None, editable=False, parent=None, transform=None):
         super().__init__(parent)
@@ -257,7 +257,7 @@ class ComboBox(QtWidgets.QComboBox):
 
 
 def combo(items, editable=False, tooltip='', parent=None):
-    """Create a readonly (by default) combobox from a list of items"""
+    """Create a readonly (by default) combo box from a list of items"""
     combobox = ComboBox(editable=editable, items=items, parent=parent)
     if tooltip:
         combobox.setToolTip(tooltip)
@@ -265,7 +265,7 @@ def combo(items, editable=False, tooltip='', parent=None):
 
 
 def combo_mapped(data, editable=False, transform=None, parent=None):
-    """Create a readonly (by default) combobox from a list of items"""
+    """Create a readonly (by default) combo box from a list of items"""
     widget = ComboBox(editable=editable, transform=transform, parent=parent)
     for k, v in data:
         widget.add_item(k, v)
@@ -285,7 +285,7 @@ def link(url, text, palette=None):
     if palette is None:
         palette = QtGui.QPalette()
 
-    color = palette.color(QtGui.QPalette.Foreground)
+    color = palette.color(QtGui.QPalette.WindowText)
     rgb_color = f'rgb({color.red()}, {color.green()}, {color.blue()})'
     scope = {'rgb': rgb_color, 'text': text, 'url': url}
 
@@ -331,8 +331,7 @@ def prompt_n(msg, inputs):
         if len(k + v) > len(long_value):
             long_value = k + v
 
-    metrics = QtGui.QFontMetrics(dialog.font())
-    min_width = min(720, metrics.width(long_value) + 100)
+    min_width = min(720, text_width(dialog.font(), long_value) + 100)
     dialog.setMinimumWidth(min_width)
 
     ok_b = ok_button(msg, enabled=False)
@@ -346,7 +345,6 @@ def prompt_n(msg, inputs):
     for name, value in inputs:
         lineedit = QtWidgets.QLineEdit()
         # Enable the OK button only when all fields have been populated
-        # pylint: disable=no-member
         lineedit.textChanged.connect(
             lambda x: ok_b.setEnabled(all(get_values())), type=Qt.QueuedConnection
         )
@@ -490,13 +488,20 @@ def open_files(title, directory=None, filters=''):
     return result[0]
 
 
+def _enum_value(value):
+    """Resolve Qt6 enum values"""
+    if hasattr(value, 'value'):
+        return value.value
+    return value
+
+
 def opendir_dialog(caption, path):
     """Prompts for a directory path"""
-    options = (
-        QtWidgets.QFileDialog.Directory
-        | QtWidgets.QFileDialog.DontResolveSymlinks
-        | QtWidgets.QFileDialog.ReadOnly
-        | QtWidgets.QFileDialog.ShowDirsOnly
+    options = QtWidgets.QFileDialog.Option(
+        _enum_value(QtWidgets.QFileDialog.Directory)
+        | _enum_value(QtWidgets.QFileDialog.DontResolveSymlinks)
+        | _enum_value(QtWidgets.QFileDialog.ReadOnly)
+        | _enum_value(QtWidgets.QFileDialog.ShowDirsOnly)
     )
     return compat.getexistingdirectory(
         parent=active_window(), caption=caption, basedir=path, options=options
@@ -539,7 +544,6 @@ def set_clipboard(text):
     persist_clipboard()
 
 
-# pylint: disable=line-too-long
 def persist_clipboard():
     """Persist the clipboard
 
@@ -606,7 +610,7 @@ def _add_action(widget, text, tip, func, connect, *shortcuts):
 
 
 def set_selected_item(widget, idx):
-    """Sets a the currently selected item to the item at index idx."""
+    """Sets the currently selected item to the item at index idx."""
     if isinstance(widget, QtWidgets.QTreeWidget):
         item = widget.topLevelItem(idx)
         if item:
@@ -692,10 +696,10 @@ def diff_font_str(context):
 
 
 def diff_font(context):
-    return font(diff_font_str(context))
+    return font_from_string(diff_font_str(context))
 
 
-def font(string):
+def font_from_string(string):
     qfont = QtGui.QFont()
     qfont.fromString(string)
     return qfont
@@ -759,7 +763,7 @@ def tool_button():
 
 
 def create_action_button(tooltip=None, icon=None, visible=None):
-    """Create a small toolbutton for use in dock title widgets"""
+    """Create a small tool button for use in dock title widgets"""
     button = tool_button()
     if tooltip is not None:
         button.setToolTip(tooltip)
@@ -836,6 +840,7 @@ class DockTitleBarWidget(QtWidgets.QFrame):
         )
 
         self.corner_layout = hbox(defs.no_margin, defs.spacing)
+        self.title_layout = hbox(defs.no_margin, defs.button_spacing, qlabel)
 
         if stretch:
             separator = STRETCH
@@ -845,7 +850,7 @@ class DockTitleBarWidget(QtWidgets.QFrame):
         self.main_layout = hbox(
             defs.small_margin,
             defs.titlebar_spacing,
-            qlabel,
+            self.title_layout,
             separator,
             self.corner_layout,
             self.toggle_button,
@@ -866,7 +871,12 @@ class DockTitleBarWidget(QtWidgets.QFrame):
     def set_title(self, title):
         self.label.setText(title)
 
+    def add_title_widget(self, widget):
+        """Add widgets to the title area"""
+        self.title_layout.addWidget(widget)
+
     def add_corner_widget(self, widget):
+        """Add widgets to the corner area"""
         self.corner_layout.addWidget(widget)
 
     def update_tooltips(self):
@@ -906,11 +916,11 @@ def create_menu(title, parent):
 
 
 class DebouncingMenu(QtWidgets.QMenu):
-    """Menu that debounces mouse release action ie. stops it if occurred
+    """Menu that debounces mouse release action i.e. stops it if occurred
     right after menu creation.
 
     Disables annoying behaviour when RMB is pressed to show menu, cursor is
-    moved accidentally 1px onto newly created menu and released causing to
+    moved accidentally 1 px onto newly created menu and released causing to
     execute menu action
     """
 
@@ -954,24 +964,23 @@ def create_toolbutton(text=None, layout=None, tooltip=None, icon=None):
 
 
 def create_toolbutton_with_callback(callback, text, icon, tooltip, layout=None):
-    """Create a toolbutton that runs the specified callback"""
+    """Create a tool button that runs the specified callback"""
     toolbutton = create_toolbutton(text=text, layout=layout, tooltip=tooltip, icon=icon)
     connect_button(toolbutton, callback)
     return toolbutton
 
 
-# pylint: disable=line-too-long
 def mimedata_from_paths(context, paths, include_urls=True):
-    """Return mimedata with a list of absolute path URLs
+    """Return mime data with a list of absolute path URLs
 
     Set `include_urls` to False to prevent URLs from being included
-    in the mimedata. This is useful in some terminals that do not gracefully handle
+    in the mime data. This is useful in some terminals that do not gracefully handle
     multiple URLs being included in the payload.
 
-    This allows the mimedata to contain just plain a plain text value that we
+    This allows the mime data to contain just plain a plain text value that we
     are able to format ourselves.
 
-    Older verisons of gnome-terminal expected a utf-16 encoding, but that
+    Older versions of gnome-terminal expected a UTF-16 encoding, but that
     behavior is no longer needed.
     """  # noqa
     abspaths = [core.abspath(path) for path in paths]
@@ -981,8 +990,8 @@ def mimedata_from_paths(context, paths, include_urls=True):
     # mimedata.removeFormat('text/x-moz-url') has no effect.
     # http://www.qtcentre.org/threads/44643-Dragging-text-uri-list-Qt-inserts-garbage
     #
-    # Older versions of gnome-terminal expect utf-16 encoded text, but other terminals,
-    # e.g. terminator, expect utf-8, so use cola.dragencoding to override the default.
+    # Older versions of gnome-terminal expect UTF-16 encoded text, but other terminals,
+    # e.g. terminator, expect UTF-8, so use cola.dragencoding to override the default.
     # NOTE: text/x-moz-url does not seem to be used/needed by modern versions of
     # gnome-terminal, kitty, and terminator.
     mimedata = QtCore.QMimeData()
@@ -998,7 +1007,7 @@ def mimedata_from_paths(context, paths, include_urls=True):
 
 
 def path_mimetypes(include_urls=True):
-    """Return a list of mimetypes that we generate"""
+    """Return a list of mime types that we generate"""
     mime_types = [
         'text/plain',
         'text/plain;charset=utf-8',
@@ -1041,7 +1050,7 @@ class Task(QtCore.QRunnable):
         self.channel = Channel()
         self.result = None
         # Python's garbage collector will try to double-free the task
-        # once it's finished, so disable Qt's auto-deletion as a workaround.
+        # once it's finished so disable the Qt auto-deletion.
         self.setAutoDelete(False)
 
     def run(self):
@@ -1118,6 +1127,10 @@ class RunTask(QtCore.QObject):
 
         if finish is not None:
             finish(task)
+
+    def wait(self):
+        """Wait until all tasks have finished processing"""
+        self.threadpool.waitForDone()
 
 
 # Syntax highlighting
@@ -1286,3 +1299,30 @@ def add_menu_actions(menu, menu_actions):
         if action is None:
             action = menu_separator(menu)
         menu.insertAction(first_action, action)
+
+
+def fontmetrics_width(metrics, text):
+    """Get the width in pixels of specified text
+
+    Calls QFontMetrics.horizontalAdvance() when available.
+    QFontMetricswidth() is deprecated. Qt 5.11 added horizontalAdvance().
+    """
+    if hasattr(metrics, 'horizontalAdvance'):
+        return metrics.horizontalAdvance(text)
+    return metrics.width(text)
+
+
+def text_width(font, text):
+    """Get the width in pixels for the QFont and text"""
+    metrics = QtGui.QFontMetrics(font)
+    return fontmetrics_width(metrics, text)
+
+
+def text_size(font, text):
+    """Return the width in pixels for the specified text
+
+    :param font_or_widget: The QFont or widget providing the font to use.
+    :param text: The text to measure.
+    """
+    metrics = QtGui.QFontMetrics(font)
+    return (fontmetrics_width(metrics, text), metrics.height())

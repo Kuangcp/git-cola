@@ -14,8 +14,8 @@ from .. import icons
 from .. import qtutils
 from .. import utils
 from . import defs
+from . import log
 from . import standard
-from . import remotemessage
 
 
 FETCH = 'FETCH'
@@ -132,8 +132,6 @@ class RemoteActionDialog(standard.Dialog):
         self.selected_remotes = []
 
         self.runtask = qtutils.RunTask(parent=self)
-        self.progress = standard.progress(title, N_('Updating'), self)
-
         self.local_label = QtWidgets.QLabel()
         self.local_label.setText(N_('Local Branch'))
 
@@ -148,7 +146,7 @@ class RemoteActionDialog(standard.Dialog):
 
         self.remote_name = QtWidgets.QLineEdit()
         qtutils.add_completer(self.remote_name, model.remotes)
-        # pylint: disable=no-member
+
         self.remote_name.editingFinished.connect(self.remote_name_edited)
         self.remote_name.textEdited.connect(lambda x: self.remote_name_edited())
 
@@ -220,10 +218,36 @@ class RemoteActionDialog(standard.Dialog):
         tooltip = N_('Configure the remote branch as the the new upstream')
         self.upstream_checkbox = qtutils.checkbox(text=text, tooltip=tooltip)
 
+        text = N_('Close on completion')
+        tooltip = N_('Close dialog when completed')
+        self.close_on_completion_checkbox = qtutils.checkbox(
+            checked=True, text=text, tooltip=tooltip
+        )
+
         self.action_button = qtutils.ok_button(title, icon=icon)
         self.close_button = qtutils.close_button()
-
-        self.buttons = utils.Group(self.action_button, self.close_button)
+        self.buttons_group = utils.Group(self.close_button, self.action_button)
+        self.inputs_group = utils.Group(
+            self.close_on_completion_checkbox,
+            self.force_checkbox,
+            self.ff_only_checkbox,
+            self.local_branch,
+            self.local_branches,
+            self.tags_checkbox,
+            self.prune_checkbox,
+            self.rebase_checkbox,
+            self.remote_name,
+            self.remotes,
+            self.remote_branch,
+            self.remote_branches,
+            self.upstream_checkbox,
+            self.prompt_checkbox,
+            self.remote_messages_checkbox,
+        )
+        self.progress = standard.progress_bar(
+            self,
+            disable=(self.buttons_group, self.inputs_group),
+        )
 
         self.local_branch_layout = qtutils.hbox(
             defs.small_margin, defs.spacing, self.local_label, self.local_branch
@@ -251,8 +275,10 @@ class RemoteActionDialog(standard.Dialog):
             self.rebase_checkbox,
             self.upstream_checkbox,
             self.prompt_checkbox,
+            self.close_on_completion_checkbox,
             self.remote_messages_checkbox,
             qtutils.STRETCH,
+            self.progress,
             self.close_button,
             self.action_button,
         )
@@ -307,7 +333,6 @@ class RemoteActionDialog(standard.Dialog):
         self.set_field_defaults()
 
         # Setup signals and slots
-        # pylint: disable=no-member
         self.remotes.itemSelectionChanged.connect(self.update_remotes)
 
         local = self.local_branches
@@ -638,13 +663,14 @@ class RemoteActionDialog(standard.Dialog):
             ):
                 return
 
-        # Disable the GUI by default
-        self.buttons.setEnabled(False)
+        self.progress.setMaximumHeight(
+            self.action_button.height() - defs.small_margin * 2
+        )
 
         # Use a thread to update in the background
         task = ActionTask(model_action, remote, kwargs)
         if remote_messages:
-            result = remotemessage.from_context(self.context)
+            result = log.show_remote_messages(self, self.context)
         else:
             result = None
         self.runtask.start(
@@ -656,7 +682,6 @@ class RemoteActionDialog(standard.Dialog):
 
     def action_completed(self, task):
         """Grab the results of the action and finish up"""
-        self.buttons.setEnabled(True)
         if not task.result or not isinstance(task.result, (list, tuple)):
             return
 
@@ -671,7 +696,9 @@ class RemoteActionDialog(standard.Dialog):
         Interaction.log(log_message)
 
         if status == 0:
-            self.accept()
+            close_on_completion = get(self.close_on_completion_checkbox)
+            if close_on_completion:
+                self.accept()
             return
 
         if self.action == PUSH:
@@ -683,12 +710,16 @@ class RemoteActionDialog(standard.Dialog):
     def export_state(self):
         """Export persistent settings"""
         state = standard.Dialog.export_state(self)
+        state['close_on_completion'] = get(self.close_on_completion_checkbox)
         state['remote_messages'] = get(self.remote_messages_checkbox)
         return state
 
     def apply_state(self, state):
         """Apply persistent settings"""
         result = standard.Dialog.apply_state(self, state)
+        # Restore the "close on completion" checkbox
+        close_on_completion = bool(state.get('close_on_completion', True))
+        self.close_on_completion_checkbox.setChecked(close_on_completion)
         # Restore the "show remote messages" checkbox
         remote_messages = bool(state.get('remote_messages', False))
         self.remote_messages_checkbox.setChecked(remote_messages)

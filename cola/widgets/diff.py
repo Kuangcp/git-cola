@@ -26,6 +26,8 @@ from .. import utils
 from .. import qtutils
 from .text import TextDecorator
 from .text import VimHintedPlainTextEdit
+from .text import PlainTextLabel
+from .text import RichTextLabel
 from .text import TextSearchWidget
 from . import defs
 from . import standard
@@ -183,7 +185,6 @@ class DiffSyntaxHighlighter(QtGui.QSyntaxHighlighter):
         return state, formats
 
 
-# pylint: disable=too-many-ancestors
 class DiffTextEdit(VimHintedPlainTextEdit):
     """A textedit for interacting with diff text"""
 
@@ -211,8 +212,6 @@ class DiffTextEdit(VimHintedPlainTextEdit):
         self.copy_diff_action.setIcon(icons.copy())
         self.copy_diff_action.setEnabled(False)
         self.menu_actions.append(self.copy_diff_action)
-
-        # pylint: disable=no-member
         self.cursorPositionChanged.connect(self._cursor_changed)
         self.selectionChanged.connect(self._selection_changed)
 
@@ -220,8 +219,7 @@ class DiffTextEdit(VimHintedPlainTextEdit):
         """Override setFont() so that we can use a custom "block" cursor"""
         super().setFont(font)
         if prefs.block_cursor(self.context):
-            metrics = QtGui.QFontMetrics(font)
-            width = metrics.width('M')
+            width = qtutils.text_width(font, 'M')
             self.setCursorWidth(width)
 
     def _cursor_changed(self):
@@ -349,8 +347,9 @@ class DiffLineNumbers(TextDecorator):
         self.parser = diffparse.DiffLines()
         self.formatter = diffparse.FormatDigits()
 
-        self.setFont(qtutils.diff_font(context))
-        self._char_width = self.fontMetrics().width('0')
+        font = qtutils.diff_font(context)
+        self.setFont(font)
+        self._char_width = qtutils.text_width(font, 'M')
 
         QPalette = QtGui.QPalette
         self._palette = palette = self.palette()
@@ -478,6 +477,12 @@ class Viewer(QtWidgets.QFrame):
         self.images = []
         self.pixmaps = []
         self.options = options = Options(self)
+        self.filename = PlainTextLabel(parent=self)
+        self.filename.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        font = self.font()
+        font.setItalic(True)
+        self.filename.setFont(font)
+        self.filename.elide()
         self.text = DiffEditor(context, options, self)
         self.image = imageview.ImageView(parent=self)
         self.image.setFocusPolicy(Qt.NoFocus)
@@ -559,10 +564,11 @@ class Viewer(QtWidgets.QFrame):
             return
         if not self.search_widget.isVisible():
             self.search_widget.show()
-        self.search_widget.setFocus(True)
+        self.search_widget.setFocus()
 
     def export_state(self, state):
         state['show_diff_line_numbers'] = self.options.show_line_numbers.isChecked()
+        state['show_diff_filenames'] = self.options.show_filenames.isChecked()
         state['image_diff_mode'] = self.options.image_mode.currentIndex()
         state['image_zoom_mode'] = self.options.zoom_mode.currentIndex()
         state['word_wrap'] = self.options.enable_word_wrapping.isChecked()
@@ -571,6 +577,9 @@ class Viewer(QtWidgets.QFrame):
     def apply_state(self, state):
         diff_numbers = bool(state.get('show_diff_line_numbers', False))
         self.set_line_numbers(diff_numbers, update=True)
+
+        show_filenames = bool(state.get('show_diff_filenames', True))
+        self.set_show_filenames(show_filenames, update=True)
 
         image_mode = utils.asint(state.get('image_diff_mode', 0))
         self.options.image_mode.set_index(image_mode)
@@ -598,9 +607,29 @@ class Viewer(QtWidgets.QFrame):
         # The "file type" is whether the file itself is an image.
         self.options.set_file_type(file_type)
 
+    def enable_filename_tracking(self):
+        """Enable displaying the currently selected filename"""
+        self.context.selection.selection_changed.connect(
+            self.update_filename, type=Qt.QueuedConnection
+        )
+
+    def update_filename(self):
+        """Update the filename display when the selection changes"""
+        filename = self.context.selection.filename()
+        self.filename.set_text(filename or '')
+
     def update_options(self):
         """Emit a signal indicating that options have changed"""
         self.text.update_options()
+        show_filenames = get(self.options.show_filenames)
+        self.set_show_filenames(show_filenames)
+
+    def set_show_filenames(self, enabled, update=False):
+        """Enable/disable displaying the selected filename"""
+        self.filename.setVisible(enabled)
+        if update:
+            with qtutils.BlockSignals(self.options.show_filenames):
+                self.options.show_filenames.setChecked(enabled)
 
     def set_line_numbers(self, enabled, update=False):
         """Enable/disable line numbers in the text widget"""
@@ -749,20 +778,17 @@ class Options(QtWidgets.QWidget):
         self.ignore_space_at_eol = self.add_option(
             N_('Ignore changes in whitespace at EOL')
         )
-
         self.ignore_space_change = self.add_option(
             N_('Ignore changes in amount of whitespace')
         )
-
         self.ignore_all_space = self.add_option(N_('Ignore all whitespace'))
-
         self.function_context = self.add_option(
             N_('Show whole surrounding functions of changes')
         )
-
         self.show_line_numbers = qtutils.add_action_bool(
             self, N_('Show line numbers'), self.set_line_numbers, True
         )
+        self.show_filenames = self.add_option(N_('Show filenames'))
         self.enable_word_wrapping = qtutils.add_action_bool(
             self, N_('Enable word wrapping'), self.set_word_wrapping, True
         )
@@ -800,6 +826,7 @@ class Options(QtWidgets.QWidget):
         menu.addSeparator()
         menu.addAction(self.function_context)
         menu.addAction(self.show_line_numbers)
+        menu.addAction(self.show_filenames)
         menu.addSeparator()
         menu.addAction(self.enable_word_wrapping)
 
@@ -865,6 +892,7 @@ class Options(QtWidgets.QWidget):
 
     def hide_advanced_options(self):
         """Hide advanced options that are not applicable to the DiffWidget"""
+        self.show_filenames.setVisible(False)
         self.show_line_numbers.setVisible(False)
         self.ignore_space_at_eol.setVisible(False)
         self.ignore_space_change.setVisible(False)
@@ -872,7 +900,6 @@ class Options(QtWidgets.QWidget):
         self.function_context.setVisible(False)
 
 
-# pylint: disable=too-many-ancestors
 class DiffEditor(DiffTextEdit):
     up = Signal()
     down = Signal()
@@ -1278,7 +1305,7 @@ def _add_patch_actions(widget, context, menu):
 
 
 def _build_patch_append_menu(widget, context, menu):
-    """Build the "Append Patch" submenu"""
+    """Build the "Append Patch" sub-menu"""
     # Build the menu when first displayed only. This initial check avoids
     # re-populating the menu with duplicate actions.
     menu_actions = menu.actions()
@@ -1391,35 +1418,23 @@ class DiffWidget(QtWidgets.QWidget):
         summary_font = QtGui.QFont(author_font)
         summary_font.setWeight(QtGui.QFont.Bold)
 
-        policy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum
-        )
-
         self.gravatar_label = gravatar.GravatarLabel(self.context, parent=self)
 
-        self.oid_label = TextLabel()
-        self.oid_label.setTextFormat(Qt.PlainText)
-        self.oid_label.setSizePolicy(policy)
+        self.oid_label = PlainTextLabel(parent=self)
         self.oid_label.setAlignment(Qt.AlignBottom)
         self.oid_label.elide()
 
-        self.author_label = TextLabel()
-        self.author_label.setTextFormat(Qt.RichText)
+        self.author_label = RichTextLabel(parent=self)
         self.author_label.setFont(author_font)
-        self.author_label.setSizePolicy(policy)
         self.author_label.setAlignment(Qt.AlignTop)
         self.author_label.elide()
 
-        self.date_label = TextLabel()
-        self.date_label.setTextFormat(Qt.PlainText)
-        self.date_label.setSizePolicy(policy)
+        self.date_label = PlainTextLabel(parent=self)
         self.date_label.setAlignment(Qt.AlignTop)
         self.date_label.elide()
 
-        self.summary_label = TextLabel()
-        self.summary_label.setTextFormat(Qt.PlainText)
+        self.summary_label = PlainTextLabel(parent=self)
         self.summary_label.setFont(summary_font)
-        self.summary_label.setSizePolicy(policy)
         self.summary_label.setAlignment(Qt.AlignTop)
         self.summary_label.elide()
 
@@ -1528,14 +1543,15 @@ class DiffWidget(QtWidgets.QWidget):
 
     def files_selected(self, filenames):
         """Update the view when a filename is selected"""
-        if not filenames:
-            return
         oid_start = self.oid_start
         oid_end = self.oid_end
+        extra_args = {}
+        if filenames:
+            extra_args['filename'] = filenames[0]
         if oid_start and oid_end:
-            self.set_diff_range(oid_start.oid, oid_end.oid, filename=filenames[0])
+            self.set_diff_range(oid_start.oid, oid_end.oid, **extra_args)
         else:
-            self.set_diff_oid(self.oid, filename=filenames[0])
+            self.set_diff_oid(self.oid, **extra_args)
 
 
 class DiffPanel(QtWidgets.QWidget):
@@ -1564,54 +1580,7 @@ class DiffPanel(QtWidgets.QWidget):
         # The diff search is only active in text mode.
         if not self.search_widget.isVisible():
             self.search_widget.show()
-        self.search_widget.setFocus(True)
-
-
-class TextLabel(QtWidgets.QLabel):
-    def __init__(self, parent=None):
-        QtWidgets.QLabel.__init__(self, parent)
-        self.setTextInteractionFlags(
-            Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse
-        )
-        self._display = ''
-        self._template = ''
-        self._text = ''
-        self._elide = False
-        self._metrics = QtGui.QFontMetrics(self.font())
-        self.setOpenExternalLinks(True)
-
-    def elide(self):
-        self._elide = True
-
-    def set_text(self, text):
-        self.set_template(text, text)
-
-    def set_template(self, text, template):
-        self._display = text
-        self._text = text
-        self._template = template
-        self.update_text(self.width())
-        self.setText(self._display)
-
-    def update_text(self, width):
-        self._display = self._text
-        if not self._elide:
-            return
-        text = self._metrics.elidedText(self._template, Qt.ElideRight, width - 2)
-        if text != self._template:
-            self._display = text
-
-    # Qt overrides
-    def setFont(self, font):
-        self._metrics = QtGui.QFontMetrics(font)
-        QtWidgets.QLabel.setFont(self, font)
-
-    def resizeEvent(self, event):
-        if self._elide:
-            self.update_text(event.size().width())
-            with qtutils.BlockSignals(self):
-                self.setText(self._display)
-        QtWidgets.QLabel.resizeEvent(self, event)
+        self.search_widget.setFocus()
 
 
 class DiffInfoTask(qtutils.Task):
@@ -1662,7 +1631,7 @@ def new_apply_patches(context, patches=None, parent=None):
 
 
 def get_patches_from_paths(paths):
-    """Returns all patches benath a given path"""
+    """Returns all patches beneath a given path"""
     paths = [core.decode(p) for p in paths]
     patches = [p for p in paths if core.isfile(p) and p.endswith(('.patch', '.mbox'))]
     dirs = [p for p in paths if core.isdir(p)]
@@ -1716,7 +1685,6 @@ class ApplyPatches(standard.Dialog):
 
         self.tree = PatchTreeWidget(parent=self)
         self.tree.setHeaderHidden(True)
-        # pylint: disable=no-member
         self.tree.itemSelectionChanged.connect(self._tree_selection_changed)
 
         self.diffwidget = DiffWidget(context, self, is_commit=True)
@@ -1781,7 +1749,7 @@ class ApplyPatches(standard.Dialog):
         qtutils.connect_button(self.apply_button, self.apply_patches)
         qtutils.connect_button(self.close_button, self.close)
 
-        self.init_state(None, self.resize, 666, 420)
+        self.init_state(None, self.resize, 720, 480)
 
     def apply_patches(self):
         items = self.tree.items()
@@ -1851,7 +1819,6 @@ class ApplyPatches(standard.Dialog):
         return result
 
 
-# pylint: disable=too-many-ancestors
 class PatchTreeWidget(standard.DraggableTreeWidget):
     def add_paths(self, paths):
         patches = get_patches_from_paths(paths)

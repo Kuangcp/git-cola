@@ -1,5 +1,4 @@
 """Editor commands"""
-# pylint: disable=too-many-lines
 import os
 import re
 import sys
@@ -79,7 +78,7 @@ class ConfirmAction(ContextCommand):
     """Confirm an action before running it"""
 
     def ok_to_run(self):
-        """Return True when the command is ok to run"""
+        """Return True when the command is okay to run"""
         return True
 
     def confirm(self):
@@ -261,6 +260,7 @@ class AmendMode(EditModel):
         super().do()
         self.model.set_commitmsg(self.new_commitmsg)
         self.model.update_file_status()
+        self.context.selection.reset(emit=True)
 
     def undo(self):
         if self.skip:
@@ -268,6 +268,7 @@ class AmendMode(EditModel):
         self.model.set_commitmsg(self.old_commitmsg)
         super().undo()
         self.model.update_file_status()
+        self.context.selection.reset(emit=True)
 
 
 class AnnexAdd(ContextCommand):
@@ -318,7 +319,7 @@ class LFSInstall(ContextCommand):
 
 
 class ApplyPatch(ContextCommand):
-    """Apply the specfied patch to the worktree or index"""
+    """Apply the specified patch to the worktree or index"""
 
     def __init__(
         self,
@@ -437,8 +438,7 @@ class Archive(ContextCommand):
 class Checkout(EditModel):
     """A command object for git-checkout.
 
-    'argv' is handed off directly to git.
-
+    The argv list is forwarded directly to git.
     """
 
     def __init__(self, context, argv, checkout_branch=False):
@@ -613,6 +613,7 @@ class ResetMode(EditModel):
     def do(self):
         super().do()
         self.model.update_file_status()
+        self.context.selection.reset(emit=True)
 
 
 class ResetCommand(ConfirmAction):
@@ -1292,7 +1293,7 @@ class DiffImage(EditModel):
         """Query the diff type to use based on cola.imagediff.<extension>"""
         _, ext = os.path.splitext(filename)
         if ext.startswith('.'):
-            # Check eg. "cola.imagediff.svg" to see if we should imagediff.
+            # Check e.g. "cola.imagediff.svg" to see if we should imagediff.
             cfg = 'cola.imagediff' + ext
             if self.cfg.get(cfg, True):
                 result = main.Types.IMAGE
@@ -1812,7 +1813,7 @@ class OpenDir(OpenDefaultApp):
         dirnames = self._dirnames
         if not dirnames:
             return
-        # An empty dirname defaults to CWD.
+        # An empty dirname defaults to to the current directory.
         dirs = [(dirname or core.getcwd()) for dirname in dirnames]
         utils.launch_default_app(dirs)
 
@@ -1956,7 +1957,7 @@ class NewBareRepo(ContextCommand):
 
 
 def unix_path(path, is_win32=utils.is_win32):
-    """Git for Windows requires unix paths, so force them here"""
+    """Git for Windows requires Unix paths, so force them here"""
     if is_win32():
         path = path.replace('\\', '/')
         first = path[0]
@@ -1984,7 +1985,6 @@ class SequenceEditorEnvironment:
         self.env = {
             'GIT_EDITOR': prefs.editor(context),
             'GIT_SEQUENCE_EDITOR': sequence_editor(),
-            'GIT_COLA_SEQ_EDITOR_CANCEL_ACTION': 'save',
         }
         self.env.update(kwargs)
 
@@ -2451,7 +2451,7 @@ class ShowUntracked(EditModel):
 
 
 class SignOff(ContextCommand):
-    """Append a signoff to the commit message"""
+    """Append a sign-off to the commit message"""
 
     UNDOABLE = True
 
@@ -2464,7 +2464,7 @@ class SignOff(ContextCommand):
         self.old_commitmsg = self.model.commitmsg
 
     def do(self):
-        """Add a signoff to the commit message"""
+        """Add a sign-off to the commit message"""
         signoff = self.signoff()
         if signoff in self.model.commitmsg:
             return
@@ -2476,7 +2476,7 @@ class SignOff(ContextCommand):
         self.model.set_commitmsg(self.old_commitmsg)
 
     def signoff(self):
-        """Generate the signoff string"""
+        """Generate the sign-off string"""
         name, email = self.cfg.get_author()
         return f'\nSigned-off-by: {name} <{email}>'
 
@@ -2653,6 +2653,10 @@ class StageUntracked(StageCarefully):
 
     def init_paths(self):
         self.paths = self.model.untracked
+
+    def stage_all(self):
+        """Disable the stage_all() behavior for untracked files"""
+        return (0, '', '')
 
 
 class StageModifiedAndUntracked(StageCarefully):
@@ -3111,7 +3115,7 @@ def do(cls, *args, **opts):
     try:
         cmd = cls(*args, **opts)
         return cmd.do()
-    except Exception as e:  # pylint: disable=broad-except
+    except Exception as e:
         msg, details = utils.format_exception(e)
         if hasattr(cls, '__name__'):
             msg = f'{cls.__name__} exception:\n{msg}'

@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2017 David Aguilar
+# Copyright (C) 2008-2024 David Aguilar
 # Copyright (C) 2015 Daniel Harding
 """Filesystem monitor for Linux and Windows
 
@@ -205,7 +205,6 @@ if AVAILABLE == 'inotify':
                         return
                     self._pipe_r, self._pipe_w = os.pipe()
 
-                # pylint: disable=no-member
                 poll_obj = select.poll()
                 poll_obj.register(self._inotify_fd, select.POLLIN)
                 poll_obj.register(self._pipe_r, select.POLLIN)
@@ -226,7 +225,6 @@ if AVAILABLE == 'inotify':
                     timeout = None
                 try:
                     events = poll_obj.poll(timeout)
-                # pylint: disable=duplicate-except
                 except OSError:
                     continue
                 else:
@@ -293,7 +291,7 @@ if AVAILABLE == 'inotify':
                     inotify.rm_watch(self._inotify_fd, wd)
                 except OSError as e:
                     if e.errno == errno.EINVAL:
-                        # This error can occur if the target of the wd was
+                        # This error can occur if the target of the watch was
                         # removed on the filesystem before we call
                         # inotify.rm_watch() so ignore it.
                         continue
@@ -303,6 +301,8 @@ if AVAILABLE == 'inotify':
                     wd = inotify.add_watch(
                         self._inotify_fd, core.encode(path), self._ADD_MASK
                     )
+                except PermissionError:
+                    continue
                 except OSError as e:
                     if e.errno in (errno.ENOENT, errno.ENOTDIR):
                         # These two errors should only occur as a result of
@@ -381,7 +381,7 @@ if AVAILABLE == 'pywin32':
                 self.overlapped = pywintypes.OVERLAPPED()
                 self.overlapped.hEvent = self.event
                 self._start()
-            except Exception:  # pylint: disable=broad-exception-caught,broad-except
+            except Exception:
                 self.close()
 
         def append(self, events):

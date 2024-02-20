@@ -177,8 +177,13 @@ COMMANDS = {
         'action': cmds.run(cmds.UndoLastCommit),
         'icon': 'style_dialog_discard',
     },
-    'Commit::StageAll': {
-        'title': 'Stage All Untracked',
+    'Commit::StageModified': {
+        'title': 'Stage Modified',
+        'action': cmds.run(cmds.StageModified),
+        'icon': 'add',
+    },
+    'Commit::StageUntracked': {
+        'title': 'Stage Untracked',
         'action': cmds.run(cmds.StageUntracked),
         'icon': 'add',
     },

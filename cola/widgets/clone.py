@@ -148,7 +148,6 @@ class Clone(standard.Dialog):
 
         qtutils.connect_button(self.close_button, self.close)
         qtutils.connect_button(self.ok_button, self.prepare_to_clone)
-        # pylint: disable=no-member
         self.url.textChanged.connect(lambda x: self.update_actions())
 
         self.init_state(context.settings, self.resize, 720, 200)
@@ -204,7 +203,7 @@ class Clone(standard.Dialog):
             msg = N_('"%s" already exists, cola will create a new directory') % destdir
             Interaction.information(N_('Directory Exists'), msg)
 
-        # Make sure the new destdir doesn't exist
+        # Make sure the directory doesn't exist
         while core.exists(destdir):
             destdir = olddestdir + str(count)
             count += 1

@@ -1,7 +1,6 @@
 import operator
 
 from qtpy import QtCore
-from qtpy import QtGui
 from qtpy import QtWidgets
 from qtpy.QtCore import Qt
 from qtpy.QtCore import Signal
@@ -68,10 +67,9 @@ class RemoteEditor(standard.Dialog):
         self.info = text.VimHintedPlainTextEdit(context, hint, parent=self)
         self.info.setToolTip(tooltip)
 
-        font = self.info.font()
-        metrics = QtGui.QFontMetrics(font)
-        width = metrics.width('_' * 42)
-        height = metrics.height() * 13
+        text_width, text_height = qtutils.text_size(self.info.font(), 'M')
+        width = text_width * 42
+        height = text_height * 13
         self.info.setMinimumWidth(width)
         self.info.setMinimumHeight(height)
         self.info_thread = RemoteInfoThread(context, self)
@@ -134,7 +132,6 @@ class RemoteEditor(standard.Dialog):
         thread = self.info_thread
         thread.result.connect(self.set_info, type=Qt.QueuedConnection)
 
-        # pylint: disable=no-member
         self.editor.remote_name.returnPressed.connect(self.save)
         self.editor.remote_url.returnPressed.connect(self.save)
         self.editor.valid.connect(self.editor_valid)
@@ -407,9 +404,10 @@ class AddRemoteDialog(QtWidgets.QDialog):
 
 
 def lineedit(context, hint):
+    """Create a HintedLineEdit with a preset minimum width"""
     widget = text.HintedLineEdit(context, hint)
-    metrics = widget.fontMetrics()
-    widget.setMinimumWidth(metrics.width('M' * 32))
+    width = qtutils.text_width(widget.font(), 'M')
+    widget.setMinimumWidth(width * 32)
     return widget
 
 
@@ -452,7 +450,6 @@ class RemoteWidget(QtWidgets.QWidget):
         self._layout = qtutils.vbox(defs.margin, defs.spacing, self._form)
         self.setLayout(self._layout)
 
-        # pylint: disable=no-member
         self.remote_name.textChanged.connect(self.validate)
         self.remote_url.textChanged.connect(self.validate)
         qtutils.connect_button(self.open_button, self.open_repo)
