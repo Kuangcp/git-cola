@@ -37,7 +37,7 @@ def read_json(path):
         return {}
 
 
-def write_json(values, path):
+def write_json(values, path, sync=True):
     """Write the specified values dict to a JSON file at the specified path"""
     try:
         parent = os.path.dirname(path)
@@ -45,6 +45,8 @@ def write_json(values, path):
             core.makedirs(parent)
         with core.open_write(path) as fp:
             json.dump(values, fp, indent=4)
+            if sync:
+                core.fsync(fp.fileno())
     except (ValueError, TypeError, OSError):
         sys.stderr.write('git-cola: error writing "%s"\n' % path)
         return False
@@ -165,7 +167,7 @@ class Settings:
     def path(self):
         return self.config_path
 
-    def save(self):
+    def save(self, sync=True):
         """Write settings robustly to avoid losing data during a forced shutdown.
 
         To save robustly we take these steps:
@@ -181,7 +183,7 @@ class Settings:
         path_tmp = path + '.tmp'
         path_bak = path + '.bak'
         # Write the new settings to the .tmp file.
-        if not write_json(self.values, path_tmp):
+        if not write_json(self.values, path_tmp, sync=sync):
             return
         # Rename the current settings to a .bak file.
         if core.exists(path) and not rename_path(path, path_bak):
@@ -189,8 +191,6 @@ class Settings:
         # Rename the new settings from .tmp to the settings file.
         if not rename_path(path_tmp, path):
             return
-        # Flush the data to disk.
-        core.sync()
         # Delete the .bak file.
         if core.exists(path_bak):
             remove_path(path_bak)
@@ -276,11 +276,11 @@ class Settings:
             entry['path'] = normalize(entry['path'])
         return values
 
-    def save_gui_state(self, gui):
+    def save_gui_state(self, gui, sync=True):
         """Saves settings for a cola view"""
         name = gui.name()
         self.gui_state[name] = mkdict(gui.export_state())
-        self.save()
+        self.save(sync=sync)
 
     def get_gui_state(self, gui):
         """Returns the saved state for a gui"""

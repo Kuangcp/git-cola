@@ -25,22 +25,24 @@
 #   garden grow pages           # Clone the Git Cola homepage
 #   garden grow fedora          # Clone the Fedora packaging
 #   garden grow deb             # Clone the Debian packaging
+#   garden grow flatpak         # Clone the Flatpak packaging
 trees:
   git-cola:
     description: The highly-caffeinated Git GUI
     path: "${GARDEN_CONFIG_DIR}"
     url: "git@gitlab.com:git-cola/git-cola.git"
     commands:
-      doc: ${GARDEN} -vv cmd docs html man -- "$@"
+      clean: rm -rf build dist git-cola-*.windows.zip
+      doc: garden ${GARDEN_CMD_VERBOSE} cmd docs html man -- "$@"
       dev: ${PYTHON} -m venv --system-site-packages ${env_dir}
       dev>:
         - dev/extras
         - dev/development
         - dev/build
-      dev/build: ${activate} ${PIP} install --editable '.[build]'
-      dev/development: ${activate} ${PIP} install --editable '.[docs,dev,testing]'
-      dev/extras: ${activate} ${PIP} install --editable '.[extras]'
-      dev/pyqt6: ${activate} ${PIP} install --editable '.[pyqt6]'
+      dev/build: ${activate} pip install --editable '.[build]'
+      dev/development: ${activate} pip install --editable '.[docs,dev,testing]'
+      dev/extras: ${activate} pip install --editable '.[extras]'
+      dev/pyqt6: ${activate} pip install --editable '.[pyqt6]'
       dev/env: ${activate} "$@"
       check>:
         - test
@@ -49,43 +51,43 @@ trees:
       check/fmt: garden fmt -- --check
       fmt: |
         ${activate}
-        ${CERCIS} --version
-        ${GIT} ls-files -- '*.py' |
-        ${GREP} -v ^qtpy |
-        ${XARGS} ${CERCIS} "$@"
-      html: ${GARDEN} -vv html docs
+        cercis --version
+        git ls-files -- '*.py' |
+        grep -v ^qtpy |
+        xargs cercis "$@"
+      html: garden ${GARDEN_CMD_VERBOSE} html docs
       install: |
         if test -n "${DESTDIR}"
         then
             pip_root="--root=${DESTDIR}"
             export DESTDIR="${DESTDIR}"
         fi
-        ${PIP} install --disable-pip-version-check $pip_root --prefix=${prefix} "$@" .
+        pip install --disable-pip-version-check $pip_root --prefix=${prefix} "$@" .
       i18n>:
         - pot
         - po
       macos/app: |
-        ${MKDIR_P} ${cola_app}/Contents/MacOS
-        ${MKDIR_P} ${cola_app_resources}
+        mkdir -p ${cola_app}/Contents/MacOS
+        mkdir -p ${cola_app_resources}
         ${PYTHON} -m venv ${cola_app_resources}
         source ${cola_app_resources}/bin/activate
-        ${PIP} install '.[docs,extras,pyqt6]'
-        ${CP} contrib/darwin/Info.plist contrib/darwin/PkgInfo ${cola_app}/Contents
+        pip install '.[docs,extras,pyqt6]'
+        cp contrib/darwin/Info.plist contrib/darwin/PkgInfo ${cola_app}/Contents
         if test -n "${cola_full_version}"
         then
-            ${SED} -i -e s/0.0.0.0/${cola_full_version}/ ${cola_app}/Contents/Info.plist
+            sed -i -e s/0.0.0.0/${cola_full_version}/ ${cola_app}/Contents/Info.plist
         fi
-        ${SED} -i -e s/0.0.0/${cola_version}/ ${cola_app}/Contents/Info.plist
-        ${CP} contrib/darwin/git-cola ${cola_app}/Contents/MacOS
-        ${CP} contrib/darwin/git-cola.icns ${cola_app}/Contents/Resources
-        ${GARDEN} -vv -D prefix=${cola_app_resources} install
-        ${GARDEN} -vv doc
-        ${GARDEN} -vv -D prefix=${cola_app_resources} install docs
-      man: ${GARDEN} -vv man docs
+        sed -i -e s/0.0.0/${cola_version}/ ${cola_app}/Contents/Info.plist
+        cp contrib/darwin/git-cola ${cola_app}/Contents/MacOS
+        cp contrib/darwin/git-cola.icns ${cola_app}/Contents/Resources
+        garden ${GARDEN_CMD_VERBOSE} -D prefix=${cola_app_resources} install
+        garden ${GARDEN_CMD_VERBOSE} doc
+        garden ${GARDEN_CMD_VERBOSE} -D prefix=${cola_app_resources} install docs
+      man: garden ${GARDEN_CMD_VERBOSE} man docs
       po: |
         for po in cola/i18n/*.po
         do
-            ${MSGMERGE} \
+            msgmerge \
                 --no-wrap \
                 --no-fuzzy-matching \
                 --sort-output \
@@ -95,7 +97,7 @@ trees:
             mv $$po.new $$po
         done
       pot: |
-        ${XGETTEXT} \
+        xgettext \
             --language=Python \
             --keyword=N_ \
             --no-wrap \
@@ -106,12 +108,12 @@ trees:
             cola/*.py \
             cola/*/*.py
       pages<: doc
-      pages: ${GARDEN} -vv -D prefix=${TREE_PATH}/pages install docs "$@"
+      pages: garden ${GARDEN_CMD_VERBOSE} -D prefix=${TREE_PATH}/pages install docs "$@"
       run: ${activate} ./bin/git-cola "$@"
       run/qt6: ${activate} QT_API=PyQt6 ./bin/git-cola "$@"
-      test: ${activate} ${PYTEST_CMD} cola test "$@"
-      tox: ${TOX} run "$@"
-      tox/check: ${TOX} run -e check "$@"
+      test: ${activate} ${PYTEST} cola test "$@"
+      tox: tox run "$@"
+      tox/check: tox run -e check "$@"
     gitconfig:
       remote.publish.pushurl:
         - "git@gitlab.com:git-cola/git-cola.git"
@@ -182,30 +184,50 @@ trees:
   docs:
     description: Sphinx documentation
     variables:
-      env_dir: ../env3
+    env_dir: ../env3
     commands:
-      clean: rm -fr _build
-      doctest: ${activate} ${SPHINX_CMD} -b doctest . _build/doctest "$@"
-      html: ${activate} ${SPHINX_CMD} -b html . _build/html "$@"
-      man: ${activate} ${SPHINX_CMD} -b man . _build/man "$@"
-      linkcheck: ${activate} ${SPHINX_CMD} -b linkcheck . _build/linkcheck "$@"
-      install: |
-        ${MKDIR_P} ${DESTDIR}${docdir}
-        ${INSTALL} -m 644 *.html ${DESTDIR}${docdir}
-        ${INSTALL} -m 644 *.rst ${DESTDIR}${docdir}
-        # HTML documentation
-        ${MKDIR_P} ${DESTDIR}${htmldir}
-        ${RSYNC_CMD} _build/html/ ${DESTDIR}${htmldir}/
-        # Manual pages
-        ${MKDIR_P} ${DESTDIR}${mandir}
-        ${INSTALL} -m 644 _build/man/git-cola.1 ${DESTDIR}${mandir}
-        ${INSTALL} -m 644 _build/man/git-dag.1 ${DESTDIR}${mandir}
+    clean: rm -fr _build
+    doctest: ${activate} ${SPHINX} -b doctest . _build/doctest "$@"
+    html: ${activate} ${SPHINX} -b html . _build/html "$@"
+    man: ${activate} ${SPHINX} -b man . _build/man "$@"
+    linkcheck: ${activate} ${SPHINX} -b linkcheck . _build/linkcheck "$@"
+    install: |
+      mkdir -p ${DESTDIR}${docdir}
+      install -m 644 *.html ${DESTDIR}${docdir}
+      install -m 644 *.rst ${DESTDIR}${docdir}
+      # HTML documentation
+      mkdir -p ${DESTDIR}${htmldir}
+      rsync -r --delete --exclude=.buildinfo _build/html/ ${DESTDIR}${htmldir}/
+      # Manual pages
+      mkdir -p ${DESTDIR}${mandir}
+      install -m 644 _build/man/git-cola.1 ${DESTDIR}${mandir}
+      install -m 644 _build/man/git-dag.1 ${DESTDIR}${mandir}
   fedora:
     description: Fedora packaging
     url: "https://src.fedoraproject.org/rpms/git-cola.git"
     remotes:
       git-cola: "git@gitlab.com:git-cola/git-cola-fedora.git"
       davvid: "git@github.com:davvid/git-cola-fedora.git"
+  flatpak:
+    description: Flatpak packaging
+    url: "git@github.com:flathub/com.github.git_cola.git-cola.git"
+    variables:
+      app-id: com.github.git_cola.git-cola
+    commands:
+      build: flatpak-builder "$@" --user "${prefix}" ${app-id}.yml
+      check: |
+        flatpak run --command=flatpak-builder-lint \
+            org.flatpak.Builder "$@" --exceptions builddir "${prefix}"
+      install: flatpak-builder "$@" --install --user "${prefix}" ${app-id}.yml
+      run: flatpak run ${app-id}
+      setup: |
+        flatpak remote-add --user --if-not-exists \
+        flathub https://flathub.org/repo/flathub.flatpakrepo
+        flatpak install --user \
+        org.flatpak.Builder/x86_64 \
+        org.kde.Sdk/x86_64/5.15-23.08 \
+        org.kde.Platform/x86_64/5.15-23.08 \
+        com.riverbankcomputing.PyQt.BaseApp/x86_64/5.15-23.08
   pages:
     description: "Git Cola's homepage"
     url: "git@gitlab.com:git-cola/git-cola.gitlab.io.git"
@@ -218,7 +240,7 @@ trees:
         - "git@gitlab.com:git-cola/git-cola.gitlab.io.git"
         - "git@github.com:git-cola/git-cola.github.io.git"
     commands:
-      build: ${JEKYLL} build --destination build "$@"
+      build: jekyll build --destination build "$@"
     links:
       - "https://git-cola.gitlab.io"
       - "https://git-cola.github.io"
@@ -236,7 +258,7 @@ commands:
 
 # Variables can be overridden externally using "garden -D name=value ...".
 variables:
-  # Traditional DESTDIR + prefix variables
+  # DESTDIR + prefix variables: https://www.gnu.org/software/make/manual/html_node/DESTDIR.html
   DESTDIR: ""
   prefix: ${GARDEN_CONFIG_DIR}/dist
   docdir: ${prefix}/share/doc/git-cola
@@ -245,7 +267,7 @@ variables:
   cola_app: ${TREE_PATH}/git-cola.app
   cola_app_resources: ${cola_app}/Contents/Resources
   cola_full_version: $ ./bin/git-cola version --brief
-  cola_version: $ ${SED} -e "s/VERSION = '\(.*\)'/\1/"  cola/_version.py
+  cola_version: $ sed -e "s/VERSION = '\(.*\)'/\1/"  cola/_version.py
   is_virtualenv: |
     $ ${PYTHON} -c '
     import os, sys
@@ -259,25 +281,7 @@ variables:
         source "${env_dir}/bin/activate"
     fi
   # External commands and options
-  CERCIS: cercis
-  CP: cp
-  GARDEN: garden
-  GIT: git
-  GREP: grep
-  INSTALL: install
-  JEKYLL: jekyll
-  MKDIR_P: mkdir -p
-  MSGMERGE: msgmerge
-  PIP: pip
-  PYTEST: ${activate} ${PYTHON} -B -m pytest
-  PYTEST_OPTIONS: $ test "$(uname -s)" != "Linux" && printf '%s' --ignore=cola/inotify.py
-  PYTEST_CMD: ${PYTEST} ${PYTEST_OPTIONS} -p no:cacheprovider
+  PYTEST: ${PYTHON} -B -m pytest ${PYTEST_OPTIONS}
+  PYTEST_OPTIONS: $ test "$(uname -s)" != Linux && printf '%s' --ignore=cola/inotify.py
   PYTHON: python3
-  RSYNC: rsync
-  RSYNC_CMD: ${RSYNC} -r --delete --exclude=.buildinfo
-  SED: sed
-  SPHINX: ${PYTHON} -m sphinx
-  SPHINX_CMD: ${SPHINX} -d _build/doctrees -a
-  TOX: tox
-  XARGS: xargs
-  XGETTEXT: xgettext
+  SPHINX: ${PYTHON} -m sphinx -d _build/doctrees -a

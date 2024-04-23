@@ -1,3 +1,59 @@
+.. _v4.6.2:
+
+v4.6.2
+======
+
+Usability, bells and whistles
+-----------------------------
+* The Fetch dialog can now fetch directly into a remote tracking branch.
+  Previously, fetching just a remote branch would fetch it into `FETCH_HEAD`,
+  which is not very intuitive. If only a remote branch is selected then it makes
+  more sense to fetch into that branch's remote tracking branch directly.
+  Use `FETCH_HEAD` in the local branch field to fetch into `FETCH_HEAD` instead.
+  (`#1387 <https://github.com/git-cola/git-cola/pull/1387>`_)
+
+* The Fetch, Push and Pull dialogs now remember the selected remotes.
+  (`#729 <https://github.com/git-cola/git-cola/issues/729>`_)
+
+* The Fetch, Push and Pull dialogs now display the git commands that will be run.
+  The Pull dialog now selects the remote branch automatically.
+  (`#729 <https://github.com/git-cola/git-cola/issues/729>`_)
+
+* The `cola.refreshonfocus` and `cola.inotify` configuration settings are now accessible
+  from the `git cola config` settings dialog.
+
+Fixes
+-----
+* The "Ignore" action in the Status context menu now supports adding to the local
+  `.git/info/exclude` when using linked repositories created using `git worktree`.
+  (`#1394 <https://github.com/git-cola/git-cola/issues/1394>`_)
+
+* The `Cmd-m` hotkey on macOS will now minimize the application. The "Amend" action
+  can now be accessed using `Alt-m`.
+  (`#1390 <https://github.com/git-cola/git-cola/issues/1390>`_)
+  (`#1391 <https://github.com/git-cola/git-cola/pull/1391>`_)
+
+* The `git-cola-sequence-editor` Rebase Editor will now be found correctly
+  in more situatios on Windows.
+  (`#1385 <https://github.com/git-cola/git-cola/issues/1385>`_)
+  (`#1388 <https://github.com/git-cola/git-cola/pull/1388>`_)
+
+* Git Cola syncs the OS-level filesystem when windows are closed, which can
+  cause performance issues. The `cola.sync` configuration variable can
+  be configured to `false` to avoid this behavior.
+  (`#1305 <https://github.com/git-cola/git-cola/issues/1305>`_)
+
+
+.. _v4.6.1:
+
+v4.6.1
+======
+
+Packaging
+---------
+* `launchable` tags were added to the flatpak app metainfo files.
+
+
 .. _v4.6.0:
 
 v4.6.0
@@ -13,6 +69,10 @@ Usability, bells and whistles
   (`#1375 <https://github.com/git-cola/git-cola/pull/1375>`_)
   (`#1380 <https://github.com/git-cola/git-cola/pull/1380>`_)
 
+* Invalid `commit.template` configuration is now reported in the `Console` tool
+  instead of presenting an error traceback dialog via a `UsageError` exception.
+  (`#1384 <https://github.com/git-cola/git-cola/issues/1384>`_)
+
 Fixes
 -----
 * The file system monitor was corrected to catch `PermissionError` exceptions.
@@ -20,6 +80,12 @@ Fixes
 
 Packaging
 ---------
+* If the `polib` module (e.g. `sudo apt install python3-polib`) is installed then it
+  will be used instead of the vendored `cola.polib` module. This makes it easier for
+  distributions to remove the vendored module from the `cola` namespace.
+  `polib` is now listed as an install requirement in `pyproject.toml`.
+  (`bz #2264526 <https://bugzilla.redhat.com/show_bug.cgi?id=2264526>`_)
+
 * The flatpak metainfo now contains the required developer name field.
   (`#1382 <https://github.com/git-cola/git-cola/pull/1382>`_)
 
