@@ -32,7 +32,7 @@ trees:
     path: "${GARDEN_CONFIG_DIR}"
     url: "git@gitlab.com:git-cola/git-cola.git"
     commands:
-      clean: rm -rf build dist git-cola-*.windows.zip
+      clean: rm -rf build dist git_cola.egg-info git-cola-*.windows.zip
       doc: garden ${GARDEN_CMD_VERBOSE} cmd docs html man -- "$@"
       dev: ${PYTHON} -m venv --system-site-packages ${env_dir}
       dev>:
@@ -43,6 +43,7 @@ trees:
       dev/development: ${activate} pip install --editable '.[docs,dev,testing]'
       dev/extras: ${activate} pip install --editable '.[extras]'
       dev/pyqt6: ${activate} pip install --editable '.[pyqt6]'
+      dev/install: ${activate} pip install --editable .
       dev/env: ${activate} "$@"
       check>:
         - test
@@ -62,7 +63,7 @@ trees:
             pip_root="--root=${DESTDIR}"
             export DESTDIR="${DESTDIR}"
         fi
-        pip install --disable-pip-version-check $pip_root --prefix=${prefix} "$@" .
+        pip install --disable-pip-version-check $pip_root --prefix="${prefix}" "$@" .
       i18n>:
         - pot
         - po
@@ -109,11 +110,15 @@ trees:
             cola/*/*.py
       pages<: doc
       pages: garden ${GARDEN_CMD_VERBOSE} -D prefix=${TREE_PATH}/pages install docs "$@"
+      publish: |
+        ${activate}
+        twine upload --sign dist/*.whl dist/*.tar.gz
       run: ${activate} ./bin/git-cola "$@"
       run/qt6: ${activate} QT_API=PyQt6 ./bin/git-cola "$@"
       test: ${activate} ${PYTEST} cola test "$@"
       tox: tox run "$@"
       tox/check: tox run -e check "$@"
+      wheel: ${activate} python3 -m build -n .
     gitconfig:
       remote.publish.pushurl:
         - "git@gitlab.com:git-cola/git-cola.git"
@@ -192,16 +197,16 @@ trees:
     man: ${activate} ${SPHINX} -b man . _build/man "$@"
     linkcheck: ${activate} ${SPHINX} -b linkcheck . _build/linkcheck "$@"
     install: |
-      mkdir -p ${DESTDIR}${docdir}
-      install -m 644 *.html ${DESTDIR}${docdir}
-      install -m 644 *.rst ${DESTDIR}${docdir}
+      mkdir -p "${DESTDIR}${docdir}"
+      install -m 644 *.html "${DESTDIR}${docdir}"
+      install -m 644 *.rst "${DESTDIR}${docdir}"
       # HTML documentation
-      mkdir -p ${DESTDIR}${htmldir}
-      rsync -r --delete --exclude=.buildinfo _build/html/ ${DESTDIR}${htmldir}/
+      mkdir -p "${DESTDIR}${htmldir}"
+      rsync -r --delete --exclude=.buildinfo _build/html/ "${DESTDIR}${htmldir}/"
       # Manual pages
-      mkdir -p ${DESTDIR}${mandir}
-      install -m 644 _build/man/git-cola.1 ${DESTDIR}${mandir}
-      install -m 644 _build/man/git-dag.1 ${DESTDIR}${mandir}
+      mkdir -p "${DESTDIR}${mandir}"
+      install -m 644 _build/man/git-cola.1 "${DESTDIR}${mandir}"
+      install -m 644 _build/man/git-dag.1 "${DESTDIR}${mandir}"
   fedora:
     description: Fedora packaging
     url: "https://src.fedoraproject.org/rpms/git-cola.git"
@@ -214,11 +219,11 @@ trees:
     variables:
       app-id: com.github.git_cola.git-cola
     commands:
-      build: flatpak-builder "$@" --user "${prefix}" ${app-id}.yml
+      build: flatpak-builder "$@" --user "${prefix}" "${app-id}.yml"
       check: |
         flatpak run --command=flatpak-builder-lint \
             org.flatpak.Builder "$@" --exceptions builddir "${prefix}"
-      install: flatpak-builder "$@" --install --user "${prefix}" ${app-id}.yml
+      install: flatpak-builder "$@" --install --user "${prefix}" "${app-id}.yml"
       run: flatpak run ${app-id}
       setup: |
         flatpak remote-add --user --if-not-exists \
@@ -266,7 +271,7 @@ variables:
   mandir: ${prefix}/share/man/man1
   cola_app: ${TREE_PATH}/git-cola.app
   cola_app_resources: ${cola_app}/Contents/Resources
-  cola_full_version: $ ./bin/git-cola version --brief
+  cola_full_version: $ ./bin/git-cola version --brief --builtin
   cola_version: $ sed -e "s/VERSION = '\(.*\)'/\1/"  cola/_version.py
   is_virtualenv: |
     $ ${PYTHON} -c '

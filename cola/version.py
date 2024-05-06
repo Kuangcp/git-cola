@@ -1,10 +1,5 @@
 """Provide git-cola's version number"""
-import os
 import sys
-
-from .git import STDOUT
-from .decorators import memoize
-from ._version import VERSION
 
 try:
     if sys.version_info < (3, 8):
@@ -14,10 +9,14 @@ try:
 except (ImportError, OSError):
     metadata = None
 
+from .git import STDOUT
+from .decorators import memoize
+from ._version import VERSION
 
-if __name__ == '__main__':
-    srcdir = os.path.dirname(os.path.dirname(__file__))
-    sys.path.insert(1, srcdir)
+try:
+    from ._scm_version import __version__ as SCM_VERSION
+except ImportError:
+    SCM_VERSION = None
 
 
 # minimum version requirements
@@ -63,12 +62,22 @@ def get(key):
 
 def version():
     """Returns the current version"""
+    if SCM_VERSION:
+        return SCM_VERSION
+
     pkg_version = VERSION
-    if metadata is not None:
-        try:
-            pkg_version = metadata.version('git-cola')
-        except (ImportError, OSError):
-            pass
+    if metadata is None:
+        return pkg_version
+
+    try:
+        metadata_version = metadata.version('git-cola')
+    except (ImportError, OSError):
+        return pkg_version
+
+    # Building from a tarball can end up reporting "0.0.0" or "0.1.dev*".
+    # Use the fallback version in these scenarios.
+    if not metadata_version.startswith('0.'):
+        return metadata_version
     return pkg_version
 
 
@@ -123,21 +132,24 @@ def git_version(context):
         result = parts[2]
     else:
         # minimum supported version
-        result = '1.6.3'
+        result = get('git')
     return result
 
 
-def cola_version():
+def cola_version(builtin=False):
     """A version string for consumption by humans"""
-    suffix = version()
+    if builtin:
+        suffix = builtin_version()
+    else:
+        suffix = version()
     return 'cola version %s' % suffix
 
 
 def print_version(builtin=False, brief=False):
-    if builtin:
+    if builtin and brief:
         msg = builtin_version()
     elif brief:
         msg = version()
     else:
-        msg = cola_version()
-    sys.stdout.write('%s\n' % msg)
+        msg = cola_version(builtin=builtin)
+    print(msg)
