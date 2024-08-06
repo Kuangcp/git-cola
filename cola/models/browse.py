@@ -1,9 +1,6 @@
-from __future__ import division, absolute_import, unicode_literals
 import time
 
-from qtpy import QtCore
 from qtpy import QtGui
-from qtpy import QtWidgets
 from qtpy.QtCore import Qt
 from qtpy.QtCore import Signal
 
@@ -16,7 +13,7 @@ from ..git import STDOUT
 from ..i18n import N_
 
 
-class Columns(object):
+class Columns:
     """Defines columns in the worktree browser"""
 
     NAME = 0
@@ -60,7 +57,6 @@ class Columns(object):
 class GitRepoModel(QtGui.QStandardItemModel):
     """Provides an interface into a git repository for browsing purposes."""
 
-    model_updated = Signal()
     restore = Signal()
 
     def __init__(self, context, parent):
@@ -68,38 +64,32 @@ class GitRepoModel(QtGui.QStandardItemModel):
         self.setColumnCount(len(Columns.ALL))
 
         self.context = context
-        self.model = model = context.model
+        self.model = context.model
         self.entries = {}
         cfg = context.cfg
         self.turbo = cfg.get('cola.turbo', False)
         self.default_author = cfg.get('user.name', N_('Author'))
-        self._parent = parent
         self._interesting_paths = set()
         self._interesting_files = set()
         self._runtask = qtutils.RunTask(parent=parent)
 
-        self.model_updated.connect(self.refresh, type=Qt.QueuedConnection)
-
-        model = context.model
-        model.add_observer(model.message_updated, self._model_updated)
+        self.model.updated.connect(self.refresh, type=Qt.QueuedConnection)
 
         self.file_icon = icons.file_text()
         self.dir_icon = icons.directory()
 
     def mimeData(self, indexes):
-        context = self.context
         paths = qtutils.paths_from_indexes(
             self, indexes, item_type=GitRepoNameItem.TYPE
         )
-        return qtutils.mimedata_from_paths(context, paths)
+        return qtutils.mimedata_from_paths(self.context, paths)
 
-    # pylint: disable=no-self-use
     def mimeTypes(self):
         return qtutils.path_mimetypes()
 
     def clear(self):
         self.entries.clear()
-        super(GitRepoModel, self).clear()
+        super().clear()
 
     def hasChildren(self, index):
         if index.isValid():
@@ -210,10 +200,6 @@ class GitRepoModel(QtGui.QStandardItemModel):
         model = self.model
         return set(model.staged + model.unstaged)
 
-    def _model_updated(self):
-        """Observes model changes and updates paths accordingly."""
-        self.model_updated.emit()
-
     def refresh(self):
         old_files = self._interesting_files
         old_paths = self._interesting_paths
@@ -245,8 +231,17 @@ class GitRepoModel(QtGui.QStandardItemModel):
         if self.turbo or path not in self.entries:
             return  # entry doesn't currently exist
         context = self.context
-        task = GitRepoInfoTask(context, self._parent, path, self.default_author)
+        task = GitRepoInfoTask(context, path, self.default_author)
+        task.connect(self.apply_data)
         self._runtask.start(task)
+
+    def apply_data(self, data):
+        entry = self.get(data[0])
+        if entry:
+            entry[1].set_status(data[1])
+            entry[2].setText(data[2])
+            entry[3].setText(data[3])
+            entry[4].setText(data[4])
 
 
 def create_column(col, path, is_dir):
@@ -263,11 +258,10 @@ def create_column(col, path, is_dir):
 class GitRepoInfoTask(qtutils.Task):
     """Handles expensive git lookups for a path."""
 
-    def __init__(self, context, parent, path, default_author):
-        qtutils.Task.__init__(self, parent)
+    def __init__(self, context, path, default_author):
+        qtutils.Task.__init__(self)
         self.context = context
         self.path = path
-        self._parent = parent
         self._default_author = default_author
         self._data = {}
 
@@ -354,25 +348,7 @@ class GitRepoInfoTask(qtutils.Task):
             self.data('author'),
             self.data('date'),
         )
-        app = QtWidgets.QApplication.instance()
-        try:
-            app.postEvent(self._parent, GitRepoInfoEvent(data))
-        except RuntimeError:
-            pass  # The app exited before this task finished
-
-
-class GitRepoInfoEvent(QtCore.QEvent):
-    """Transport mechanism for communicating from a GitRepoInfoTask."""
-
-    # Custom event type
-    TYPE = QtCore.QEvent.Type(QtCore.QEvent.registerEventType())
-
-    def __init__(self, data):
-        QtCore.QEvent.__init__(self, self.TYPE)
-        self.data = data
-
-    def type(self):
-        return self.TYPE
+        return data
 
 
 class GitRepoItem(QtGui.QStandardItem):
@@ -403,7 +379,7 @@ class GitRepoItem(QtGui.QStandardItem):
 class GitRepoNameItem(GitRepoItem):
     """Subclass GitRepoItem to provide a custom type()."""
 
-    TYPE = QtGui.QStandardItem.ItemType(QtGui.QStandardItem.UserType + 1)
+    TYPE = qtutils.standard_item_type_value(1)
 
     def __init__(self, path, is_dir):
         GitRepoItem.__init__(self, path)

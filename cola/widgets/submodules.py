@@ -1,5 +1,4 @@
 """Provides widgets related to submodules"""
-from __future__ import absolute_import
 
 from qtpy import QtWidgets
 from qtpy.QtCore import Qt
@@ -27,7 +26,7 @@ def add_submodule(context, parent):
 
 class SubmodulesWidget(QtWidgets.QFrame):
     def __init__(self, context, parent):
-        super(SubmodulesWidget, self).__init__(parent)
+        super().__init__(parent)
         self.context = context
         self.setToolTip(N_('Submodules'))
 
@@ -63,13 +62,10 @@ class SubmodulesWidget(QtWidgets.QFrame):
 
         # Connections
         qtutils.connect_button(self.add_button, self.add_submodule)
-        qtutils.connect_button(self.refresh_button, self.refresh)
+        qtutils.connect_button(self.refresh_button, self.tree.update_model.emit)
         qtutils.connect_button(
             self.open_parent_button, cmds.run(cmds.OpenParentRepo, context)
         )
-
-    def refresh(self):
-        self.context.model.update_submodules_list()
 
     def add_submodule(self):
         add_submodule(self.context, self)
@@ -79,7 +75,7 @@ class AddSubmodule(standard.Dialog):
     """Add a new submodule"""
 
     def __init__(self, parent):
-        super(AddSubmodule, self).__init__(parent=parent)
+        super().__init__(parent=parent)
 
         hint = N_('git://git.example.com/repo.git')
         tooltip = N_('Submodule URL (can be relative, ex: ../repo.git)')
@@ -127,8 +123,8 @@ class AddSubmodule(standard.Dialog):
             defs.no_margin,
             defs.button_spacing,
             qtutils.STRETCH,
-            self.add_button,
             self.close_button,
+            self.add_button,
         )
 
         self.main_layout = qtutils.vbox(
@@ -136,7 +132,7 @@ class AddSubmodule(standard.Dialog):
         )
         self.setLayout(self.main_layout)
         self.init_size(parent=qtutils.active_window())
-        # pylint: disable=no-member
+
         self.url_text.textChanged.connect(lambda x: self._update_widgets())
         qtutils.connect_button(self.add_button, self.accept)
         qtutils.connect_button(self.close_button, self.close)
@@ -156,9 +152,8 @@ class AddSubmodule(standard.Dialog):
         )
 
 
-# pylint: disable=too-many-ancestors
 class SubmodulesTreeWidget(standard.TreeWidget):
-    updated = Signal()
+    update_model = Signal()
 
     def __init__(self, context, parent=None):
         standard.TreeWidget.__init__(self, parent=parent)
@@ -172,15 +167,15 @@ class SubmodulesTreeWidget(standard.TreeWidget):
         self._active = False
         self.list_helper = BuildItem()
         # Connections
-        # pylint: disable=no-member
         self.itemDoubleClicked.connect(self.tree_double_clicked)
-        self.updated.connect(self.refresh, type=Qt.QueuedConnection)
-        model.add_observer(model.message_submodules_changed, self.updated.emit)
+        model.submodules_changed.connect(self.refresh, type=Qt.QueuedConnection)
+        self.update_model.connect(
+            model.update_submodules_list, type=Qt.QueuedConnection
+        )
 
     def refresh(self):
         if not self._active:
             return
-
         submodules = self.context.model.submodules_list
         items = [self.list_helper.get(entry) for entry in submodules]
         self.clear()
@@ -191,15 +186,15 @@ class SubmodulesTreeWidget(standard.TreeWidget):
         """Defer updating widgets until the widget is visible"""
         if not self._active:
             self._active = True
-            self.refresh()
-        return super(SubmodulesTreeWidget, self).showEvent(event)
+            self.update_model.emit()
+        return super().showEvent(event)
 
     def tree_double_clicked(self, item, _column):
         path = core.abspath(item.path)
         cmds.do(cmds.OpenRepo, self.context, path)
 
 
-class BuildItem(object):
+class BuildItem:
     def __init__(self):
         self.state_folder_map = {}
         self.state_folder_map[''] = icons.folder()
@@ -211,10 +206,9 @@ class BuildItem(object):
         """entry: same as returned from list_submodule"""
         name = entry[2]
         path = entry[2]
-        # TODO better tip
         tip = path + '\n' + entry[1]
         if entry[3]:
-            tip += '\n({0})'.format(entry[3])
+            tip += f'\n({entry[3]})'
         icon = self.state_folder_map[entry[0]]
         return SubmodulesTreeWidgetItem(name, path, tip, icon)
 

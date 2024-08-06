@@ -1,4 +1,4 @@
-from __future__ import division, absolute_import, unicode_literals
+import shlex
 
 from qtpy.QtCore import Qt
 from qtpy.QtCore import Signal
@@ -11,9 +11,9 @@ from ..models.browse import GitRepoNameItem
 from ..models.selection import State
 from ..i18n import N_
 from ..interaction import Interaction
-from ..models import browse
 from .. import cmds
 from .. import core
+from .. import difftool
 from .. import gitcmds
 from .. import hotkeys
 from .. import icons
@@ -28,6 +28,9 @@ from . import standard
 def worktree_browser(context, parent=None, update=True, show=True):
     """Create a new worktree browser"""
     view = Browser(context, parent, update=update)
+    if parent is None:
+        context.browser_windows.append(view)
+        view.closed.connect(context.browser_windows.remove)
     model = GitRepoModel(context, view.tree)
     view.set_model(model)
     if update:
@@ -50,7 +53,7 @@ def save_path(context, path, model):
 
 
 class Browser(standard.Widget):
-    updated = Signal()
+    """A repository branch file browser. Browses files provided by GitRepoModel"""
 
     # Read-only mode property
     mode = property(lambda self: self.model.mode)
@@ -61,14 +64,12 @@ class Browser(standard.Widget):
         self.mainlayout = qtutils.hbox(defs.no_margin, defs.spacing, self.tree)
         self.setLayout(self.mainlayout)
 
-        self.updated.connect(self._updated_callback, type=Qt.QueuedConnection)
-
         self.model = context.model
-        self.model.add_observer(self.model.message_updated, self.model_updated)
+        self.model.updated.connect(self._updated_callback, type=Qt.QueuedConnection)
         if parent is None:
             qtutils.add_close_action(self)
         if update:
-            self.model_updated()
+            self._updated_callback()
 
         self.init_state(context.settings, self.resize, 720, 420)
 
@@ -80,10 +81,6 @@ class Browser(standard.Widget):
         """Refresh the model triggering view updates"""
         self.tree.refresh()
 
-    def model_updated(self):
-        """Update the title with the current branch and directory name."""
-        self.updated.emit()
-
     def _updated_callback(self):
         branch = self.model.currentbranch
         curdir = core.getcwd()
@@ -92,19 +89,18 @@ class Browser(standard.Widget):
         msg += N_('Branch: %s') % branch
         self.setToolTip(msg)
 
-        scope = dict(project=self.model.project, branch=branch)
+        scope = {
+            'project': self.model.project,
+            'branch': branch,
+        }
         title = N_('%(project)s: %(branch)s - Browse') % scope
         if self.mode == self.model.mode_amend:
             title += ' %s' % N_('(Amending)')
         self.setWindowTitle(title)
 
 
-# pylint: disable=too-many-ancestors
 class RepoTreeView(standard.TreeView):
     """Provides a filesystem-like view of a git repository."""
-
-    about_to_update = Signal()
-    updated = Signal()
 
     def __init__(self, context, parent):
         standard.TreeView.__init__(self, parent)
@@ -115,8 +111,7 @@ class RepoTreeView(standard.TreeView):
         self.saved_current_path = None
         self.saved_open_folders = set()
         self.restoring_selection = False
-
-        self.info_event_type = browse.GitRepoInfoEvent.TYPE
+        self._columns_sized = False
 
         self.setDragEnabled(True)
         self.setRootIsDecorated(False)
@@ -125,11 +120,8 @@ class RepoTreeView(standard.TreeView):
 
         # Observe model updates
         model = context.model
-        model.add_observer(model.message_about_to_update, self.emit_about_to_update)
-        model.add_observer(model.message_updated, self.emit_update)
-        # pylint: disable=no-member
-        self.about_to_update.connect(self.save_selection, type=Qt.QueuedConnection)
-        self.updated.connect(self.update_actions, type=Qt.QueuedConnection)
+        model.about_to_update.connect(self.save_selection, type=Qt.QueuedConnection)
+        model.updated.connect(self.update_actions, type=Qt.QueuedConnection)
         self.expanded.connect(self.index_expanded)
 
         self.collapsed.connect(lambda idx: self.size_columns())
@@ -139,7 +131,7 @@ class RepoTreeView(standard.TreeView):
         queued = Qt.QueuedConnection
         self.index_about_to_change.connect(self.sync_selection, type=queued)
 
-        self.action_history = qtutils.add_action_with_status_tip(
+        self.action_history = qtutils.add_action_with_tooltip(
             self,
             N_('View History...'),
             N_('View history for selected paths'),
@@ -147,7 +139,7 @@ class RepoTreeView(standard.TreeView):
             hotkeys.HISTORY,
         )
 
-        self.action_stage = qtutils.add_action_with_status_tip(
+        self.action_stage = qtutils.add_action_with_tooltip(
             self,
             cmds.StageOrUnstage.name(),
             N_('Stage/unstage selected paths for commit'),
@@ -155,26 +147,26 @@ class RepoTreeView(standard.TreeView):
             hotkeys.STAGE_SELECTION,
         )
 
-        self.action_untrack = qtutils.add_action_with_status_tip(
+        self.action_untrack = qtutils.add_action_with_tooltip(
             self,
             N_('Untrack Selected'),
             N_('Stop tracking paths'),
             self.untrack_selected,
         )
 
-        self.action_rename = qtutils.add_action_with_status_tip(
+        self.action_rename = qtutils.add_action_with_tooltip(
             self, N_('Rename'), N_('Rename selected paths'), self.rename_selected
         )
 
-        self.action_difftool = qtutils.add_action_with_status_tip(
+        self.action_difftool = qtutils.add_action_with_tooltip(
             self,
-            cmds.LaunchDifftool.name(),
+            difftool.LaunchDifftool.name(),
             N_('Launch git-difftool on the current path'),
-            cmds.run(cmds.LaunchDifftool, context),
+            cmds.run(difftool.LaunchDifftool, context),
             hotkeys.DIFF,
         )
 
-        self.action_difftool_predecessor = qtutils.add_action_with_status_tip(
+        self.action_difftool_predecessor = qtutils.add_action_with_tooltip(
             self,
             N_('Diff Against Predecessor...'),
             N_('Launch git-difftool against previous versions'),
@@ -182,15 +174,16 @@ class RepoTreeView(standard.TreeView):
             hotkeys.DIFF_SECONDARY,
         )
 
-        self.action_revert_unstaged = qtutils.add_action_with_status_tip(
+        self.action_revert_unstaged = qtutils.add_action_with_tooltip(
             self,
             cmds.RevertUnstagedEdits.name(),
             N_('Revert unstaged changes to selected paths'),
             cmds.run(cmds.RevertUnstagedEdits, context),
             hotkeys.REVERT,
+            hotkeys.REVERT_ALT,
         )
 
-        self.action_revert_uncommitted = qtutils.add_action_with_status_tip(
+        self.action_revert_uncommitted = qtutils.add_action_with_tooltip(
             self,
             cmds.RevertUncommittedEdits.name(),
             N_('Revert uncommitted changes to selected paths'),
@@ -198,7 +191,7 @@ class RepoTreeView(standard.TreeView):
             hotkeys.UNDO,
         )
 
-        self.action_editor = qtutils.add_action_with_status_tip(
+        self.action_editor = qtutils.add_action_with_tooltip(
             self,
             cmds.LaunchEditor.name(),
             N_('Edit selected paths'),
@@ -206,7 +199,7 @@ class RepoTreeView(standard.TreeView):
             hotkeys.EDIT,
         )
 
-        self.action_blame = qtutils.add_action_with_status_tip(
+        self.action_blame = qtutils.add_action_with_tooltip(
             self,
             cmds.BlamePaths.name(),
             N_('Blame selected paths'),
@@ -215,21 +208,20 @@ class RepoTreeView(standard.TreeView):
 
         self.action_refresh = common.refresh_action(context, self)
 
-        if not utils.is_win32():
-            self.action_default_app = common.default_app_action(
-                context, self, self.selected_paths
-            )
-
-            self.action_parent_dir = common.parent_dir_action(
-                context, self, self.selected_paths
-            )
-
-        self.action_terminal = common.terminal_action(
+        self.action_default_app = common.default_app_action(
             context, self, self.selected_paths
         )
 
-        self.x_width = QtGui.QFontMetrics(self.font()).width('x')
-        self.size_columns()
+        self.action_parent_dir = common.parent_dir_action(
+            context, self, self.selected_paths
+        )
+
+        self.action_terminal = common.terminal_action(
+            context, self, func=self.selected_paths
+        )
+
+        self.x_width = qtutils.text_width(self.font(), 'x')
+        self.size_columns(force=True)
 
     def index_expanded(self, index):
         """Update information about a directory as it is expanded."""
@@ -260,8 +252,12 @@ class RepoTreeView(standard.TreeView):
     def refresh(self):
         self.model().refresh()
 
-    def size_columns(self):
+    def size_columns(self, force=False):
         """Set the column widths."""
+        cfg = self.context.cfg
+        should_resize = cfg.get('cola.resizebrowsercolumns', default=False)
+        if not force and not should_resize:
+            return
         self.resizeColumnToContents(0)
         self.resizeColumnToContents(1)
         self.resizeColumnToContents(2)
@@ -285,14 +281,8 @@ class RepoTreeView(standard.TreeView):
             size = x_width * 16
         else:
             # Filename and others use the actual content
-            size = super(RepoTreeView, self).sizeHintForColumn(column)
+            size = super().sizeHintForColumn(column)
         return size
-
-    def emit_update(self):
-        self.updated.emit()
-
-    def emit_about_to_update(self):
-        self.about_to_update.emit()
 
     def save_selection(self):
         selection = self.selected_paths()
@@ -343,23 +333,14 @@ class RepoTreeView(standard.TreeView):
 
         self.restoring_selection = False
 
-        self.size_columns()
+        # Resize the columns once when cola.resizebrowsercolumns is False.
+        # This provides a good initial size since we will not be resizing
+        # the columns during expand/collapse.
+        if not self._columns_sized:
+            self._columns_sized = True
+            self.size_columns(force=True)
+
         self.update_diff()
-
-    def event(self, ev):
-        """Respond to GitRepoInfoEvents"""
-        if ev.type() == self.info_event_type:
-            ev.accept()
-            self.apply_data(ev.data)
-        return super(RepoTreeView, self).event(ev)
-
-    def apply_data(self, data):
-        entry = self.model().get(data[0])
-        if entry:
-            entry[1].set_status(data[1])
-            entry[2].setText(data[2])
-            entry[3].setText(data[3])
-            entry[4].setText(data[4])
 
     def update_actions(self):
         """Enable/disable actions."""
@@ -373,9 +354,8 @@ class RepoTreeView(standard.TreeView):
 
         self.action_editor.setEnabled(selected)
         self.action_history.setEnabled(selected)
-        if not utils.is_win32():
-            self.action_default_app.setEnabled(selected)
-            self.action_parent_dir.setEnabled(selected)
+        self.action_default_app.setEnabled(selected)
+        self.action_parent_dir.setEnabled(selected)
 
         if self.action_terminal is not None:
             self.action_terminal.setEnabled(selected)
@@ -404,10 +384,9 @@ class RepoTreeView(standard.TreeView):
         menu.addAction(self.action_revert_uncommitted)
         menu.addAction(self.action_untrack)
         menu.addAction(self.action_rename)
-        if not utils.is_win32():
-            menu.addSeparator()
-            menu.addAction(self.action_default_app)
-            menu.addAction(self.action_parent_dir)
+        menu.addSeparator()
+        menu.addAction(self.action_default_app)
+        menu.addAction(self.action_parent_dir)
 
         if self.action_terminal is not None:
             menu.addAction(self.action_terminal)
@@ -527,12 +506,12 @@ class RepoTreeView(standard.TreeView):
         cmds.do(cmds.VisualizePaths, self.context, paths)
 
     def untrack_selected(self):
-        """untrack selected paths."""
+        """Untrack selected paths."""
         context = self.context
         cmds.do(cmds.Untrack, context, self.selected_tracked_paths())
 
     def rename_selected(self):
-        """untrack selected paths."""
+        """Untrack selected paths."""
         context = self.context
         cmds.do(cmds.Rename, context, self.selected_tracked_paths())
 
@@ -548,7 +527,7 @@ class RepoTreeView(standard.TreeView):
         if not commits:
             return
         commit = commits[0]
-        cmds.difftool_launch(context, left=commit, paths=paths)
+        difftool.difftool_launch(context, left=commit, paths=paths)
 
     def current_path(self):
         """Return the path for the current item."""
@@ -558,7 +537,7 @@ class RepoTreeView(standard.TreeView):
         return self.name_item_from_index(index).path
 
 
-class BrowseModel(object):
+class BrowseModel:
     """Context data used for browsing branches via git-ls-tree"""
 
     def __init__(self, ref, filename=None):
@@ -569,19 +548,30 @@ class BrowseModel(object):
 
 class SaveBlob(cmds.ContextCommand):
     def __init__(self, context, model):
-        super(SaveBlob, self).__init__(context)
+        super().__init__(context)
         self.browse_model = model
 
     def do(self):
         git = self.context.git
         model = self.browse_model
-        ref = '%s:%s' % (model.ref, model.relpath)
+        ref = f'{model.ref}:{model.relpath}'
         with core.xopen(model.filename, 'wb') as fp:
-            status, _, _ = git.show(ref, _stdout=fp)
+            status, output, err = git.show(ref, _stdout=fp)
 
-        msg = N_('Saved "%(filename)s" from "%(ref)s" to "%(destination)s"') % dict(
-            filename=model.relpath, ref=model.ref, destination=model.filename
+        out = '# git show {} >{}\n{}'.format(
+            shlex.quote(ref),
+            shlex.quote(model.filename),
+            output,
         )
+        Interaction.command(N_('Error Saving File'), 'git show', status, out, err)
+        if status != 0:
+            return
+
+        msg = N_('Saved "%(filename)s" from "%(ref)s" to "%(destination)s"') % {
+            'filename': model.relpath,
+            'ref': model.ref,
+            'destination': model.filename,
+        }
         Interaction.log_status(status, msg, '')
 
         Interaction.information(
@@ -671,16 +661,13 @@ class BrowseBranch(standard.Dialog):
         self.save.setEnabled(bool(filenames))
 
 
-# pylint: disable=too-many-ancestors
 class GitTreeWidget(standard.TreeView):
-
     selection_changed = Signal()
     path_chosen = Signal(object)
 
     def __init__(self, parent=None):
         standard.TreeView.__init__(self, parent)
         self.setHeaderHidden(True)
-        # pylint: disable=no-member
         self.doubleClicked.connect(self.double_clicked)
 
     def double_clicked(self, index):
@@ -828,7 +815,7 @@ class GitTreeModel(GitFileTreeModel):
 
 class GitTreeItem(QtGui.QStandardItem):
     """
-    Represents a cell in a treeview.
+    Represents a cell in a tree view.
 
     Many GitRepoItems could map to a single repository path,
     but this tree only has a single column.

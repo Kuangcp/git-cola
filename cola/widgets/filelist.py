@@ -1,74 +1,92 @@
-from __future__ import division, absolute_import, unicode_literals
-
 from qtpy import QtWidgets
 from qtpy.QtCore import Signal
 from qtpy.QtCore import QSize
+from qtpy.QtCore import Qt
 
 from .. import cmds
 from .. import hotkeys
 from .. import qtutils
 from ..i18n import N_
 from .standard import TreeWidget
-from .diff import COMMITS_SELECTED
-from .diff import FILES_SELECTED
-
-HISTORIES_SELECTED = 'HISTORIES_SELECTED'
-DIFFTOOL_SELECTED = 'DIFFTOOL_SELECTED'
 
 
-# pylint: disable=too-many-ancestors
 class FileWidget(TreeWidget):
-
+    files_selected = Signal(object)
+    difftool_selected = Signal(object)
+    histories_selected = Signal(object)
     grab_file = Signal(object)
+    grab_file_from_parent = Signal(object)
+    remark_toggled = Signal(object, object)
 
-    def __init__(self, context, notifier, parent):
+    def __init__(self, context, parent, remarks=False):
         TreeWidget.__init__(self, parent)
         self.context = context
-        self.notifier = notifier
 
         labels = [N_('Filename'), N_('Additions'), N_('Deletions')]
         self.setHeaderLabels(labels)
 
-        notifier.add_observer(COMMITS_SELECTED, self.commits_selected)
-
         self.show_history_action = qtutils.add_action(
             self, N_('Show History'), self.show_history, hotkeys.HISTORY
         )
-
         self.launch_difftool_action = qtutils.add_action(
             self, N_('Launch Diff Tool'), self.show_diff
         )
-
         self.launch_editor_action = qtutils.add_action(
             self, N_('Launch Editor'), self.edit_paths, hotkeys.EDIT
         )
-
         self.grab_file_action = qtutils.add_action(
             self, N_('Grab File...'), self._grab_file
         )
+        self.grab_file_from_parent_action = qtutils.add_action(
+            self, N_('Grab File from Parent Commit...'), self._grab_file_from_parent
+        )
 
-        # pylint: disable=no-member
+        if remarks:
+            self.toggle_remark_actions = tuple(
+                qtutils.add_action(
+                    self,
+                    r,
+                    lambda remark=r: self.toggle_remark(remark),
+                    hotkeys.hotkey(Qt.CTRL | getattr(Qt, 'Key_' + r)),
+                )
+                for r in map(str, range(10))
+            )
+        else:
+            self.toggle_remark_actions = tuple()
+
         self.itemSelectionChanged.connect(self.selection_changed)
 
     def selection_changed(self):
         items = self.selected_items()
-        self.notifier.notify_observers(FILES_SELECTED, [i.path for i in items])
+        self.files_selected.emit([i.path for i in items])
 
     def commits_selected(self, commits):
         if not commits:
+            self.clear()
             return
+
         git = self.context.git
-        commit = commits[0]
-        oid = commit.oid
-        status, out, _ = git.show(
-            oid, z=True, numstat=True, oneline=True, no_renames=True
-        )
-        if status == 0:
-            paths = [f for f in out.rstrip('\0').split('\0') if f]
-            if paths:
-                paths = paths[1:]
+        paths = []
+
+        if len(commits) > 1:
+            # Get a list of changed files for a commit range.
+            start = commits[0].oid + '~'
+            end = commits[-1].oid
+            status, out, _ = git.diff(start, end, z=True, numstat=True, no_renames=True)
+            if status == 0:
+                paths = [f for f in out.rstrip('\0').split('\0') if f]
         else:
-            paths = []
+            # Get the list of changed files in a single commit.
+            commit = commits[0]
+            oid = commit.oid
+            status, out, _ = git.show(
+                oid, z=True, numstat=True, oneline=True, no_renames=True
+            )
+            if status == 0:
+                paths = [f for f in out.rstrip('\0').split('\0') if f]
+                if paths:
+                    paths = paths[1:]  # Skip over the summary on the first line.
+
         self.list_files(paths)
 
     def list_files(self, files_log):
@@ -76,8 +94,8 @@ class FileWidget(TreeWidget):
         if not files_log:
             return
         files = []
-        for f in files_log:
-            item = FileTreeWidgetItem(f)
+        for filename in files_log:
+            item = FileTreeWidgetItem(filename)
             files.append(item)
         self.insertTopLevelItems(0, files)
 
@@ -96,23 +114,31 @@ class FileWidget(TreeWidget):
     def show(self):
         self.adjust_columns(QSize(), QSize())
 
-    def resizeEvent(self, e):
-        self.adjust_columns(e.size(), e.oldSize())
+    def resizeEvent(self, event):
+        self.adjust_columns(event.size(), event.oldSize())
 
     def contextMenuEvent(self, event):
         menu = qtutils.create_menu(N_('Actions'), self)
         menu.addAction(self.grab_file_action)
+        menu.addAction(self.grab_file_from_parent_action)
         menu.addAction(self.show_history_action)
         menu.addAction(self.launch_difftool_action)
         menu.addAction(self.launch_editor_action)
+        if self.toggle_remark_actions:
+            menu_toggle_remark = menu.addMenu(N_('Toggle remark of touching commits'))
+            tuple(map(menu_toggle_remark.addAction, self.toggle_remark_actions))
         menu.exec_(self.mapToGlobal(event.pos()))
 
     def show_diff(self):
-        self.notifier.notify_observers(DIFFTOOL_SELECTED, self.selected_paths())
+        self.difftool_selected.emit(self.selected_paths())
 
     def _grab_file(self):
         for path in self.selected_paths():
             self.grab_file.emit(path)
+
+    def _grab_file_from_parent(self):
+        for path in self.selected_paths():
+            self.grab_file_from_parent.emit(path)
 
     def selected_paths(self):
         return [i.path for i in self.selected_items()]
@@ -123,7 +149,12 @@ class FileWidget(TreeWidget):
     def show_history(self):
         items = self.selected_items()
         paths = [i.path for i in items]
-        self.notifier.notify_observers(HISTORIES_SELECTED, paths)
+        self.histories_selected.emit(paths)
+
+    def toggle_remark(self, remark):
+        items = self.selected_items()
+        paths = tuple(i.path for i in items)
+        self.remark_toggled.emit(remark, paths)
 
 
 class FileTreeWidgetItem(QtWidgets.QTreeWidgetItem):

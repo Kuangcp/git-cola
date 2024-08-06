@@ -1,4 +1,4 @@
-# Copyright (C) 2008-2017 David Aguilar
+# Copyright (C) 2008-2024 David Aguilar
 # Copyright (C) 2015 Daniel Harding
 """Filesystem monitor for Linux and Windows
 
@@ -6,7 +6,6 @@ Linux monitoring uses using inotify.
 Windows monitoring uses pywin32 and the ReadDirectoryChanges function.
 
 """
-from __future__ import division, absolute_import, unicode_literals
 import errno
 import os
 import os.path
@@ -26,16 +25,21 @@ from .interaction import Interaction
 
 AVAILABLE = None
 
+pywintypes = None
+win32file = None
+win32con = None
+win32event = None
 if utils.is_win32():
     try:
         import pywintypes
         import win32con
         import win32event
         import win32file
+
+        AVAILABLE = 'pywin32'
     except ImportError:
         pass
-    else:
-        AVAILABLE = 'pywin32'
+
 elif utils.is_linux():
     try:
         from . import inotify
@@ -46,7 +50,6 @@ elif utils.is_linux():
 
 
 class _Monitor(QtCore.QObject):
-
     files_changed = Signal()
     config_changed = Signal()
 
@@ -94,7 +97,6 @@ class _BaseThread(QtCore.QThread):
     def _pending(self):
         return self._force_notify or self._file_paths or self._force_config
 
-    # pylint: disable=no-self-use
     def refresh(self):
         """Do any housekeeping necessary in response to repository changes."""
         return
@@ -203,7 +205,6 @@ if AVAILABLE == 'inotify':
                         return
                     self._pipe_r, self._pipe_w = os.pipe()
 
-                # pylint: disable=no-member
                 poll_obj = select.poll()
                 poll_obj.register(self._inotify_fd, select.POLLIN)
                 poll_obj.register(self._pipe_r, select.POLLIN)
@@ -224,8 +225,7 @@ if AVAILABLE == 'inotify':
                     timeout = None
                 try:
                     events = poll_obj.poll(timeout)
-                # pylint: disable=duplicate-except
-                except (OSError, select.error):
+                except OSError:
                     continue
                 else:
                     if not self._running:
@@ -233,7 +233,7 @@ if AVAILABLE == 'inotify':
                     if not events:
                         self.notify()
                     else:
-                        for (fd, _) in events:
+                        for fd, _ in events:
                             if fd == self._inotify_fd:
                                 self._handle_events()
 
@@ -258,12 +258,10 @@ if AVAILABLE == 'inotify':
             context = self.context
             try:
                 if self._worktree is not None:
-                    tracked_dirs = set(
-                        [
-                            os.path.dirname(os.path.join(self._worktree, path))
-                            for path in gitcmds.tracked_files(context)
-                        ]
-                    )
+                    tracked_dirs = {
+                        os.path.dirname(os.path.join(self._worktree, path))
+                        for path in gitcmds.tracked_files(context)
+                    }
                     self._refresh_watches(
                         tracked_dirs,
                         self._worktree_wd_to_path_map,
@@ -293,7 +291,7 @@ if AVAILABLE == 'inotify':
                     inotify.rm_watch(self._inotify_fd, wd)
                 except OSError as e:
                     if e.errno == errno.EINVAL:
-                        # This error can occur if the target of the wd was
+                        # This error can occur if the target of the watch was
                         # removed on the filesystem before we call
                         # inotify.rm_watch() so ignore it.
                         continue
@@ -303,6 +301,8 @@ if AVAILABLE == 'inotify':
                     wd = inotify.add_watch(
                         self._inotify_fd, core.encode(path), self._ADD_MASK
                     )
+                except PermissionError:
+                    continue
                 except OSError as e:
                     if e.errno in (errno.ENOENT, errno.ENOTDIR):
                         # These two errors should only occur as a result of
@@ -314,9 +314,8 @@ if AVAILABLE == 'inotify':
                         # simply ignore them.
                         continue
                     raise e
-                else:
-                    wd_to_path_map[wd] = path
-                    path_to_wd_map[path] = wd
+                wd_to_path_map[wd] = path
+                path_to_wd_map[path] = wd
 
         def _check_event(self, wd, mask, name):
             if mask & inotify.IN_Q_OVERFLOW:
@@ -359,7 +358,7 @@ if AVAILABLE == 'inotify':
 
 if AVAILABLE == 'pywin32':
 
-    class _Win32Watch(object):
+    class _Win32Watch:
         def __init__(self, path, flags):
             self.flags = flags
 
@@ -384,14 +383,22 @@ if AVAILABLE == 'pywin32':
                 self._start()
             except Exception:
                 self.close()
-                raise
+
+        def append(self, events):
+            """Append our event to the events list when valid"""
+            if self.event is not None:
+                events.append(self.event)
 
         def _start(self):
+            if self.handle is None:
+                return
             win32file.ReadDirectoryChangesW(
                 self.handle, self.buffer, True, self.flags, self.overlapped
             )
 
         def read(self):
+            if self.handle is None or self.event is None:
+                return []
             if win32event.WaitForSingleObject(self.event, 0) == win32event.WAIT_TIMEOUT:
                 result = []
             else:
@@ -445,10 +452,10 @@ if AVAILABLE == 'pywin32':
 
                 if self._worktree is not None:
                     self._worktree_watch = _Win32Watch(self._worktree, self._FLAGS)
-                    events.append(self._worktree_watch.event)
+                    self._worktree_watch.append(events)
 
                 self._git_dir_watch = _Win32Watch(self._git_dir, self._FLAGS)
-                events.append(self._git_dir_watch.event)
+                self._git_dir_watch.append(events)
 
                 self._log_enabled_message()
 
@@ -457,10 +464,10 @@ if AVAILABLE == 'pywin32':
                         timeout = self._NOTIFICATION_DELAY
                     else:
                         timeout = win32event.INFINITE
-                    rc = win32event.WaitForMultipleObjects(events, False, timeout)
+                    status = win32event.WaitForMultipleObjects(events, False, timeout)
                     if not self._running:
                         break
-                    if rc == win32event.WAIT_TIMEOUT:
+                    if status == win32event.WAIT_TIMEOUT:
                         self.notify()
                     else:
                         self._handle_results()

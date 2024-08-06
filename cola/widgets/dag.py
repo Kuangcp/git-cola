@@ -1,4 +1,3 @@
-from __future__ import division, absolute_import, unicode_literals
 import collections
 import itertools
 import math
@@ -13,14 +12,16 @@ from qtpy import QtWidgets
 from ..compat import maxsize
 from ..i18n import N_
 from ..models import dag
+from ..models import main
+from ..models import prefs
 from ..qtutils import get
 from .. import core
 from .. import cmds
 from .. import difftool
 from .. import gitcmds
+from .. import guicmds
 from .. import hotkeys
 from .. import icons
-from .. import observable
 from .. import qtcompat
 from .. import qtutils
 from .. import utils
@@ -56,7 +57,7 @@ def git_dag(context, args=None, existing_view=None, show=True):
     return view
 
 
-class FocusRedirectProxy(object):
+class FocusRedirectProxy:
     """Redirect actions from the main widget to child widgets"""
 
     def __init__(self, *widgets):
@@ -71,14 +72,14 @@ class FocusRedirectProxy(object):
         """Forward the captured action to the focused or default widget"""
         widget = QtWidgets.QApplication.focusWidget()
         if widget in self.widgets and hasattr(widget, name):
-            fn = getattr(widget, name)
+            func = getattr(widget, name)
         else:
-            fn = getattr(self.default, name)
+            func = getattr(self.default, name)
 
-        return fn(*args, **kwargs)
+        return func(*args, **kwargs)
 
 
-class ViewerMixin(object):
+class ViewerMixin:
     """Implementations must provide selected_items()"""
 
     def __init__(self):
@@ -95,6 +96,7 @@ class ViewerMixin(object):
         return selected_items[0]
 
     def selected_oid(self):
+        """Return the currently selected commit object ID"""
         item = self.selected_item()
         if item is None:
             result = None
@@ -103,51 +105,104 @@ class ViewerMixin(object):
         return result
 
     def selected_oids(self):
+        """Return the currently selected commit object IDs"""
         return [i.commit for i in self.selected_items()]
 
-    def with_oid(self, fn):
+    def clicked_oid(self):
+        """Return the clicked or selected commit object ID"""
+        if self.clicked:
+            return self.clicked.oid
+        return self.selected_oid()
+
+    def with_oid(self, func):
+        """Run an operation with a commit object ID"""
+        oid = self.clicked_oid()
+        if oid:
+            result = func(oid)
+        else:
+            result = None
+        return result
+
+    def with_oid_short(self, func):
+        """Run an operation with a short commit object ID"""
+        oid = self.clicked_oid()
+        if oid:
+            abbrev = prefs.abbrev(self.context)
+            result = func(oid[:abbrev])
+        else:
+            result = None
+        return result
+
+    def with_selected_oid(self, func):
+        """Run an operation with a commit object ID"""
         oid = self.selected_oid()
         if oid:
-            result = fn(oid)
+            result = func(oid)
         else:
             result = None
         return result
 
     def diff_selected_this(self):
+        """Diff the selected commit against the clicked commit"""
         clicked_oid = self.clicked.oid
         selected_oid = self.selected.oid
         self.diff_commits.emit(selected_oid, clicked_oid)
 
     def diff_this_selected(self):
+        """Diff the clicked commit against the selected commit"""
         clicked_oid = self.clicked.oid
         selected_oid = self.selected.oid
         self.diff_commits.emit(clicked_oid, selected_oid)
 
     def cherry_pick(self):
+        """Cherry-pick a commit using git cherry-pick"""
         context = self.context
         self.with_oid(lambda oid: cmds.do(cmds.CherryPick, context, [oid]))
 
     def revert(self):
+        """Revert a commit using git revert"""
         context = self.context
         self.with_oid(lambda oid: cmds.do(cmds.Revert, context, oid))
 
     def copy_to_clipboard(self):
+        """Copy the current commit object ID to the clipboard"""
         self.with_oid(qtutils.set_clipboard)
 
+    def copy_to_clipboard_short(self):
+        """Copy the current commit object ID to the clipboard"""
+        self.with_oid_short(qtutils.set_clipboard)
+
+    def checkout_branch(self):
+        """Checkout the clicked/selected branch"""
+        branches = []
+        clicked = self.clicked
+        selected = self.selected_item()
+        if clicked:
+            branches.extend(clicked.branches)
+        if selected:
+            branches.extend(selected.commit.branches)
+        if not branches:
+            return
+        guicmds.checkout_branch(self.context, default=branches[0])
+
     def create_branch(self):
+        """Create a branch at the selected commit"""
         context = self.context
         create_new_branch = partial(createbranch.create_new_branch, context)
         self.with_oid(lambda oid: create_new_branch(revision=oid))
 
     def create_tag(self):
+        """Create a tag at the selected commit"""
         context = self.context
         self.with_oid(lambda oid: createtag.create_tag(context, ref=oid))
 
     def create_tarball(self):
+        """Create a tarball from the selected commit"""
         context = self.context
         self.with_oid(lambda oid: archive.show_save_dialog(context, oid, parent=self))
 
     def show_diff(self):
+        """Show the diff for the selected commit"""
         context = self.context
         self.with_oid(
             lambda oid: difftool.diff_expression(
@@ -156,47 +211,68 @@ class ViewerMixin(object):
         )
 
     def show_dir_diff(self):
+        """Show a full directory diff for the selected commit"""
         context = self.context
         self.with_oid(
-            lambda oid: cmds.difftool_launch(
+            lambda oid: difftool.difftool_launch(
                 context, left=oid, left_take_magic=True, dir_diff=True
             )
         )
 
+    def rebase_to_commit(self):
+        """Rebase the current branch to the selected commit"""
+        context = self.context
+        self.with_oid(lambda oid: cmds.do(cmds.Rebase, context, upstream=oid))
+
     def reset_mixed(self):
+        """Reset the repository using git reset --mixed"""
         context = self.context
         self.with_oid(lambda oid: cmds.do(cmds.ResetMixed, context, ref=oid))
 
     def reset_keep(self):
+        """Reset the repository using git reset --keep"""
         context = self.context
         self.with_oid(lambda oid: cmds.do(cmds.ResetKeep, context, ref=oid))
 
     def reset_merge(self):
+        """Reset the repository using git reset --merge"""
         context = self.context
         self.with_oid(lambda oid: cmds.do(cmds.ResetMerge, context, ref=oid))
 
     def reset_soft(self):
+        """Reset the repository using git reset --soft"""
         context = self.context
         self.with_oid(lambda oid: cmds.do(cmds.ResetSoft, context, ref=oid))
 
     def reset_hard(self):
+        """Reset the repository using git reset --hard"""
         context = self.context
         self.with_oid(lambda oid: cmds.do(cmds.ResetHard, context, ref=oid))
 
     def restore_worktree(self):
+        """Reset the worktree contents from the selected commit"""
         context = self.context
         self.with_oid(lambda oid: cmds.do(cmds.RestoreWorktree, context, ref=oid))
 
     def checkout_detached(self):
+        """Checkout a commit using an anonymous detached HEAD"""
         context = self.context
         self.with_oid(lambda oid: cmds.do(cmds.Checkout, context, [oid]))
 
     def save_blob_dialog(self):
+        """Save a file blob from the selected commit"""
         context = self.context
         self.with_oid(lambda oid: browse.BrowseBranch.browse(context, oid))
 
+    def save_blob_from_parent_dialog(self):
+        """Save a file blob from the parent of the selected commit"""
+        context = self.context
+        self.with_oid(lambda oid: browse.BrowseBranch.browse(context, oid + '^'))
+
     def update_menu_actions(self, event):
+        """Update menu actions to reflect the selection state"""
         selected_items = self.selected_items()
+        selected_item = self.selected_item()
         item = self.itemAt(event.pos())
         if item is None:
             self.clicked = commit = None
@@ -204,10 +280,19 @@ class ViewerMixin(object):
             self.clicked = commit = item.commit
 
         has_single_selection = len(selected_items) == 1
+        has_single_selection_or_clicked = bool(has_single_selection or commit)
         has_selection = bool(selected_items)
         can_diff = bool(
-            commit and has_single_selection and commit is not selected_items[0].commit
+            commit
+            and has_single_selection
+            and selected_items
+            and commit is not selected_items[0].commit
         )
+        has_branches = (
+            has_single_selection
+            and selected_item
+            and bool(selected_item.commit.branches)
+        ) or (self.clicked and bool(self.clicked.branches))
 
         if can_diff:
             self.selected = selected_items[0].commit
@@ -216,26 +301,39 @@ class ViewerMixin(object):
 
         self.menu_actions['diff_this_selected'].setEnabled(can_diff)
         self.menu_actions['diff_selected_this'].setEnabled(can_diff)
-        self.menu_actions['diff_commit'].setEnabled(has_single_selection)
-        self.menu_actions['diff_commit_all'].setEnabled(has_single_selection)
+        self.menu_actions['diff_commit'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['diff_commit_all'].setEnabled(has_single_selection_or_clicked)
 
-        self.menu_actions['checkout_detached'].setEnabled(has_single_selection)
-        self.menu_actions['cherry_pick'].setEnabled(has_single_selection)
-        self.menu_actions['copy'].setEnabled(has_single_selection)
-        self.menu_actions['create_branch'].setEnabled(has_single_selection)
+        self.menu_actions['checkout_branch'].setEnabled(has_branches)
+        self.menu_actions['checkout_detached'].setEnabled(
+            has_single_selection_or_clicked
+        )
+        self.menu_actions['cherry_pick'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['copy'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['copy_short'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['create_branch'].setEnabled(has_single_selection_or_clicked)
         self.menu_actions['create_patch'].setEnabled(has_selection)
-        self.menu_actions['create_tag'].setEnabled(has_single_selection)
-        self.menu_actions['create_tarball'].setEnabled(has_single_selection)
-        self.menu_actions['reset_mixed'].setEnabled(has_single_selection)
-        self.menu_actions['reset_keep'].setEnabled(has_single_selection)
-        self.menu_actions['reset_merge'].setEnabled(has_single_selection)
-        self.menu_actions['reset_soft'].setEnabled(has_single_selection)
-        self.menu_actions['reset_hard'].setEnabled(has_single_selection)
-        self.menu_actions['restore_worktree'].setEnabled(has_single_selection)
-        self.menu_actions['revert'].setEnabled(has_single_selection)
-        self.menu_actions['save_blob'].setEnabled(has_single_selection)
+        self.menu_actions['create_tag'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['create_tarball'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['rebase_to_commit'].setEnabled(
+            has_single_selection_or_clicked
+        )
+        self.menu_actions['reset_mixed'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['reset_keep'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['reset_merge'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['reset_soft'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['reset_hard'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['restore_worktree'].setEnabled(
+            has_single_selection_or_clicked
+        )
+        self.menu_actions['revert'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['save_blob'].setEnabled(has_single_selection_or_clicked)
+        self.menu_actions['save_blob_from_parent'].setEnabled(
+            has_single_selection_or_clicked
+        )
 
     def context_menu_event(self, event):
+        """Build a context menu and execute it"""
         self.update_menu_actions(event)
         menu = qtutils.create_menu(N_('Actions'), self)
         menu.addAction(self.menu_actions['diff_this_selected'])
@@ -243,8 +341,10 @@ class ViewerMixin(object):
         menu.addAction(self.menu_actions['diff_commit'])
         menu.addAction(self.menu_actions['diff_commit_all'])
         menu.addSeparator()
+        menu.addAction(self.menu_actions['checkout_branch'])
         menu.addAction(self.menu_actions['create_branch'])
         menu.addAction(self.menu_actions['create_tag'])
+        menu.addAction(self.menu_actions['rebase_to_commit'])
         menu.addSeparator()
         menu.addAction(self.menu_actions['cherry_pick'])
         menu.addAction(self.menu_actions['revert'])
@@ -262,17 +362,20 @@ class ViewerMixin(object):
         menu.addAction(self.menu_actions['checkout_detached'])
         menu.addSeparator()
         menu.addAction(self.menu_actions['save_blob'])
+        menu.addAction(self.menu_actions['save_blob_from_parent'])
+        menu.addAction(self.menu_actions['copy_short'])
         menu.addAction(self.menu_actions['copy'])
         menu.exec_(self.mapToGlobal(event.pos()))
 
 
 def set_icon(icon, action):
-    """"Set the icon for an action and return the action"""
+    """ "Set the icon for an action and return the action"""
     action.setIcon(icon)
     return action
 
 
 def viewer_actions(widget):
+    """Return common actions across the tree and graph widgets"""
     return {
         'diff_this_selected': set_icon(
             icons.compare(),
@@ -305,7 +408,7 @@ def viewer_actions(widget):
             ),
         ),
         'cherry_pick': set_icon(
-            icons.style_dialog_apply(),
+            icons.cherry_pick(),
             qtutils.add_action(widget, N_('Cherry Pick'), widget.proxy.cherry_pick),
         ),
         'revert': set_icon(
@@ -326,8 +429,20 @@ def viewer_actions(widget):
                 hotkeys.DIFF_SECONDARY,
             ),
         ),
+        'checkout_branch': set_icon(
+            icons.branch(),
+            qtutils.add_action(
+                widget, N_('Checkout Branch'), widget.proxy.checkout_branch
+            ),
+        ),
         'checkout_detached': qtutils.add_action(
             widget, N_('Checkout Detached HEAD'), widget.proxy.checkout_detached
+        ),
+        'rebase_to_commit': set_icon(
+            icons.play(),
+            qtutils.add_action(
+                widget, N_('Rebase to this commit'), widget.proxy.rebase_to_commit
+            ),
         ),
         'reset_soft': set_icon(
             icons.style_dialog_reset(),
@@ -377,19 +492,105 @@ def viewer_actions(widget):
                 widget, N_('Grab File...'), widget.proxy.save_blob_dialog
             ),
         ),
+        'save_blob_from_parent': set_icon(
+            icons.save(),
+            qtutils.add_action(
+                widget,
+                N_('Grab File from Parent Commit...'),
+                widget.proxy.save_blob_from_parent_dialog,
+            ),
+        ),
         'copy': set_icon(
             icons.copy(),
             qtutils.add_action(
                 widget,
-                N_('Copy SHA-1'),
+                N_('Copy Commit'),
                 widget.proxy.copy_to_clipboard,
-                hotkeys.COPY_SHA1,
+                hotkeys.COPY_COMMIT_ID,
+            ),
+        ),
+        'copy_short': set_icon(
+            icons.copy(),
+            qtutils.add_action(
+                widget,
+                N_('Copy Commit (Short)'),
+                widget.proxy.copy_to_clipboard_short,
+                hotkeys.COPY,
             ),
         ),
     }
 
 
+class GitDagLineEdit(completion.GitLogLineEdit):
+    """The text input field for specifying "git log" options"""
+
+    def __init__(self, context):
+        super().__init__(context)
+        self._action_filter_to_current_author = qtutils.add_action(
+            self, N_('Commits authored by me'), self._filter_to_current_author
+        )
+        self._action_pickaxe_search = qtutils.add_action(
+            self, N_('Pickaxe search for changes containing text'), self._pickaxe_search
+        )
+        self._action_grep_search = qtutils.add_action(
+            self,
+            N_('Search commit messages'),
+            self._grep_search,
+        )
+        self._action_no_merges = qtutils.add_action(
+            self, N_('Ignore merge commits'), self._no_merges
+        )
+
+    def contextMenuEvent(self, event):
+        """Adds custom actions to the default context menu"""
+        event_pos = event.pos()
+        menu = self.createStandardContextMenu()
+        menu.addSeparator()
+        actions = menu.actions()
+        first_action = actions[0]
+        menu.insertAction(first_action, self._action_pickaxe_search)
+        menu.insertAction(first_action, self._action_filter_to_current_author)
+        menu.insertAction(first_action, self._action_grep_search)
+        menu.insertAction(first_action, self._action_no_merges)
+        menu.insertSeparator(first_action)
+        menu.exec_(self.mapToGlobal(event_pos))
+
+    def insert(self, text):
+        """Insert text at the beginning of the current text"""
+        value = self.value()
+        if value:
+            text = f'{text} {value}'
+        self.setText(text)
+        self.close_popup()
+
+    def _filter_to_current_author(self):
+        """Filter to commits by the current author/user"""
+        _, email = self.context.cfg.get_author()
+        author_filter = '--author=' + email
+        self.insert(author_filter)
+
+    def _pickaxe_search(self):
+        """Pickaxe search for changes containing text"""
+        self.insert('-G"search"')
+        start = len('-G"')
+        length = len('search')
+        self.setSelection(start, length)
+
+    def _grep_search(self):
+        """Pickaxe search for changes containing text"""
+        self.insert('--grep="search"')
+        start = len('--grep="')
+        length = len('search')
+        self.setSelection(start, length)
+
+    def _no_merges(self):
+        """Ignore merge commits"""
+        self.insert('--no-merges')
+
+
 class CommitTreeWidgetItem(QtWidgets.QTreeWidgetItem):
+    """Custom TreeWidgetItem used in to build the commit tree widget"""
+
     def __init__(self, commit, parent=None):
         QtWidgets.QTreeWidgetItem.__init__(self, parent)
         self.commit = commit
@@ -398,13 +599,14 @@ class CommitTreeWidgetItem(QtWidgets.QTreeWidgetItem):
         self.setText(2, commit.authdate)
 
 
-# pylint: disable=too-many-ancestors
 class CommitTreeWidget(standard.TreeWidget, ViewerMixin):
+    """Display commits using a flat treewidget in "list" mode"""
 
+    commits_selected = Signal(object)
     diff_commits = Signal(object, object)
     zoom_to_fit = Signal()
 
-    def __init__(self, context, notifier, parent):
+    def __init__(self, context, parent):
         standard.TreeWidget.__init__(self, parent)
         ViewerMixin.__init__(self)
 
@@ -414,11 +616,9 @@ class CommitTreeWidget(standard.TreeWidget, ViewerMixin):
         self.context = context
         self.oidmap = {}
         self.menu_actions = None
-        self.notifier = notifier
         self.selecting = False
         self.commits = []
         self._adjust_columns = False
-
         self.action_up = qtutils.add_action(
             self, N_('Go Up'), self.go_up, hotkeys.MOVE_UP
         )
@@ -431,14 +631,12 @@ class CommitTreeWidget(standard.TreeWidget, ViewerMixin):
             self, N_('Zoom to Fit'), self.zoom_to_fit.emit, hotkeys.FIT
         )
 
-        notifier.add_observer(diff.COMMITS_SELECTED, self.commits_selected)
-        # pylint: disable=no-member
         self.itemSelectionChanged.connect(self.selection_changed)
 
     def export_state(self):
         """Export the widget's state"""
         # The base class method is intentionally overridden because we only
-        # care about the details below for this subwidget.
+        # care about the details below for this sub-widget.
         state = {}
         state['column_widths'] = self.column_widths()
         return state
@@ -476,12 +674,15 @@ class CommitTreeWidget(standard.TreeWidget, ViewerMixin):
 
     # ViewerMixin
     def go_up(self):
+        """Select the item above the current item"""
         self.goto(self.itemAbove)
 
     def go_down(self):
+        """Select the item below the current item"""
         self.goto(self.itemBelow)
 
     def goto(self, finder):
+        """Move the selection using a finder strategy"""
         items = self.selected_items()
         item = items[0] if items else None
         if item is None:
@@ -491,32 +692,40 @@ class CommitTreeWidget(standard.TreeWidget, ViewerMixin):
             self.select([found.commit.oid])
 
     def selected_commit_range(self):
+        """Return a range of selected commits"""
         selected_items = self.selected_items()
         if not selected_items:
             return None, None
         return selected_items[-1].commit.oid, selected_items[0].commit.oid
 
     def set_selecting(self, selecting):
+        """Record the  "are we selecting?" status"""
         self.selecting = selecting
 
     def selection_changed(self):
+        """Respond to itemSelectionChanged notifications"""
         items = self.selected_items()
         if not items:
+            self.set_selecting(True)
+            self.commits_selected.emit([])
+            self.set_selecting(False)
             return
         self.set_selecting(True)
-        self.notifier.notify_observers(diff.COMMITS_SELECTED, [i.commit for i in items])
+        self.commits_selected.emit(sort_by_generation([i.commit for i in items]))
         self.set_selecting(False)
 
-    def commits_selected(self, commits):
+    def select_commits(self, commits):
+        """Select commits that were selected by the sibling tree/graph widget"""
         if self.selecting:
             return
         with qtutils.BlockSignals(self):
             self.select([commit.oid for commit in commits])
 
     def select(self, oids):
+        """Mark items as selected"""
+        self.clearSelection()
         if not oids:
             return
-        self.clearSelection()
         for oid in oids:
             try:
                 item = self.oidmap[oid]
@@ -526,11 +735,13 @@ class CommitTreeWidget(standard.TreeWidget, ViewerMixin):
             item.setSelected(True)
 
     def clear(self):
+        """Clear the tree"""
         QtWidgets.QTreeWidget.clear(self)
         self.oidmap.clear()
         self.commits = []
 
     def add_commits(self, commits):
+        """Add commits to the tree"""
         self.commits.extend(commits)
         items = []
         for c in reversed(commits):
@@ -542,6 +753,7 @@ class CommitTreeWidget(standard.TreeWidget, ViewerMixin):
         self.insertTopLevelItems(0, items)
 
     def create_patch(self):
+        """Export a patch from the selected items"""
         items = self.selectedItems()
         if not items:
             return
@@ -552,9 +764,16 @@ class CommitTreeWidget(standard.TreeWidget, ViewerMixin):
 
     # Qt overrides
     def contextMenuEvent(self, event):
+        """Create a custom context menu and execute it"""
         self.context_menu_event(event)
 
     def mousePressEvent(self, event):
+        """Intercept the right-click event to retain selection state"""
+        item = self.itemAt(event.pos())
+        if item is None:
+            self.clicked = None
+        else:
+            self.clicked = item.commit
         if event.button() == Qt.RightButton:
             event.accept()
             return
@@ -564,10 +783,10 @@ class CommitTreeWidget(standard.TreeWidget, ViewerMixin):
 class GitDAG(standard.MainWindow):
     """The git-dag widget."""
 
-    updated = Signal()
+    commits_selected = Signal(object)
 
     def __init__(self, context, params, parent=None):
-        super(GitDAG, self).__init__(parent)
+        super().__init__(parent)
 
         self.setMinimumSize(420, 420)
 
@@ -586,7 +805,7 @@ class GitDAG(standard.MainWindow):
         self.force_refresh = False
 
         self.thread = None
-        self.revtext = completion.GitLogLineEdit(context)
+        self.revtext = GitDagLineEdit(context)
         self.maxresults = standard.SpinBox()
 
         self.zoom_out = qtutils.create_action_button(
@@ -601,17 +820,23 @@ class GitDAG(standard.MainWindow):
             tooltip=N_('Zoom to Fit'), icon=icons.zoom_fit_best()
         )
 
-        self.notifier = notifier = observable.Observable()
-        self.notifier.refs_updated = refs_updated = 'refs_updated'
-        self.notifier.add_observer(refs_updated, self.display)
-        self.notifier.add_observer(filelist.HISTORIES_SELECTED, self.histories_selected)
-        self.notifier.add_observer(filelist.DIFFTOOL_SELECTED, self.difftool_selected)
-        self.notifier.add_observer(diff.COMMITS_SELECTED, self.commits_selected)
+        self.treewidget = CommitTreeWidget(context, self)
+        self.diffwidget = diff.DiffWidget(context, self, is_commit=True)
+        self.filewidget = filelist.FileWidget(context, self)
+        self.graphview = GraphView(context, self)
 
-        self.treewidget = CommitTreeWidget(context, notifier, self)
-        self.diffwidget = diff.DiffWidget(context, notifier, self, is_commit=True)
-        self.filewidget = filelist.FileWidget(context, notifier, self)
-        self.graphview = GraphView(context, notifier, self)
+        self.treewidget.commits_selected.connect(self.commits_selected)
+        self.graphview.commits_selected.connect(self.commits_selected)
+
+        self.commits_selected.connect(self.select_commits)
+        self.commits_selected.connect(self.diffwidget.commits_selected)
+        self.commits_selected.connect(self.filewidget.commits_selected)
+        self.commits_selected.connect(self.graphview.select_commits)
+        self.commits_selected.connect(self.treewidget.select_commits)
+
+        self.filewidget.files_selected.connect(self.diffwidget.files_selected)
+        self.filewidget.difftool_selected.connect(self.difftool_selected)
+        self.filewidget.histories_selected.connect(self.histories_selected)
 
         self.proxy = FocusRedirectProxy(
             self.treewidget, self.graphview, self.filewidget
@@ -628,16 +853,25 @@ class GitDAG(standard.MainWindow):
         self.controls_widget = QtWidgets.QWidget()
         self.controls_widget.setLayout(self.controls_layout)
 
-        self.log_dock = qtutils.create_dock(N_('Log'), self, stretch=False)
+        self.log_dock = qtutils.create_dock('Log', N_('Log'), self, stretch=False)
         self.log_dock.setWidget(self.treewidget)
         log_dock_titlebar = self.log_dock.titleBarWidget()
         log_dock_titlebar.add_corner_widget(self.controls_widget)
 
-        self.file_dock = qtutils.create_dock(N_('Files'), self)
+        self.file_dock = qtutils.create_dock('Files', N_('Files'), self)
         self.file_dock.setWidget(self.filewidget)
 
-        self.diff_dock = qtutils.create_dock(N_('Diff'), self)
-        self.diff_dock.setWidget(self.diffwidget)
+        self.diff_panel = diff.DiffPanel(self.diffwidget, self.diffwidget.diff, self)
+        self.diff_options = diff.Options(self.diffwidget)
+        self.diffwidget.set_options(self.diff_options)
+        self.diff_options.hide_advanced_options()
+        self.diff_options.set_diff_type(main.Types.TEXT)
+
+        self.diff_dock = qtutils.create_dock('Diff', N_('Diff'), self)
+        self.diff_dock.setWidget(self.diff_panel)
+
+        diff_titlebar = self.diff_dock.titleBarWidget()
+        diff_titlebar.add_corner_widget(self.diff_options)
 
         self.graph_controls_layout = qtutils.hbox(
             defs.no_margin,
@@ -651,7 +885,7 @@ class GitDAG(standard.MainWindow):
         self.graph_controls_widget = QtWidgets.QWidget()
         self.graph_controls_widget.setLayout(self.graph_controls_layout)
 
-        self.graphview_dock = qtutils.create_dock(N_('Graph'), self)
+        self.graphview_dock = qtutils.create_dock('Graph', N_('Graph'), self)
         self.graphview_dock.setWidget(self.graphview)
         graph_titlebar = self.graphview_dock.titleBarWidget()
         graph_titlebar.add_corner_widget(self.graph_controls_widget)
@@ -696,21 +930,19 @@ class GitDAG(standard.MainWindow):
         self.treewidget.diff_commits.connect(self.diff_commits)
         self.graphview.diff_commits.connect(self.diff_commits)
         self.filewidget.grab_file.connect(self.grab_file)
-
-        # pylint: disable=no-member
+        self.filewidget.grab_file_from_parent.connect(self.grab_file_from_parent)
         self.maxresults.editingFinished.connect(self.display)
-
         self.revtext.textChanged.connect(self.text_changed)
         self.revtext.activated.connect(self.display)
         self.revtext.enter.connect(self.display)
         self.revtext.down.connect(self.focus_tree)
-
         # The model is updated in another thread so use
         # signals/slots to bring control back to the main GUI thread
-        self.model.add_observer(self.model.message_updated, self.updated.emit)
-        self.updated.connect(self.model_updated, type=Qt.QueuedConnection)
+        self.model.updated.connect(self.model_updated, type=Qt.QueuedConnection)
 
-        qtutils.add_action(self, 'Focus', self.focus_input, hotkeys.FOCUS)
+        qtutils.add_action(self, 'FocusInput', self.focus_input, hotkeys.FOCUS_INPUT)
+        qtutils.add_action(self, 'FocusTree', self.focus_tree, hotkeys.FOCUS_TREE)
+        qtutils.add_action(self, 'FocusDiff', self.focus_diff, hotkeys.FOCUS_DIFF)
         qtutils.add_close_action(self)
 
         self.set_params(params)
@@ -736,10 +968,16 @@ class GitDAG(standard.MainWindow):
         thread.end.connect(self.thread_end, type=Qt.QueuedConnection)
 
     def focus_input(self):
+        """Focus the revision input field"""
         self.revtext.setFocus()
 
     def focus_tree(self):
+        """Focus the revision tree list widget"""
         self.treewidget.setFocus()
+
+    def focus_diff(self):
+        """Focus the diff widget"""
+        self.diffwidget.setFocus()
 
     def text_changed(self, txt):
         self.params.ref = txt
@@ -750,7 +988,10 @@ class GitDAG(standard.MainWindow):
         if self.params.ref:
             self.setWindowTitle(
                 N_('%(project)s: %(ref)s - DAG')
-                % dict(project=project, ref=self.params.ref)
+                % {
+                    'project': project,
+                    'ref': self.params.ref,
+                }
             )
         else:
             self.setWindowTitle(project + N_(' - DAG'))
@@ -759,6 +1000,7 @@ class GitDAG(standard.MainWindow):
         state = standard.MainWindow.export_state(self)
         state['count'] = self.params.count
         state['log'] = self.treewidget.export_state()
+        state['word_wrap'] = self.diffwidget.options.enable_word_wrapping.isChecked()
         return state
 
     def apply_state(self, state):
@@ -772,6 +1014,7 @@ class GitDAG(standard.MainWindow):
             result = False
         self.params.set_count(count)
         self.lock_layout_action.setChecked(state.get('lock_layout', False))
+        self.diffwidget.set_word_wrapping(state.get('word_wrap', False), update=True)
 
         try:
             log_state = state['log']
@@ -791,7 +1034,6 @@ class GitDAG(standard.MainWindow):
         # self.force_refresh triggers an Unconditional redraw
         self.force_refresh = True
         cmds.do(cmds.Refresh, self.context)
-        self.force_refresh = False
 
     def display(self):
         """Update the view when the Git refs change"""
@@ -829,10 +1071,10 @@ class GitDAG(standard.MainWindow):
         self.old_oids = oids
         self.old_count = count
         self.old_refs = refs
+        self.force_refresh = False
 
-    def commits_selected(self, commits):
-        if commits:
-            self.selection = commits
+    def select_commits(self, commits):
+        self.selection = commits
 
     def clear(self):
         self.commits.clear()
@@ -871,19 +1113,19 @@ class GitDAG(standard.MainWindow):
         new_commits = [c for c in new_commits if c is not None]
         if new_commits:
             # The old selection exists in the new state
-            self.notifier.notify_observers(diff.COMMITS_SELECTED, new_commits)
+            self.commits_selected.emit(sort_by_generation(new_commits))
         else:
             # The old selection is now empty.  Select the top-most commit
-            self.notifier.notify_observers(diff.COMMITS_SELECTED, [commit_obj])
+            self.commits_selected.emit([commit_obj])
 
         self.graphview.set_initial_view()
 
-    def diff_commits(self, a, b):
+    def diff_commits(self, left, right):
         paths = self.params.paths()
         if paths:
-            cmds.difftool_launch(self.context, left=a, right=b, paths=paths)
+            difftool.difftool_launch(self.context, left=left, right=right, paths=paths)
         else:
-            difftool.diff_commits(self.context, self, a, b)
+            difftool.diff_commits(self.context, self, left, right)
 
     # Qt overrides
     def closeEvent(self, event):
@@ -894,21 +1136,27 @@ class GitDAG(standard.MainWindow):
     def histories_selected(self, histories):
         argv = [self.model.currentbranch, '--']
         argv.extend(histories)
-        text = core.list2cmdline(argv)
-        self.revtext.setText(text)
+        rev_text = core.list2cmdline(argv)
+        self.revtext.setText(rev_text)
         self.display()
 
     def difftool_selected(self, files):
         bottom, top = self.treewidget.selected_commit_range()
         if not top:
             return
-        cmds.difftool_launch(
+        difftool.difftool_launch(
             self.context, left=bottom, left_take_parent=True, right=top, paths=files
         )
 
     def grab_file(self, filename):
-        """Save the selected file from the filelist widget"""
+        """Save the selected file from the file list widget"""
         oid = self.treewidget.selected_oid()
+        model = browse.BrowseModel(oid, filename=filename)
+        browse.save_path(self.context, filename, model)
+
+    def grab_file_from_parent(self, filename):
+        """Save the selected file from parent commit in the file list widget"""
+        oid = self.treewidget.selected_oid() + '^'
         model = browse.BrowseModel(oid, filename=filename)
         browse.save_path(self.context, filename, model)
 
@@ -934,7 +1182,7 @@ class ReaderThread(QtCore.QThread):
         repo.reset()
         self.begin.emit()
         commits = []
-        for c in repo.get():
+        for commit in repo.get():
             self._mutex.lock()
             if self._stop:
                 self._condition.wait(self._mutex)
@@ -942,7 +1190,7 @@ class ReaderThread(QtCore.QThread):
             if self._abort:
                 repo.reset()
                 return
-            commits.append(c)
+            commits.append(commit)
             if len(commits) >= 512:
                 self.add.emit(commits)
                 commits = []
@@ -973,8 +1221,7 @@ class ReaderThread(QtCore.QThread):
         self.wait()
 
 
-class Cache(object):
-
+class Cache:
     _label_font = None
 
     @classmethod
@@ -987,10 +1234,9 @@ class Cache(object):
 
 
 class Edge(QtWidgets.QGraphicsItem):
-    item_type = QtWidgets.QGraphicsItem.UserType + 1
+    item_type = qtutils.standard_item_type_value(1)
 
     def __init__(self, source, dest):
-
         QtWidgets.QGraphicsItem.__init__(self)
 
         self.setAcceptedMouseButtons(Qt.NoButton)
@@ -1014,7 +1260,7 @@ class Edge(QtWidgets.QGraphicsItem):
             color = EdgeColor.current()
             line = Qt.SolidLine
 
-        self.pen = QtGui.QPen(color, 4.0, line, Qt.SquareCap, Qt.RoundJoin)
+        self.pen = QtGui.QPen(color, 2.0, line, Qt.SquareCap, Qt.RoundJoin)
 
     def recompute_bound(self):
         dest_pt = Commit.item_bbox.center()
@@ -1058,12 +1304,12 @@ class Edge(QtWidgets.QGraphicsItem):
             path.moveTo(self.source.x(), self.source.y())
             path.lineTo(self.dest.x(), self.dest.y())
         else:
-            # Define points starting from source
+            # Define points starting from the source.
             point1 = QPointF(self.source.x(), self.source.y())
             point2 = QPointF(point1.x(), point1.y() - connector_length)
             point3 = QPointF(point2.x() + arc_rect, point2.y() - arc_rect)
 
-            # Define points starting from dest
+            # Define points starting from the destination.
             point4 = QPointF(self.dest.x(), self.dest.y())
             point5 = QPointF(point4.x(), point3.y() - arc_rect)
             point6 = QPointF(point5.x() - arc_rect, point5.y() + arc_rect)
@@ -1073,8 +1319,8 @@ class Edge(QtWidgets.QGraphicsItem):
             start_angle_arc2 = 90
             span_angle_arc2 = -90
 
-            # If the dest is at the left of the source, then we
-            # need to reverse some values
+            # If the destination is at the left of the source, then we need to
+            # reverse some values.
             if self.source.x() > self.dest.x():
                 point3 = QPointF(point2.x() - arc_rect, point3.y())
                 point6 = QPointF(point5.x() + arc_rect, point6.y())
@@ -1098,28 +1344,40 @@ class Edge(QtWidgets.QGraphicsItem):
         painter.drawPath(self.path)
 
 
-class EdgeColor(object):
+class EdgeColor:
     """An edge color factory"""
 
     current_color_index = 0
     colors = [
         QtGui.QColor(Qt.red),
-        QtGui.QColor(Qt.green),
-        QtGui.QColor(Qt.blue),
-        QtGui.QColor(Qt.black),
-        QtGui.QColor(Qt.darkRed),
-        QtGui.QColor(Qt.darkGreen),
-        QtGui.QColor(Qt.darkBlue),
         QtGui.QColor(Qt.cyan),
         QtGui.QColor(Qt.magenta),
+        QtGui.QColor(Qt.green),
         # Orange; Qt.yellow is too low-contrast
         qtutils.rgba(0xFF, 0x66, 0x00),
-        QtGui.QColor(Qt.gray),
-        QtGui.QColor(Qt.darkCyan),
-        QtGui.QColor(Qt.darkMagenta),
-        QtGui.QColor(Qt.darkYellow),
-        QtGui.QColor(Qt.darkGray),
     ]
+
+    @classmethod
+    def update_colors(cls, theme):
+        """Update the colors based on the color theme"""
+        if theme.is_dark or theme.is_palette_dark:
+            cls.colors.extend([
+                QtGui.QColor(Qt.red).lighter(),
+                QtGui.QColor(Qt.cyan).lighter(),
+                QtGui.QColor(Qt.magenta).lighter(),
+                QtGui.QColor(Qt.green).lighter(),
+                QtGui.QColor(Qt.yellow).lighter(),
+            ])
+        else:
+            cls.colors.extend([
+                QtGui.QColor(Qt.blue),
+                QtGui.QColor(Qt.darkRed),
+                QtGui.QColor(Qt.darkCyan),
+                QtGui.QColor(Qt.darkMagenta),
+                QtGui.QColor(Qt.darkGreen),
+                QtGui.QColor(Qt.darkYellow),
+                QtGui.QColor(Qt.darkBlue),
+            ])
 
     @classmethod
     def cycle(cls):
@@ -1139,7 +1397,7 @@ class EdgeColor(object):
 
 
 class Commit(QtWidgets.QGraphicsItem):
-    item_type = QtWidgets.QGraphicsItem.UserType + 2
+    item_type = qtutils.standard_item_type_value(2)
     commit_radius = 12.0
     merge_radius = 18.0
 
@@ -1172,18 +1430,15 @@ class Commit(QtWidgets.QGraphicsItem):
     def __init__(
         self,
         commit,
-        notifier,
         selectable=QtWidgets.QGraphicsItem.ItemIsSelectable,
         cursor=Qt.PointingHandCursor,
         xpos=commit_radius / 2.0 + 1.0,
         cached_commit_color=commit_color,
         cached_merge_color=merge_color,
     ):
-
         QtWidgets.QGraphicsItem.__init__(self)
 
         self.commit = commit
-        self.notifier = notifier
         self.selected = False
 
         self.setZValue(0)
@@ -1205,21 +1460,10 @@ class Commit(QtWidgets.QGraphicsItem):
 
         self.pressed = False
         self.dragged = False
-
         self.edges = {}
-
-    def blockSignals(self, blocked):
-        self.notifier.notification_enabled = not blocked
 
     def itemChange(self, change, value):
         if change == QtWidgets.QGraphicsItem.ItemSelectedHasChanged:
-            # Broadcast selection to other widgets
-            selected_items = self.scene().selectedItems()
-            commits = [item.commit for item in selected_items]
-            self.scene().parent().set_selecting(True)
-            self.notifier.notify_observers(diff.COMMITS_SELECTED, commits)
-            self.scene().parent().set_selecting(False)
-
             # Cache the pen for use in paint()
             if value:
                 self.brush = self.commit_selected_color
@@ -1231,7 +1475,7 @@ class Commit(QtWidgets.QGraphicsItem):
                     self.brush = self.commit_color
                 color = self.outline_color
             commit_pen = QtGui.QPen()
-            commit_pen.setWidth(1.0)
+            commit_pen.setWidth(1)
             commit_pen.setColor(color)
             self.commit_pen = commit_pen
 
@@ -1247,8 +1491,7 @@ class Commit(QtWidgets.QGraphicsItem):
         return self.item_shape
 
     def paint(self, painter, option, _widget):
-
-        # Do not draw outside the exposed rect
+        # Do not draw outside the exposed rectangle.
         painter.setClipRect(option.exposedRect)
 
         # Draw ellipse
@@ -1275,29 +1518,24 @@ class Commit(QtWidgets.QGraphicsItem):
 
 
 class Label(QtWidgets.QGraphicsItem):
-
-    item_type = QtWidgets.QGraphicsItem.UserType + 3
+    item_type = qtutils.graphics_item_type_value(3)
 
     head_color = QtGui.QColor(Qt.green)
     other_color = QtGui.QColor(Qt.white)
     remote_color = QtGui.QColor(Qt.yellow)
 
     head_pen = QtGui.QPen()
-    head_pen.setColor(head_color.darker().darker())
+    head_pen.setColor(QtGui.QColor(Qt.black))
     head_pen.setWidth(1)
 
     text_pen = QtGui.QPen()
-    text_pen.setColor(QtGui.QColor(Qt.darkGray))
+    text_pen.setColor(QtGui.QColor(Qt.black))
     text_pen.setWidth(1)
 
-    alpha = 180
-    head_color.setAlpha(alpha)
-    other_color.setAlpha(alpha)
-    remote_color.setAlpha(alpha)
-
-    border = 2
-    item_spacing = 5
-    text_offset = 1
+    border = 1
+    item_spacing = 8
+    text_x_offset = 3
+    text_y_offset = 0
 
     def __init__(self, commit):
         QtWidgets.QGraphicsItem.__init__(self)
@@ -1315,20 +1553,21 @@ class Label(QtWidgets.QGraphicsItem):
         height = 18
         current_width = 0
         spacing = self.item_spacing
-        border = self.border + self.text_offset  # text offset=1 in paint()
+        border_x = self.border + self.text_x_offset
+        border_y = self.border + self.text_y_offset
 
         font = cache.label_font()
         item_shape = QPainterPath()
 
         base_rect = QRectF(0, 0, width, height)
-        base_rect = base_rect.adjusted(-border, -border, border, border)
+        base_rect = base_rect.adjusted(-border_x, -border_y, border_x, border_y)
         item_shape.addRect(base_rect)
 
         for tag in self.commit.tags:
             text_shape = QPainterPath()
             text_shape.addText(current_width, 0, font, tag)
             text_rect = text_shape.boundingRect()
-            box_rect = text_rect.adjusted(-border, -border, border, border)
+            box_rect = text_rect.adjusted(-border_x, -border_y, border_x, border_y)
             item_shape.addRect(box_rect)
             current_width = item_shape.boundingRect().width() + spacing
 
@@ -1339,9 +1578,10 @@ class Label(QtWidgets.QGraphicsItem):
         font = cache.label_font()
         painter.setFont(font)
 
-        current_width = 0
+        current_width = 3
         border = self.border
-        offset = self.text_offset
+        x_offset = self.text_x_offset
+        y_offset = self.text_y_offset
         spacing = self.item_spacing
         QRectF = QtCore.QRectF
 
@@ -1376,37 +1616,36 @@ class Label(QtWidgets.QGraphicsItem):
             text_rect = painter.boundingRect(
                 QRectF(current_width, 0, 0, 0), Qt.TextSingleLine, tag
             )
-            box_rect = text_rect.adjusted(-offset, -offset, offset, offset)
+            box_rect = text_rect.adjusted(-x_offset, -y_offset, x_offset, y_offset)
 
             painter.drawRoundedRect(box_rect, border, border)
             painter.drawText(text_rect, Qt.TextSingleLine, tag)
             current_width += text_rect.width() + spacing
 
 
-# pylint: disable=too-many-ancestors
 class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
-
+    commits_selected = Signal(object)
     diff_commits = Signal(object, object)
 
     x_adjust = int(Commit.commit_radius * 4 / 3)
     y_adjust = int(Commit.commit_radius * 4 / 3)
 
     x_off = -18
-    y_off = -24
+    y_off = -20
 
-    def __init__(self, context, notifier, parent):
+    def __init__(self, context, parent):
         QtWidgets.QGraphicsView.__init__(self, parent)
         ViewerMixin.__init__(self)
+        EdgeColor.update_colors(context.app.theme)
 
-        highlight = self.palette().color(QtGui.QPalette.Highlight)
+        theme = context.app.theme
+        highlight = theme.selection_color()
         Commit.commit_selected_color = highlight
         Commit.selected_outline_color = highlight.darker()
 
         self.context = context
         self.columns = {}
-        self.selection_list = []
         self.menu_actions = None
-        self.notifier = notifier
         self.commits = []
         self.items = {}
         self.mouse_start = [0, 0]
@@ -1428,15 +1667,18 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
         self.setDragMode(self.RubberBandDrag)
 
         scene = QtWidgets.QGraphicsScene(self)
-        scene.setItemIndexMethod(QtWidgets.QGraphicsScene.NoIndex)
+        scene.setItemIndexMethod(QtWidgets.QGraphicsScene.BspTreeIndex)
+        scene.selectionChanged.connect(self.selection_changed)
         self.setScene(scene)
 
         self.setRenderHint(QtGui.QPainter.Antialiasing)
-        self.setViewportUpdateMode(self.BoundingRectViewportUpdate)
+        self.setViewportUpdateMode(self.SmartViewportUpdate)
         self.setCacheMode(QtWidgets.QGraphicsView.CacheBackground)
         self.setTransformationAnchor(QtWidgets.QGraphicsView.AnchorUnderMouse)
         self.setResizeAnchor(QtWidgets.QGraphicsView.NoAnchor)
-        self.setBackgroundBrush(QtGui.QColor(Qt.white))
+
+        background_color = qtutils.css_color(context.app.theme.background_color_rgb())
+        self.setBackgroundBrush(background_color)
 
         qtutils.add_action(
             self,
@@ -1469,12 +1711,9 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
             self, N_('Select Newest Child'), self._select_newest_child, hotkeys.MOVE_UP
         )
 
-        notifier.add_observer(diff.COMMITS_SELECTED, self.commits_selected)
-
     def clear(self):
         EdgeColor.reset()
         self.scene().clear()
-        self.selection_list = []
         self.items.clear()
         self.x_offsets.clear()
         self.x_min = 24
@@ -1491,10 +1730,19 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
     def zoom_out(self):
         self.scale_view(1.0 / 1.5)
 
-    def commits_selected(self, commits):
+    def selection_changed(self):
+        # Broadcast selection to other widgets
+        selected_items = self.scene().selectedItems()
+        commits = sort_by_generation([item.commit for item in selected_items])
+        self.set_selecting(True)
+        self.commits_selected.emit(commits)
+        self.set_selecting(False)
+
+    def select_commits(self, commits):
         if self.selecting:
             return
-        self.select([commit.oid for commit in commits])
+        with qtutils.BlockSignals(self.scene()):
+            self.select([commit.oid for commit in commits])
 
     def select(self, oids):
         """Select the item for the oids"""
@@ -1504,19 +1752,17 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
                 item = self.items[oid]
             except KeyError:
                 continue
-            item.blockSignals(True)
             item.setSelected(True)
-            item.blockSignals(False)
             item_rect = item.sceneTransform().mapRect(item.boundingRect())
             self.ensureVisible(item_rect)
 
-    def _get_item_by_generation(self, commits, criteria_fn):
+    def _get_item_by_generation(self, commits, criteria_func):
         """Return the item for the commit matching criteria"""
         if not commits:
             return None
         generation = None
         for commit in commits:
-            if generation is None or criteria_fn(generation, commit.generation):
+            if generation is None or criteria_func(generation, commit.generation):
                 oid = commit.oid
                 generation = commit.generation
         try:
@@ -1539,7 +1785,7 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
         context = self.context
         selected_commits = sort_by_generation([n.commit for n in items])
         oids = [c.oid for c in selected_commits]
-        all_oids = [c.oid for c in self.commits]
+        all_oids = [c.oid for c in sort_by_generation(self.commits)]
         cmds.do(cmds.FormatPatch, context, oids, all_oids)
 
     def _select_parent(self):
@@ -1607,12 +1853,13 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
             commit = self.commits[-1]
             items.append(self.items[commit.oid])
 
-        self.setSceneRect(self.scene().itemsBoundingRect())
+        bounds = self.scene().itemsBoundingRect()
+        bounds.adjust(-64, 0, 0, 0)
+        self.setSceneRect(bounds)
         self.fit_view_to_items(items)
 
     def zoom_to_fit(self):
         """Fit selected items into the viewport"""
-
         items = self.selected_items()
         self.fit_view_to_items(items)
 
@@ -1625,12 +1872,12 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
 
             for item in items:
                 pos = item.pos()
-                x = pos.x()
-                y = pos.y()
-                x_min = min(x_min, x)
-                x_max = max(x_max, x)
-                y_min = min(y_min, y)
-                y_max = max(y_max, y)
+                x_val = pos.x()
+                y_val = pos.y()
+                x_min = min(x_min, x_val)
+                x_max = max(x_max, x_val)
+                y_min = min(y_min, y_val)
+                y_max = max(y_max, y_val)
 
             rect = QtCore.QRectF(x_min, y_min, abs(x_max - x_min), abs(y_max - y_min))
 
@@ -1648,51 +1895,37 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
         self.fitInView(rect, Qt.KeepAspectRatio)
         self.scene().invalidate()
 
-    def save_selection(self, event):
-        if event.button() != Qt.LeftButton:
-            return
-        elif Qt.ShiftModifier != event.modifiers():
-            return
-        self.selection_list = self.selected_items()
-
-    def restore_selection(self, event):
-        if Qt.ShiftModifier != event.modifiers():
-            return
-        for item in self.selection_list:
-            item.setSelected(True)
-
-    def handle_event(self, event_handler, event):
-        self.save_selection(event)
+    def handle_event(self, event_handler, event, update=True):
         event_handler(self, event)
-        self.restore_selection(event)
-        self.update()
+        if update:
+            self.update()
 
     def set_selecting(self, selecting):
         self.selecting = selecting
 
     def pan(self, event):
         pos = event.pos()
-        dx = pos.x() - self.mouse_start[0]
-        dy = pos.y() - self.mouse_start[1]
+        x_offset = pos.x() - self.mouse_start[0]
+        y_offset = pos.y() - self.mouse_start[1]
 
-        if dx == 0 and dy == 0:
+        if x_offset == 0 and y_offset == 0:
             return
 
-        rect = QtCore.QRect(0, 0, abs(dx), abs(dy))
+        rect = QtCore.QRect(0, 0, abs(x_offset), abs(y_offset))
         delta = self.mapToScene(rect).boundingRect()
 
-        tx = delta.width()
-        if dx < 0.0:
-            tx = -tx
+        x_translate = delta.width()
+        if x_offset < 0.0:
+            x_translate = -x_translate
 
-        ty = delta.height()
-        if dy < 0.0:
-            ty = -ty
+        y_translate = delta.height()
+        if y_offset < 0.0:
+            y_translate = -y_translate
 
         matrix = self.transform()
         matrix.reset()
         matrix *= self.saved_matrix
-        matrix.translate(tx, ty)
+        matrix.translate(x_translate, y_translate)
 
         self.setTransformationAnchor(QtWidgets.QGraphicsView.NoAnchor)
         self.setTransform(matrix)
@@ -1734,29 +1967,29 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
             return
         self.zoom = scale
 
-        adjust_scrollbars = True
+        adjust_scrollbars = False
         scrollbar = self.verticalScrollBar()
+        scrollbar_offset = 1.0
         if scrollbar:
             value = get(scrollbar)
-            min_ = scrollbar.minimum()
-            max_ = scrollbar.maximum()
-            range_ = max_ - min_
-            distance = value - min_
-            nonzero_range = range_ > 0.1
+            minimum = scrollbar.minimum()
+            maximum = scrollbar.maximum()
+            scrollbar_range = maximum - minimum
+            distance = value - minimum
+            nonzero_range = scrollbar_range > 0.1
             if nonzero_range:
-                scrolloffset = distance / range_
-            else:
-                adjust_scrollbars = False
+                scrollbar_offset = distance / scrollbar_range
+                adjust_scrollbars = True
 
         self.setTransformationAnchor(QtWidgets.QGraphicsView.NoAnchor)
         self.scale(scale, scale)
 
         scrollbar = self.verticalScrollBar()
         if scrollbar and adjust_scrollbars:
-            min_ = scrollbar.minimum()
-            max_ = scrollbar.maximum()
-            range_ = max_ - min_
-            value = min_ + int(float(range_) * scrolloffset)
+            minimum = scrollbar.minimum()
+            maximum = scrollbar.maximum()
+            scrollbar_range = maximum - minimum
+            value = minimum + int(float(scrollbar_range) * scrollbar_offset)
             scrollbar.setValue(value)
 
     def add_commits(self, commits):
@@ -1764,7 +1997,7 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
         self.commits.extend(commits)
         scene = self.scene()
         for commit in commits:
-            item = Commit(commit, self.notifier)
+            item = Commit(commit)
             self.items[commit.oid] = item
             for ref in commit.tags:
                 self.items[ref] = item
@@ -1780,14 +2013,12 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
             try:
                 commit_item = self.items[commit.oid]
             except KeyError:
-                # TODO - Handle truncated history viewing
-                continue
+                continue  # The history is truncated.
             for parent in reversed(commit.parents):
                 try:
                     parent_item = self.items[parent.oid]
                 except KeyError:
-                    # TODO - Handle truncated history viewing
-                    continue
+                    continue  # The history is truncated.
                 try:
                     edge = parent_item.edges[commit.oid]
                 except KeyError:
@@ -1805,12 +2036,12 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
         # edges to prevent double edge invalidation.
         invalid_edges = set()
 
-        for oid, (x, y) in positions.items():
+        for oid, (x_val, y_val) in positions.items():
             item = self.items[oid]
 
             pos = item.pos()
-            if pos != (x, y):
-                item.setPos(x, y)
+            if pos != (x_val, y_val):
+                item.setPos(x_val, y_val)
 
                 for edge in item.edges.values():
                     invalid_edges.add(edge)
@@ -1889,7 +2120,7 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
     def reset_columns(self):
         # Some children of displayed commits might not be accounted in
         # 'commits' list. It is common case during loading of big graph.
-        # But, they are assigned a column that must be reseted. Hence, use
+        # But, they are assigned a column that must be reset. Hence, use
         # depth-first traversal to reset all columns assigned.
         for node in self.commits:
             if node.column is None:
@@ -1921,12 +2152,12 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
             # frontier values for fork children will be overridden in course of
             # propagate_frontier.
             for offset in itertools.count(1):
-                for c in [column + offset, column - offset]:
-                    if c not in self.columns:
-                        # Column 'c' is not occupied.
+                for value in (column + offset, column - offset):
+                    if value not in self.columns:
+                        # Column is not occupied.
                         continue
                     try:
-                        frontier = self.frontier[c]
+                        frontier = self.frontier[value]
                     except KeyError:
                         # Column 'c' was never allocated.
                         continue
@@ -1988,8 +2219,8 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
                 can_overlap = list(range(column + 1, self.max_column + 1))
             else:
                 can_overlap = list(range(column - 1, self.min_column - 1, -1))
-            for c in can_overlap:
-                frontier = self.frontier[c]
+            for value in can_overlap:
+                frontier = self.frontier[value]
                 if frontier > cell_row:
                     cell_row = frontier
 
@@ -1999,8 +2230,8 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
         else:
             can_overlap = list(range(self.max_column, column, -1))
         for cell_row in itertools.count(cell_row):
-            for c in can_overlap:
-                if (c, cell_row) in self.tagged_cells:
+            for value in can_overlap:
+                if (value, cell_row) in self.tagged_cells:
                     # Overlapping. Try next row.
                     break
             else:
@@ -2033,7 +2264,7 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
 
         for node in sort_by_generation(list(self.commits)):
             if node.column is None:
-                # Node is either root or its parent is not in items. The last
+                # Node is either root or its parent is not in items. This
                 # happens when tree loading is in progress. Allocate new
                 # columns for such nodes.
                 node.column = self.alloc_column()
@@ -2092,11 +2323,11 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
         positions = {}
 
         for node in self.commits:
-            x_pos = x_start + node.column * x_off
-            y_pos = y_off + node.row * y_off
+            x_val = x_start + node.column * x_off
+            y_val = y_off + node.row * y_off
 
-            positions[node.oid] = (x_pos, y_pos)
-            x_min = min(x_min, x_pos)
+            positions[node.oid] = (x_val, y_val)
+            x_min = min(x_min, x_val)
 
         self.x_min = x_min
 
@@ -2121,15 +2352,13 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
         self.handle_event(QtWidgets.QGraphicsView.mousePressEvent, event)
 
     def mouseMoveEvent(self, event):
-        pos = self.mapToScene(event.pos())
         if self.is_panning:
             self.pan(event)
             return
+        pos = self.mapToScene(event.pos())
         self.last_mouse[0] = pos.x()
         self.last_mouse[1] = pos.y()
-        self.handle_event(QtWidgets.QGraphicsView.mouseMoveEvent, event)
-        if self.pressed:
-            self.viewport().repaint()
+        self.handle_event(QtWidgets.QGraphicsView.mouseMoveEvent, event, update=False)
 
     def mouseReleaseEvent(self, event):
         self.pressed = False
@@ -2137,7 +2366,6 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
             self.is_panning = False
             return
         self.handle_event(QtWidgets.QGraphicsView.mouseReleaseEvent, event)
-        self.selection_list = []
         self.viewport().repaint()
 
     def wheelEvent(self, event):
@@ -2170,7 +2398,8 @@ class GraphView(QtWidgets.QGraphicsView, ViewerMixin):
 
 
 def sort_by_generation(commits):
-    if len(commits) < 2:
+    """Sort commits by their generation. Ensures consistent diffs and patch exports"""
+    if len(commits) <= 1:
         return commits
     commits.sort(key=lambda x: x.generation)
     return commits
@@ -2178,5 +2407,5 @@ def sort_by_generation(commits):
 
 # Glossary
 # ========
-# oid -- Git objects IDs (i.e. SHA-1 IDs)
+# oid -- Git objects IDs (i.e. SHA-1 / SHA-256 IDs)
 # ref -- Git references that resolve to a commit-ish (HEAD, branches, tags)

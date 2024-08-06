@@ -1,5 +1,4 @@
 """A widget for searching git commits"""
-from __future__ import division, absolute_import, unicode_literals
 import time
 
 from qtpy import QtCore
@@ -26,7 +25,7 @@ def mkdate(timespec):
     return '%04d-%02d-%02d' % time.localtime(timespec)[:3]
 
 
-class SearchOptions(object):
+class SearchOptions:
     def __init__(self):
         self.query = ''
         self.max_count = 500
@@ -64,7 +63,7 @@ class SearchWidget(standard.Dialog):
         self.max_count = standard.SpinBox(value=500, mini=5, maxi=9995, step=5)
 
         self.commit_list = QtWidgets.QListWidget()
-        self.commit_list.setMinimumSize(QtCore.QSize(1, 1))
+        self.commit_list.setMinimumSize(QtCore.QSize(10, 10))
         self.commit_list.setAlternatingRowColors(True)
         selection_mode = QtWidgets.QAbstractItemView.SingleSelection
         self.commit_list.setSelectionMode(selection_mode)
@@ -76,7 +75,7 @@ class SearchWidget(standard.Dialog):
         )
 
         self.button_cherrypick = qtutils.create_button(
-            text=N_('Cherry Pick'), icon=icons.save()
+            text=N_('Cherry Pick'), icon=icons.cherry_pick()
         )
         self.button_close = qtutils.close_button()
 
@@ -100,8 +99,8 @@ class SearchWidget(standard.Dialog):
         self.bottom_layout = qtutils.hbox(
             defs.no_margin,
             defs.spacing,
-            self.button_close,
             qtutils.STRETCH,
+            self.button_close,
             self.button_export,
             self.button_cherrypick,
         )
@@ -123,7 +122,7 @@ def search(context):
     return search_commits(context, qtutils.active_window())
 
 
-class SearchEngine(object):
+class SearchEngine:
     def __init__(self, context, model):
         self.context = context
         self.model = model
@@ -256,7 +255,6 @@ class Search(SearchWidget):
         connect_button(self.button_cherrypick, self.cherry_pick)
         connect_button(self.button_close, self.accept)
 
-        # pylint: disable=no-member
         self.mode_combo.currentIndexChanged.connect(self.mode_changed)
         self.commit_list.itemSelectionChanged.connect(self.display)
 
@@ -299,7 +297,6 @@ class Search(SearchWidget):
     def mode(self):
         return self.mode_combo.currentText()
 
-    # pylint: disable=unused-argument
     def search_callback(self, *args):
         engineclass = self.engines[self.mode()]
         self.model.query = get(self.query)
@@ -342,7 +339,6 @@ class Search(SearchWidget):
         result = qtutils.selected_item(self.commit_list, self.results)
         return result[0] if result else None
 
-    # pylint: disable=unused-argument
     def display(self, *args):
         context = self.context
         revision = self.selected_revision()

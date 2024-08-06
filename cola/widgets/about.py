@@ -1,5 +1,3 @@
-# encoding: utf-8
-from __future__ import division, absolute_import, unicode_literals
 import platform
 import webbrowser
 import sys
@@ -32,19 +30,18 @@ class ExpandingTabBar(QtWidgets.QTabBar):
     The setExpanding(True) method does not work in practice because
     it respects the OS style.  We override the style by implementing
     tabSizeHint() so that we can specify the size explicitly.
-
     """
 
     def tabSizeHint(self, tab_index):
-        width = self.parent().width() / max(1, self.count()) - 1
-        size = super(ExpandingTabBar, self).tabSizeHint(tab_index)
+        width = self.parent().width() // max(2, self.count()) - 1
+        size = super().tabSizeHint(tab_index)
         size.setWidth(width)
         return size
 
 
 class ExpandingTabWidget(QtWidgets.QTabWidget):
     def __init__(self, parent=None):
-        super(ExpandingTabWidget, self).__init__(parent)
+        super().__init__(parent)
         self.setTabBar(ExpandingTabBar(self))
 
     def resizeEvent(self, event):
@@ -54,7 +51,7 @@ class ExpandingTabWidget(QtWidgets.QTabWidget):
         width = event.size().width()
         height = self.tabBar().height()
         self.tabBar().resize(width, height)
-        return super(ExpandingTabWidget, self).resizeEvent(event)
+        return super().resizeEvent(event)
 
 
 class AboutView(QtWidgets.QDialog):
@@ -126,7 +123,7 @@ def copyright_text():
     return """
 Git Cola: The highly caffeinated Git GUI
 
-Copyright (C) 2007-2020 David Aguilar and contributors
+Copyright (C) 2007-2024 David Aguilar and contributors
 
 This program is free software: you can redistribute it and/or
 modify it under the terms of the GNU General Public License
@@ -149,13 +146,16 @@ If not, see http://www.gnu.org/licenses/.
 def version_text(context):
     git_version = version.git_version(context)
     cola_version = version.version()
-    build_version = version.build_version()
     python_path = sys.executable
     python_version = sys.version
     qt_version = qtpy.QT_VERSION
     qtpy_version = qtpy.__version__
     pyqt_api_name = qtpy.API_NAME
-    if qtpy.PYQT5 or qtpy.PYQT4:
+    if (
+        getattr(qtpy, 'PYQT6', False)
+        or getattr(qtpy, 'PYQT5', False)
+        or getattr(qtpy, 'PYQT4', False)
+    ):
         pyqt_api_version = qtpy.PYQT_VERSION
     elif qtpy.PYSIDE:
         pyqt_api_version = qtpy.PYSIDE_VERSION
@@ -164,15 +164,8 @@ def version_text(context):
 
     platform_version = platform.platform()
 
-    # Only show the build version if _build_version.py exists
-    if build_version:
-        build_version = '(%s)' % build_version
-    else:
-        build_version = ''
-
     scope = dict(
         cola_version=cola_version,
-        build_version=build_version,
         git_version=git_version,
         platform_version=platform_version,
         pyqt_api_name=pyqt_api_name,
@@ -187,7 +180,7 @@ def version_text(context):
         N_(
             """
         <br>
-            Git Cola version %(cola_version)s %(build_version)s
+            Git Cola version %(cola_version)s
         <ul>
             <li> %(platform_version)s
             <li> Python (%(python_path)s) %(python_version)s
@@ -202,31 +195,12 @@ def version_text(context):
     )
 
 
-def link(url, text, palette=None):
-    if palette is None:
-        palette = QtGui.QPalette()
-
-    color = palette.color(QtGui.QPalette.Foreground)
-    rgb = 'rgb(%s, %s, %s)' % (color.red(), color.green(), color.blue())
-    scope = dict(rgb=rgb, text=text, url=url)
-
-    return (
-        """
-        <a style="font-style: italic; text-decoration: none; color: %(rgb)s;"
-            href="%(url)s">
-            %(text)s
-        </a>
-    """
-        % scope
-    )
-
-
 def mailto(email, text, palette):
-    return link('mailto:%s' % email, text, palette) + '<br>'
+    return qtutils.link('mailto:%s' % email, text, palette) + '<br>'
 
 
 def render_authors(authors):
-    """Render a list of author details into richtext html"""
+    """Render a list of author details into rich text html"""
     for x in authors:
         x.setdefault('email', '')
 
@@ -270,125 +244,157 @@ def authors_text():
         # Please submit a pull request if you would like to include your
         # email address in the about screen.
         # See the `generate-about` script in the "todo" branch.
-        # vim :read! ./Meta/generate-about
+        # vim :read! ./todo/generate-about
         dict(
             name='David Aguilar',
             title=N_('Maintainer (since 2007) and developer'),
             email=mailto('davvid@gmail.com', contact, palette),
         ),
         dict(name='Daniel Harding', title=N_('Developer')),
+        dict(name='Efimov Vasily', title=N_('Developer')),
         dict(
             name='Ｖ字龍(Vdragon)',
             title=N_('Developer'),
             email=mailto('Vdragon.Taiwan@gmail.com', contact, palette),
         ),
-        dict(name='Efimov Vasily', title=N_('Developer')),
+        dict(name='Kurt McKee', title=N_('Developer')),
         dict(name='Guillaume de Bure', title=N_('Developer')),
-        dict(name='Uri Okrent', title=N_('Developer')),
         dict(name='Javier Rodriguez Cuevas', title=N_('Developer')),
+        dict(name='Uri Okrent', title=N_('Developer')),
         dict(name='Alex Chernetz', title=N_('Developer')),
         dict(name='xhl', title=N_('Developer')),
-        dict(name='Andreas Sommer', title=N_('Developer')),
-        dict(name='Thomas Kluyver', title=N_('Developer')),
-        dict(name='Minarto Margoliono', title=N_('Developer')),
         dict(name='Ville Skyttä', title=N_('Developer')),
+        dict(name='Thomas Kluyver', title=N_('Developer')),
+        dict(name='Andreas Sommer', title=N_('Developer')),
+        dict(name='nakanoi', title=N_('Developer')),
         dict(name='Szymon Judasz', title=N_('Developer')),
-        dict(name='jm4R', title=N_('Developer')),
+        dict(name='Minarto Margoliono', title=N_('Developer')),
         dict(name='Stanislaw Halik', title=N_('Developer')),
+        dict(name='jm4R', title=N_('Developer')),
         dict(name='Igor Galarraga', title=N_('Developer')),
+        dict(name='Luke Horwell', title=N_('Developer')),
         dict(name='Virgil Dupras', title=N_('Developer')),
-        dict(name='wsdfhjxc', title=N_('Developer')),
         dict(name='Barry Roberts', title=N_('Developer')),
-        dict(name='林博仁(Buo-ren Lin)', title=N_('Developer')),
+        dict(name='wsdfhjxc', title=N_('Developer')),
         dict(name='Guo Yunhe', title=N_('Developer')),
+        dict(name='malpas', title=N_('Developer')),
+        dict(name='林博仁(Buo-ren Lin)', title=N_('Developer')),
+        dict(name='Matthias Mailänder', title=N_('Developer')),
         dict(name='cclauss', title=N_('Developer')),
+        dict(name='Benjamin Somers', title=N_('Developer')),
+        dict(name='Max Harmathy', title=N_('Developer')),
         dict(name='Stefan Naewe', title=N_('Developer')),
         dict(name='Victor Nepveu', title=N_('Developer')),
-        dict(name='Pavel Rehak', title=N_('Developer')),
         dict(name='Benedict Lee', title=N_('Developer')),
-        dict(name='Tim Brown', title=N_('Developer')),
-        dict(name='Steffen Prohaska', title=N_('Developer')),
         dict(name='Filip Danilović', title=N_('Developer')),
+        dict(name='Nanda Lopes', title=N_('Developer')),
         dict(name='NotSqrt', title=N_('Developer')),
+        dict(name='Pavel Rehak', title=N_('Developer')),
+        dict(name='Steffen Prohaska', title=N_('Developer')),
+        dict(name='Thomas Kiley', title=N_('Developer')),
+        dict(name='Tim Brown', title=N_('Developer')),
+        dict(name='Chris Stefano', title=N_('Developer')),
+        dict(name='Floris Lambrechts', title=N_('Developer')),
+        dict(name='Martin Gysel', title=N_('Developer')),
         dict(name='Michael Geddes', title=N_('Developer')),
         dict(name='Rustam Safin', title=N_('Developer')),
-        dict(name='Justin Lecher', title=N_('Developer')),
+        dict(name='abid1998', title=N_('Developer')),
         dict(name='Alex Gulyás', title=N_('Developer')),
         dict(name='David Martínez Martí', title=N_('Developer')),
         dict(name='Hualiang Xie', title=N_('Developer')),
+        dict(name='Justin Lecher', title=N_('Developer')),
         dict(name='Kai Krakow', title=N_('Developer')),
         dict(name='Karl Bielefeldt', title=N_('Developer')),
         dict(name='Marco Costalba', title=N_('Developer')),
+        dict(name='Michael Baumgartner', title=N_('Developer')),
         dict(name='Michael Homer', title=N_('Developer')),
-        dict(name='Sebastian Schuberth', title=N_('Developer')),
+        dict(name='Mithil Poojary', title=N_('Developer')),
         dict(name='Sven Claussner', title=N_('Developer')),
         dict(name='Victor Gambier', title=N_('Developer')),
         dict(name='bsomers', title=N_('Developer')),
-        dict(name='real', title=N_('Developer')),
+        dict(name='mmargoliono', title=N_('Developer')),
         dict(name='v.paritskiy', title=N_('Developer')),
         dict(name='vanderkoort', title=N_('Developer')),
         dict(name='wm4', title=N_('Developer')),
+        dict(name='0xflotus', title=N_('Developer')),
+        dict(name='AJ Bagwell', title=N_('Developer')),
+        dict(name='Adrien be', title=N_('Developer')),
+        dict(name='Alexander Preißner', title=N_('Developer')),
+        dict(name='Andrej', title=N_('Developer')),
+        dict(name='Arthur Coelho', title=N_('Developer')),
         dict(name='Audrius Karabanovas', title=N_('Developer')),
-        dict(name='Matthew E. Levine', title=N_('Developer')),
-        dict(name='Matthias Mailänder', title=N_('Developer')),
-        dict(name='Md. Mahbub Alam', title=N_('Developer')),
-        dict(name='Jakub Szymański', title=N_('Developer')),
-        dict(name='ochristi', title=N_('Developer')),
-        dict(name='Miguel Boekhold', title=N_('Developer')),
-        dict(name='MiguelBoekhold', title=N_('Developer')),
-        dict(name='Mikhail Terekhov', title=N_('Developer')),
-        dict(name='Jake Biesinger', title=N_('Developer')),
+        dict(name='Axel Heider', title=N_('Developer')),
+        dict(name='Barrett Lowe', title=N_('Developer')),
+        dict(name='Ben Boeckel', title=N_('Developer')),
+        dict(name='Bob van der Linden', title=N_('Developer')),
+        dict(name='Boerje Sewing', title=N_('Developer')),
+        dict(name='Boris W', title=N_('Developer')),
+        dict(name='Bruno Cabral', title=N_('Developer')),
+        dict(name='Charles', title=N_('Developer')),
+        dict(name='Christoph Erhardt', title=N_('Developer')),
+        dict(name='Clément Pit--Claudel', title=N_('Developer')),
+        dict(name='Daniel Haskin', title=N_('Developer')),
+        dict(name='Daniel King', title=N_('Developer')),
+        dict(name='Daniel Pavel', title=N_('Developer')),
+        dict(name='DasaniT', title=N_('Developer')),
+        dict(name='Dave Cottlehuber', title=N_('Developer')),
+        dict(name='David Schwörer', title=N_('Developer')),
+        dict(name='David Zumbrunnen', title=N_('Developer')),
+        dict(name='George Vasilakos', title=N_('Developer')),
+        dict(name='Ilya Tumaykin', title=N_('Developer')),
         dict(name='Iulian Udrea', title=N_('Developer')),
+        dict(name='Jake Biesinger', title=N_('Developer')),
+        dict(name='Jakub Szymański', title=N_('Developer')),
+        dict(name='Jamie Pate', title=N_('Developer')),
+        dict(name='Jean-Francois Dagenais', title=N_('Developer')),
+        dict(name='Joachim Lusiardi', title=N_('Developer')),
+        dict(name='Karthik Manamcheri', title=N_('Developer')),
+        dict(name='Kelvie Wong', title=N_('Developer')),
+        dict(name='Klaas Neirinck', title=N_('Developer')),
+        dict(name='Kyle', title=N_('Developer')),
+        dict(name='Laszlo Boszormenyi (GCS)', title=N_('Developer')),
+        dict(name='Maciej Filipiak', title=N_('Developer')),
+        dict(name='Maicon D. Filippsen', title=N_('Developer')),
+        dict(name='Markus Heidelberg', title=N_('Developer')),
+        dict(name='Matthew E. Levine', title=N_('Developer')),
+        dict(name='Md. Mahbub Alam', title=N_('Developer')),
+        dict(name='Mikhail Terekhov', title=N_('Developer')),
+        dict(name='Niel Buys', title=N_('Developer')),
+        dict(name='Ori shalhon', title=N_('Developer')),
         dict(name='Paul Hildebrandt', title=N_('Developer')),
         dict(name='Paul Weingardt', title=N_('Developer')),
         dict(name='Paulo Fidalgo', title=N_('Developer')),
-        dict(name='Ilya Tumaykin', title=N_('Developer')),
         dict(name='Petr Gladkikh', title=N_('Developer')),
         dict(name='Philip Stark', title=N_('Developer')),
         dict(name='Radek Postołowicz', title=N_('Developer')),
         dict(name='Rainer Müller', title=N_('Developer')),
         dict(name='Ricardo J. Barberis', title=N_('Developer')),
         dict(name='Rolando Espinoza', title=N_('Developer')),
-        dict(name='George Vasilakos', title=N_('Developer')),
         dict(name="Samsul Ma'arif", title=N_('Developer')),
         dict(name='Sebastian Brass', title=N_('Developer')),
-        dict(name='Arthur Coelho', title=N_('Developer')),
+        dict(name='Sergei Dyshel', title=N_('Developer')),
         dict(name='Simon Peeters', title=N_('Developer')),
-        dict(name='Felipe Morales', title=N_('Developer')),
-        dict(name='David Zumbrunnen', title=N_('Developer')),
-        dict(name='David Schwörer', title=N_('Developer')),
         dict(name='Stephen', title=N_('Developer')),
-        dict(name='Andrej', title=N_('Developer')),
-        dict(name='Daniel Pavel', title=N_('Developer')),
-        dict(name='Daniel King', title=N_('Developer')),
-        dict(name='Daniel Haskin', title=N_('Developer')),
-        dict(name='Clément Pit--Claudel', title=N_('Developer')),
+        dict(name='Tim Gates', title=N_('Developer')),
         dict(name='Vaibhav Sagar', title=N_('Developer')),
         dict(name='Ved Vyas', title=N_('Developer')),
-        dict(name='Adrien be', title=N_('Developer')),
-        dict(name='Charles', title=N_('Developer')),
-        dict(name='Boris W', title=N_('Developer')),
-        dict(name='Ben Boeckel', title=N_('Developer')),
+        dict(name='VishnuSanal', title=N_('Developer')),
         dict(name='Voicu Hodrea', title=N_('Developer')),
+        dict(name='WNguyen14', title=N_('Developer')),
         dict(name='Wesley Wong', title=N_('Developer')),
         dict(name='Wolfgang Ocker', title=N_('Developer')),
         dict(name='Zhang Han', title=N_('Developer')),
         dict(name='beauxq', title=N_('Developer')),
-        dict(name='Jamie Pate', title=N_('Developer')),
-        dict(name='Jean-Francois Dagenais', title=N_('Developer')),
-        dict(name='Joachim Lusiardi', title=N_('Developer')),
-        dict(name='0xflotus', title=N_('Developer')),
-        dict(name='AJ Bagwell', title=N_('Developer')),
-        dict(name='Barrett Lowe', title=N_('Developer')),
-        dict(name='Karthik Manamcheri', title=N_('Developer')),
-        dict(name='Kelvie Wong', title=N_('Developer')),
-        dict(name='Kyle', title=N_('Developer')),
-        dict(name='Maciej Filipiak', title=N_('Developer')),
-        dict(name='Maicon D. Filippsen', title=N_('Developer')),
-        dict(name='Markus Heidelberg', title=N_('Developer')),
+        dict(name='bensmrs', title=N_('Developer')),
+        dict(name='lcjh', title=N_('Developer')),
+        dict(name='lefairy', title=N_('Developer')),
+        dict(name='melkecelioglu', title=N_('Developer')),
+        dict(name='ochristi', title=N_('Developer')),
+        dict(name='yael levi', title=N_('Developer')),
+        dict(name='Łukasz Wojniłowicz', title=N_('Developer')),
     )
     bug_url = 'https://github.com/git-cola/git-cola/issues'
-    bug_link = link(bug_url, bug_url)
+    bug_link = qtutils.link(bug_url, bug_url)
     scope = dict(bug_link=bug_link)
     prelude = (
         N_(
@@ -410,29 +416,31 @@ def translators_text():
 
     translators = (
         # See the `generate-about` script in the "todo" branch.
-        # vim :read! ./Meta/generate-about --translators
+        # vim :read! ./todo/generate-about --translators
         dict(
             name='Ｖ字龍(Vdragon)',
             title=N_('Traditional Chinese (Taiwan) translation'),
             email=mailto('Vdragon.Taiwan@gmail.com', contact, palette),
         ),
         dict(name='Pavel Rehak', title=N_('Czech translation')),
-        dict(name='Zhang Han', title=N_('Simplified Chinese translation')),
         dict(name='Victorhck', title=N_('Spanish translation')),
         dict(name='Vitor Lobo', title=N_('Brazilian translation')),
-        dict(name='Igor Kopach', title=N_('Ukranian translation')),
+        dict(name='Zhang Han', title=N_('Simplified Chinese translation')),
         dict(name='Łukasz Wojniłowicz', title=N_('Polish translation')),
-        dict(name='Rafael Nascimento', title=N_('Brazilian translation')),
+        dict(name='Igor Kopach', title=N_('Ukranian translation')),
+        dict(name='Gyuris Gellért', title=N_('Hungarian translation')),
+        dict(name='fu7mu4', title=N_('Japanese translation')),
         dict(name='Barış ÇELİK', title=N_('Turkish translation')),
+        dict(name='Guo Yunhe', title=N_('Simplified Chinese translation')),
+        dict(name='Luke Horwell', title=N_('Translation')),
         dict(name='Minarto Margoliono', title=N_('Indonesian translation')),
-        dict(name='Sven Claussner', title=N_('German translation')),
+        dict(name='Rafael Nascimento', title=N_('Brazilian translation')),
+        dict(name='Rafael Reuber', title=N_('Brazilian translation')),
         dict(name='Shun Sakai', title=N_('Japanese translation')),
+        dict(name='Sven Claussner', title=N_('German translation')),
         dict(name='Vaiz', title=N_('Russian translation')),
         dict(name='adlgrbz', title=N_('Turkish translation')),
-        dict(name='fu7mu4', title=N_('Japanese translation')),
-        dict(name='Guo Yunhe', title=N_('Simplified Chinese translation')),
-        dict(name="Samsul Ma'arif", title=N_('Indonesian translation')),
-        dict(name='Gyuris Gellért', title=N_('Hungarian translation')),
+        dict(name='Balázs Meskó', title=N_('Translation')),
         dict(name='Joachim Lusiardi', title=N_('German translation')),
         dict(name='Kai Krakow', title=N_('German translation')),
         dict(name='Louis Rousseau', title=N_('French translation')),
@@ -442,9 +450,9 @@ def translators_text():
             title=N_('Traditional Chinese (Taiwan) translation'),
         ),
         dict(name='Pilar Molina Lopez', title=N_('Spanish translation')),
-        dict(name='Rafael Reuber', title=N_('Brazilian translation')),
         dict(name='Sabri Ünal', title=N_('Turkish translation')),
-        dict(name='Balázs Meskó', title=N_('Translation')),
+        dict(name="Samsul Ma'arif", title=N_('Indonesian translation')),
+        dict(name='YAMAMOTO Kenyu', title=N_('Translation')),
         dict(name='Zeioth', title=N_('Spanish translation')),
         dict(name='balping', title=N_('Hungarian translation')),
         dict(name='p-bo', title=N_('Czech translation')),
@@ -455,7 +463,7 @@ def translators_text():
     )
 
     bug_url = 'https://github.com/git-cola/git-cola/issues'
-    bug_link = link(bug_url, bug_url)
+    bug_link = qtutils.link(bug_url, bug_url)
     scope = dict(bug_link=bug_link)
 
     prelude = (
@@ -493,9 +501,9 @@ def translators_text():
 def show_shortcuts():
     hotkeys_html = resources.doc(N_('hotkeys.html'))
     try:
-        from qtpy import QtWebEngineWidgets  # pylint: disable=all
+        from qtpy import QtWebEngineWidgets
     except (ImportError, qtpy.PythonQtError):
-        # redhat disabled QtWebKit in their qt build but don't punish the users
+        # Redhat disabled QtWebKit in their Qt build but don't punish the users
         webbrowser.open_new_tab('file://' + hotkeys_html)
         return
 

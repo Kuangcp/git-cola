@@ -1,9 +1,8 @@
-from __future__ import division, absolute_import, unicode_literals
 import json
 
 from .. import core
 from .. import utils
-from ..observable import Observable
+from ..models import prefs
 
 # put summary at the end b/c it can contain
 # any number of funky characters, including the separator
@@ -11,7 +10,7 @@ logfmt = r'format:%H%x01%P%x01%d%x01%an%x01%ad%x01%ae%x01%s'
 logsep = chr(0x01)
 
 
-class CommitFactory(object):
+class CommitFactory:
     root_generation = 0
     commits = {}
 
@@ -38,12 +37,8 @@ class CommitFactory(object):
         return commit
 
 
-class DAG(Observable):
-    ref_updated = 'ref_updated'
-    count_updated = 'count_updated'
-
+class DAG:
     def __init__(self, ref, count):
-        Observable.__init__(self)
         self.ref = ref
         self.count = count
         self.overrides = {}
@@ -52,14 +47,12 @@ class DAG(Observable):
         changed = ref != self.ref
         if changed:
             self.ref = ref
-            self.notify_observers(self.ref_updated)
         return changed
 
     def set_count(self, count):
         changed = count != self.count
         if changed:
             self.count = count
-            self.notify_observers(self.count_updated)
         return changed
 
     def set_arguments(self, args):
@@ -84,7 +77,7 @@ class DAG(Observable):
         return [p for p in all_refs if p and core.exists(p)]
 
 
-class Commit(object):
+class Commit:
     root_generation = 0
 
     __slots__ = (
@@ -92,6 +85,7 @@ class Commit(object):
         'summary',
         'parents',
         'children',
+        'branches',
         'tags',
         'author',
         'authdate',
@@ -107,7 +101,8 @@ class Commit(object):
         self.summary = None
         self.parents = []
         self.children = []
-        self.tags = set()
+        self.tags = []
+        self.branches = []
         self.email = None
         self.author = None
         self.authdate = None
@@ -153,6 +148,10 @@ class Commit(object):
         if tag.startswith('tag: '):
             tag = tag[5:]  # strip off "tag: " leaving refs/tags/
 
+        if tag.startswith('refs/heads/'):
+            branch = tag[11:]
+            self.branches.append(branch)
+
         if tag.startswith('refs/'):
             # strip off refs/ leaving just tags/XXX remotes/XXX heads/XXX
             tag = tag[5:]
@@ -191,10 +190,10 @@ class Commit(object):
 
         head_arrow = 'HEAD -> '
         if tag.startswith(head_arrow):
-            self.tags.add('HEAD')
+            self.tags.append('HEAD')
             self.add_label(tag[len(head_arrow) :])
         else:
-            self.tags.add(tag)
+            self.tags.append(tag)
 
     def __str__(self):
         return self.oid
@@ -213,15 +212,15 @@ class Commit(object):
         return json.dumps(self.data(), sort_keys=True, indent=4, default=list)
 
     def is_fork(self):
-        ''' Returns True if the node is a fork'''
+        """Returns True if the node is a fork"""
         return len(self.children) > 1
 
     def is_merge(self):
-        ''' Returns True if the node is a fork'''
+        """Returns True if the node is a fork"""
         return len(self.parents) > 1
 
 
-class RepoReader(object):
+class RepoReader:
     def __init__(self, context, params):
         self.context = context
         self.params = params
@@ -274,7 +273,12 @@ class RepoReader(object):
 
         self.reset()
         ref_args = utils.shell_split(self.params.ref)
-        cmd = self._cmd + ['-%d' % self.params.count] + ref_args
+        cmd = (
+            self._cmd
+            + ['-%d' % self.params.count]
+            + ['--date=%s' % prefs.logdate(self.context)]
+            + ref_args
+        )
         self._proc = core.start_command(cmd)
 
         while True:

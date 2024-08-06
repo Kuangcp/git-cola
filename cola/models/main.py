@@ -1,16 +1,21 @@
-# Copyright (C) 2007-2018 David Aguilar
-"""This module provides the central cola model.
-"""
-from __future__ import division, absolute_import, unicode_literals
-
+"""The central cola model"""
 import os
+
+from qtpy import QtCore
+from qtpy.QtCore import Signal
 
 from .. import core
 from .. import gitcmds
+from .. import gitcfg
 from .. import version
 from ..git import STDOUT
-from ..observable import Observable
 from . import prefs
+
+
+FETCH = 'fetch'
+FETCH_HEAD = 'FETCH_HEAD'
+PUSH = 'push'
+PULL = 'pull'
 
 
 def create(context):
@@ -18,54 +23,60 @@ def create(context):
     return MainModel(context)
 
 
-# pylint: disable=too-many-public-methods
-class MainModel(Observable):
+class MainModel(QtCore.QObject):
     """Repository status model"""
 
-    # TODO this class can probably be split apart into a DiffModel,
-    # CommitMessageModel, StatusModel, and an AppStatusStateMachine.
+    # Refactor: split this class apart into separate DiffModel, CommitMessageModel,
+    # StatusModel, and an DiffEditorState.
 
-    # Observable messages
-    message_about_to_update = 'about_to_update'
-    message_commit_message_changed = 'commit_message_changed'
-    message_diff_text_changed = 'diff_text_changed'
-    message_diff_text_updated = 'diff_text_updated'
+    # Signals
+    about_to_update = Signal()
+    previous_contents = Signal(list, list, list, list)
+    commit_message_changed = Signal(object)
+    diff_text_changed = Signal()
+    diff_text_updated = Signal(str)
     # "diff_type" {text,image} represents the diff viewer mode.
-    message_diff_type_changed = 'diff_type_changed'
+    diff_type_changed = Signal(object)
     # "file_type" {text,image} represents the selected file type.
-    message_file_type_changed = 'file_type_changed'
-    message_filename_changed = 'filename_changed'
-    message_images_changed = 'images_changed'
-    message_mode_about_to_change = 'mode_about_to_change'
-    message_mode_changed = 'mode_changed'
-    message_submodules_changed = 'message_submodules_changed'
-    message_refs_updated = 'message_refs_updated'
-    message_updated = 'updated'
-    message_worktree_changed = 'message_worktree_changed'
+    file_type_changed = Signal(object)
+    images_changed = Signal(object)
+    mode_changed = Signal(str)
+    submodules_changed = Signal()
+    refs_updated = Signal()
+    updated = Signal()
+    worktree_changed = Signal()
 
     # States
     mode_none = 'none'  # Default: nothing's happened, do nothing
     mode_worktree = 'worktree'  # Comparing index to worktree
     mode_diffstat = 'diffstat'  # Showing a diffstat
+    mode_display = 'display'  # Displaying arbitrary information
     mode_untracked = 'untracked'  # Dealing with an untracked file
+    mode_untracked_diff = 'untracked-diff'  # Diffing an untracked file
     mode_index = 'index'  # Comparing index to last commit
     mode_amend = 'amend'  # Amending a commit
+    mode_diff = 'diff'  # Diffing against an arbitrary commit
 
     # Modes where we can checkout files from the $head
-    modes_undoable = set((mode_amend, mode_index, mode_worktree))
+    modes_undoable = {mode_amend, mode_diff, mode_index, mode_worktree}
 
     # Modes where we can partially stage files
-    modes_stageable = set((mode_amend, mode_worktree, mode_untracked))
+    modes_partially_stageable = {
+        mode_amend,
+        mode_diff,
+        mode_worktree,
+        mode_untracked_diff,
+    }
 
     # Modes where we can partially unstage files
-    modes_unstageable = set((mode_amend, mode_index))
+    modes_unstageable = {mode_amend, mode_diff, mode_index}
 
     unstaged = property(lambda self: self.modified + self.unmerged + self.untracked)
     """An aggregate of the modified, unmerged, and untracked file lists."""
 
     def __init__(self, context, cwd=None):
         """Interface to the main repository status"""
-        Observable.__init__(self)
+        super().__init__()
 
         self.context = context
         self.git = context.git
@@ -81,8 +92,10 @@ class MainModel(Observable):
         self.file_type = Types.TEXT
         self.mode = self.mode_none
         self.filename = None
+        self.is_cherry_picking = False
         self.is_merging = False
         self.is_rebasing = False
+        self.is_applying_patch = False
         self.currentbranch = ''
         self.directory = ''
         self.project = ''
@@ -102,8 +115,9 @@ class MainModel(Observable):
         self.staged_deleted = set()
         self.unstaged_deleted = set()
         self.submodules = set()
-        self.submodules_list = []
+        self.submodules_list = None  # lazy loaded
 
+        self.error = None  # The last error message.
         self.ref_sort = 0  # (0: version, 1:reverse-chrono)
         self.local_branches = []
         self.remote_branches = []
@@ -111,33 +125,61 @@ class MainModel(Observable):
         if cwd:
             self.set_worktree(cwd)
 
-    def unstageable(self):
+    def is_diff_mode(self):
+        """Are we in diff mode?"""
+        return self.mode == self.mode_diff
+
+    def is_unstageable(self):
+        """Are we in a mode that supports "unstage" actions?"""
         return self.mode in self.modes_unstageable
 
-    def amending(self):
+    def is_amend_mode(self):
+        """Are we amending a commit?"""
         return self.mode == self.mode_amend
 
-    def undoable(self):
-        """Whether we can checkout files from the $head."""
+    def is_undoable(self):
+        """Can we checkout from the current branch or head ref?"""
         return self.mode in self.modes_undoable
 
-    def stageable(self):
+    def is_partially_stageable(self):
+        """Whether partial staging should be allowed."""
+        return self.mode in self.modes_partially_stageable
+
+    def is_stageable(self):
         """Whether staging should be allowed."""
-        return self.mode in self.modes_stageable
+        return self.is_partially_stageable() or self.mode == self.mode_untracked
 
     def all_branches(self):
         return self.local_branches + self.remote_branches
 
     def set_worktree(self, worktree):
+        last_worktree = self.git.paths.worktree
         self.git.set_worktree(worktree)
+
         is_valid = self.git.is_valid()
         if is_valid:
+            reset = last_worktree is None or last_worktree != worktree
             cwd = self.git.getcwd()
             self.project = os.path.basename(cwd)
             self.set_directory(cwd)
             core.chdir(cwd)
-            self.update_config(reset=True)
-            self.notify_observers(self.message_worktree_changed)
+            self.update_config(reset=reset)
+
+            # Detect the "git init" scenario by checking for branches.
+            # If no branches exist then we cannot use "git rev-parse" yet.
+            err = None
+            refs = self.git.git_path('refs', 'heads')
+            if core.exists(refs) and core.listdir(refs):
+                # "git rev-parse" exits with a non-zero exit status when the
+                # safe.directory protection is active.
+                status, _, err = self.git.rev_parse('HEAD')
+                is_valid = status == 0
+            if is_valid:
+                self.error = None
+                self.worktree_changed.emit()
+            else:
+                self.error = err
+
         return is_valid
 
     def is_git_lfs_enabled(self):
@@ -162,7 +204,7 @@ class MainModel(Observable):
     def set_commitmsg(self, msg, notify=True):
         self.commitmsg = msg
         if notify:
-            self.notify_observers(self.message_commit_message_changed, msg)
+            self.commit_message_changed.emit(msg)
 
     def save_commitmsg(self, msg=None):
         if msg is None:
@@ -172,7 +214,7 @@ class MainModel(Observable):
             if not msg.endswith('\n'):
                 msg += '\n'
             core.write(path, msg)
-        except (OSError, IOError):
+        except OSError:
             pass
         return path
 
@@ -180,66 +222,84 @@ class MainModel(Observable):
         """Update the text displayed in the diff editor"""
         changed = txt != self.diff_text
         self.diff_text = txt
-        self.notify_observers(self.message_diff_text_updated, txt)
+        self.diff_text_updated.emit(txt)
         if changed:
-            self.notify_observers(self.message_diff_text_changed)
+            self.diff_text_changed.emit()
 
     def set_diff_type(self, diff_type):  # text, image
         """Set the diff type to either text or image"""
         changed = diff_type != self.diff_type
         self.diff_type = diff_type
         if changed:
-            self.notify_observers(self.message_diff_type_changed, diff_type)
+            self.diff_type_changed.emit(diff_type)
 
     def set_file_type(self, file_type):  # text, image
         """Set the file type to either text or image"""
         changed = file_type != self.file_type
         self.file_type = file_type
         if changed:
-            self.notify_observers(self.message_file_type_changed, file_type)
+            self.file_type_changed.emit(file_type)
 
     def set_images(self, images):
         """Update the images shown in the preview pane"""
         self.images = images
-        self.notify_observers(self.message_images_changed, images)
+        self.images_changed.emit(images)
 
     def set_directory(self, path):
         self.directory = path
 
-    def set_filename(self, filename):
-        self.filename = filename
-        self.notify_observers(self.message_filename_changed, filename)
-
-    def set_mode(self, mode):
-        if self.amending():
-            if mode != self.mode_none:
-                return
-        if self.is_merging and mode == self.mode_amend:
+    def set_mode(self, mode, head=None):
+        """Set the current editing mode (worktree, index, amending, ...)"""
+        # Do not allow going into index or worktree mode when amending.
+        if self.is_amend_mode() and mode != self.mode_none:
+            return
+        # We cannot amend in the middle of git cherry-pick, git am or git merge.
+        if (
+            self.is_cherry_picking or self.is_merging or self.is_applying_patch
+        ) and mode == self.mode_amend:
             mode = self.mode
-        if mode == self.mode_amend:
-            head = 'HEAD^'
+
+        # Stay in diff mode until explicitly reset.
+        if self.mode == self.mode_diff and mode != self.mode_none:
+            mode = self.mode_diff
+            head = head or self.head
         else:
-            head = 'HEAD'
-        self.notify_observers(self.message_mode_about_to_change, mode)
+            # If we are amending then we'll use "HEAD^", otherwise use the specified
+            # head or "HEAD" if head has not been specified.
+            if mode == self.mode_amend:
+                head = 'HEAD^'
+            elif not head:
+                head = 'HEAD'
+
         self.head = head
         self.mode = mode
-        self.notify_observers(self.message_mode_changed, mode)
+        self.mode_changed.emit(mode)
 
     def update_path_filter(self, filter_paths):
         self.filter_paths = filter_paths
         self.update_file_status()
 
     def emit_about_to_update(self):
-        self.notify_observers(self.message_about_to_update)
+        self.previous_contents.emit(
+            self.staged, self.unmerged, self.modified, self.untracked
+        )
+        self.about_to_update.emit()
 
     def emit_updated(self):
-        self.notify_observers(self.message_updated)
+        self.updated.emit()
 
     def update_file_status(self, update_index=False):
+        """Update modified/staged files status"""
         self.emit_about_to_update()
         self.update_files(update_index=update_index, emit=True)
 
-    def update_status(self, update_index=False):
+    def update_file_merge_status(self):
+        """Update modified/staged files and Merge/Rebase/Cherry-pick status"""
+        self.emit_about_to_update()
+        self._update_merge_rebase_status()
+        self.update_file_status()
+
+    def update_status(self, update_index=False, reset=False):
         # Give observers a chance to respond
         self.emit_about_to_update()
         self.initialized = True
@@ -249,7 +309,8 @@ class MainModel(Observable):
         self._update_branches_and_tags()
         self._update_commitmsg()
         self.update_config()
-        self.update_submodules_list()
+        if reset:
+            self.update_submodules_list()
         self.emit_updated()
 
     def update_config(self, emit=False, reset=False):
@@ -301,7 +362,7 @@ class MainModel(Observable):
         return not self.local_branches
 
     def _update_remotes(self):
-        self.remotes = self.git.remote()[STDOUT].splitlines()
+        self.remotes = gitcfg.get_remotes(self.cfg)
 
     def _update_branches_and_tags(self):
         context = self.context
@@ -318,29 +379,34 @@ class MainModel(Observable):
         self.tags = tags
         # Set these early since they are used to calculate 'upstream_changed'.
         self.currentbranch = gitcmds.current_branch(self.context)
-        self.notify_observers(self.message_refs_updated)
+        self.refs_updated.emit()
 
     def _update_merge_rebase_status(self):
+        cherry_pick_head = self.git.git_path('CHERRY_PICK_HEAD')
         merge_head = self.git.git_path('MERGE_HEAD')
         rebase_merge = self.git.git_path('rebase-merge')
+        rebase_apply = self.git.git_path('rebase-apply', 'applying')
+        self.is_cherry_picking = cherry_pick_head and core.exists(cherry_pick_head)
         self.is_merging = merge_head and core.exists(merge_head)
         self.is_rebasing = rebase_merge and core.exists(rebase_merge)
-        if self.is_merging and self.mode == self.mode_amend:
+        self.is_applying_patch = rebase_apply and core.exists(rebase_apply)
+        if self.mode == self.mode_amend and (
+            self.is_merging or self.is_cherry_picking or self.is_applying_patch
+        ):
             self.set_mode(self.mode_none)
 
     def _update_commitmsg(self):
         """Check for merge message files and update the commit message
 
-        The message is cleared when the merge completes
-
+        The message is cleared when the merge completes.
         """
-        if self.amending():
+        if self.is_amend_mode():
             return
         # Check if there's a message file in .git/
         context = self.context
         merge_msg_path = gitcmds.merge_message_path(context)
         if merge_msg_path:
-            msg = core.read(merge_msg_path)
+            msg = gitcmds.read_merge_commit_message(context, merge_msg_path)
             if msg != self._auto_commitmsg:
                 self._auto_commitmsg = msg
                 self._prev_commitmsg = self.commitmsg
@@ -352,7 +418,7 @@ class MainModel(Observable):
 
     def update_submodules_list(self):
         self.submodules_list = gitcmds.list_submodule(self.context)
-        self.notify_observers(self.message_submodules_changed)
+        self.submodules_changed.emit()
 
     def update_remotes(self):
         self._update_remotes()
@@ -379,23 +445,22 @@ class MainModel(Observable):
         return gitcmds.remote_url(self.context, name, push=push)
 
     def fetch(self, remote, **opts):
-        result = run_remote_action(self.context, self.git.fetch, remote, **opts)
+        result = run_remote_action(self.context, self.git.fetch, remote, FETCH, **opts)
         self.update_refs()
         return result
 
     def push(self, remote, remote_branch='', local_branch='', **opts):
         # Swap the branches in push mode (reverse of fetch)
-        opts.update(dict(local_branch=remote_branch, remote_branch=local_branch))
-        result = run_remote_action(
-            self.context, self.git.push, remote, push=True, **opts
-        )
+        opts.update({
+            'local_branch': remote_branch,
+            'remote_branch': local_branch,
+        })
+        result = run_remote_action(self.context, self.git.push, remote, PUSH, **opts)
         self.update_refs()
         return result
 
     def pull(self, remote, **opts):
-        result = run_remote_action(
-            self.context, self.git.pull, remote, pull=True, **opts
-        )
+        result = run_remote_action(self.context, self.git.pull, remote, PULL, **opts)
         # Pull can result in merge conflicts
         self.update_refs()
         self.update_files(update_index=False, emit=True)
@@ -407,21 +472,6 @@ class MainModel(Observable):
         Pass track=True to create a local tracking branch.
         """
         return self.git.branch(name, base, track=track, force=force)
-
-    def cherry_pick_list(self, revs):
-        """Cherry-picks each revision into the current branch.
-        Returns a list of command output strings (1 per cherry pick)"""
-        if not revs:
-            return []
-        outs = []
-        errs = []
-        status = 0
-        for rev in revs:
-            stat, out, err = self.git.cherry_pick(rev)
-            status = max(stat, status)
-            outs.append(out)
-            errs.append(err)
-        return (status, '\n'.join(outs), '\n'.join(errs))
 
     def is_commit_published(self):
         """Return True if the latest commit exists in any remote branch"""
@@ -451,18 +501,17 @@ class MainModel(Observable):
         self.update_refs()
 
 
-class Types(object):
+class Types:
     """File types (used for image diff modes)"""
 
     IMAGE = 'image'
     TEXT = 'text'
 
 
-# Helpers
-# pylint: disable=too-many-arguments
 def remote_args(
     context,
     remote,
+    action,
     local_branch='',
     remote_branch='',
     ff_only=False,
@@ -470,22 +519,20 @@ def remote_args(
     no_ff=False,
     tags=False,
     rebase=False,
-    pull=False,
-    push=False,
     set_upstream=False,
     prune=False,
 ):
     """Return arguments for git fetch/push/pull"""
 
     args = [remote]
-    what = refspec_arg(local_branch, remote_branch, pull, push)
+    what = refspec_arg(local_branch, remote_branch, remote, action)
     if what:
         args.append(what)
 
     kwargs = {
         'verbose': True,
     }
-    if pull:
+    if action == PULL:
         if rebase:
             kwargs['rebase'] = True
         elif ff_only:
@@ -493,13 +540,12 @@ def remote_args(
         elif no_ff:
             kwargs['no_ff'] = True
     elif force:
-        # pylint: disable=simplifiable-if-statement
-        if push and version.check_git(context, 'force-with-lease'):
+        if action == PUSH and version.check_git(context, 'force-with-lease'):
             kwargs['force_with_lease'] = True
         else:
             kwargs['force'] = True
 
-    if push and set_upstream:
+    if action == PUSH and set_upstream:
         kwargs['set_upstream'] = True
     if tags:
         kwargs['tags'] = True
@@ -509,23 +555,39 @@ def remote_args(
     return (args, kwargs)
 
 
-def refspec(src, dst, push=False):
-    if push and src == dst:
+def refspec(src, dst, action):
+    if action == PUSH and src == dst:
         spec = src
     else:
-        spec = '%s:%s' % (src, dst)
+        spec = f'{src}:{dst}'
     return spec
 
 
-def refspec_arg(local_branch, remote_branch, pull, push):
+def refspec_arg(local_branch, remote_branch, remote, action):
     """Return the refspec for a fetch or pull command"""
-    if not pull and local_branch and remote_branch:
-        what = refspec(remote_branch, local_branch, push=push)
-    else:
-        what = local_branch or remote_branch or None
-    return what
+    ref = None
+    if action == PUSH and local_branch and remote_branch:  # Push with local and remote.
+        ref = refspec(local_branch, remote_branch, action)
+    elif action == FETCH:
+        if local_branch and remote_branch:  # Fetch with local and remote.
+            if local_branch == FETCH_HEAD:
+                ref = remote_branch
+            else:
+                ref = refspec(remote_branch, local_branch, action)
+        elif remote_branch:
+            # If we are fetching and only a remote branch was specified then setup
+            # a refspec that will fetch into the remote tracking branch only.
+            ref = refspec(
+                remote_branch,
+                f'refs/remotes/{remote}/{remote_branch}',
+                action,
+            )
+    if not ref and local_branch != FETCH_HEAD:
+        ref = local_branch or remote_branch or None
+    return ref
 
 
-def run_remote_action(context, action, remote, **kwargs):
-    args, kwargs = remote_args(context, remote, **kwargs)
-    return action(*args, **kwargs)
+def run_remote_action(context, fn, remote, action, **kwargs):
+    """Run fetch, push or pull"""
+    args, kwargs = remote_args(context, remote, action, **kwargs)
+    return fn(*args, **kwargs)

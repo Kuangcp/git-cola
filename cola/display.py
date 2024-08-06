@@ -1,5 +1,4 @@
 """Display models and utility functions"""
-from __future__ import division, absolute_import, unicode_literals
 import collections
 
 

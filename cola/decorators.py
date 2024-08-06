@@ -1,4 +1,3 @@
-from __future__ import division, absolute_import, unicode_literals
 import errno
 import functools
 
@@ -16,12 +15,11 @@ def decorator(caller, func=None):
     """
     if func is None:
         # return a decorator
-        # pylint: disable=unused-argument
         @functools.wraps(caller)
-        def _decorator(f, *dummy_args, **dummy_opts):
-            @functools.wraps(f)
+        def _decorator(func, *dummy_args, **dummy_opts):
+            @functools.wraps(func)
             def _caller(*args, **opts):
-                return caller(f, *args, **opts)
+                return caller(func, *args, **opts)
 
             return _caller
 
@@ -41,7 +39,7 @@ def memoize(func):
     """
     A decorator for memoizing function calls
 
-    http://en.wikipedia.org/wiki/Memoization
+    https://en.wikipedia.org/wiki/Memoization
 
     """
     func.cache = {}
@@ -64,11 +62,11 @@ def _memoize(func, *args, **opts):
 
 @decorator
 def interruptable(func, *args, **opts):
-    """Handle interruptable system calls
+    """Handle interruptible system calls
 
-    OSX and others are known to interrupt system calls
+    macOS and others are known to interrupt system calls
 
-        http://en.wikipedia.org/wiki/PCLSRing
+        https://en.wikipedia.org/wiki/PCLSRing
         http://en.wikipedia.org/wiki/Unix_philosophy#Worse_is_better
 
     The @interruptable decorator handles this situation
@@ -77,10 +75,9 @@ def interruptable(func, *args, **opts):
     while True:
         try:
             result = func(*args, **opts)
-        except (IOError, OSError) as e:
+        except OSError as e:
             if e.errno in (errno.EINTR, errno.EINVAL):
                 continue
             raise e
-        else:
-            break
+        break
     return result

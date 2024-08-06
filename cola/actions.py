@@ -1,7 +1,7 @@
 """QAction creator functions"""
-from __future__ import absolute_import, division, unicode_literals
 
 from . import cmds
+from . import difftool
 from . import hotkeys
 from . import icons
 from . import qtutils
@@ -34,7 +34,7 @@ def launch_editor_at_line(context, widget, *shortcuts):
 def launch_difftool(context, widget):
     """Create a QAction to launch git-difftool(1)"""
     icon = icons.diff()
-    cmd = cmds.LaunchDifftool
+    cmd = difftool.LaunchDifftool
     action = qtutils.add_action(
         widget, cmd.name(), cmds.run(cmd, context), hotkeys.DIFF
     )
@@ -52,13 +52,17 @@ def stage_or_unstage(context, widget):
 
 def move_down(widget):
     """Create a QAction to select the next item"""
-    return qtutils.add_action(
+    action = qtutils.add_action(
         widget, N_('Next File'), widget.down.emit, hotkeys.MOVE_DOWN_SECONDARY
     )
+    action.setIcon(icons.move_down())
+    return action
 
 
 def move_up(widget):
     """Create a QAction to select the previous/above item"""
-    return qtutils.add_action(
+    action = qtutils.add_action(
         widget, N_('Previous File'), widget.up.emit, hotkeys.MOVE_UP_SECONDARY
     )
+    action.setIcon(icons.move_up())
+    return action

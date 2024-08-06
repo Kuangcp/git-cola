@@ -1,4 +1,4 @@
-from __future__ import division, absolute_import, unicode_literals
+from functools import partial
 import os
 import re
 
@@ -9,6 +9,7 @@ from qtpy.QtCore import Qt
 from qtpy.QtCore import Signal
 
 from ..i18n import N_
+from ..editpatch import edit_patch
 from ..interaction import Interaction
 from ..models import main
 from ..models import prefs
@@ -25,12 +26,12 @@ from .. import utils
 from .. import qtutils
 from .text import TextDecorator
 from .text import VimHintedPlainTextEdit
+from .text import PlainTextLabel
+from .text import RichTextLabel
+from .text import TextSearchWidget
 from . import defs
+from . import standard
 from . import imageview
-
-
-COMMITS_SELECTED = 'COMMITS_SELECTED'
-FILES_SELECTED = 'FILES_SELECTED'
 
 
 class DiffSyntaxHighlighter(QtGui.QSyntaxHighlighter):
@@ -46,7 +47,7 @@ class DiffSyntaxHighlighter(QtGui.QSyntaxHighlighter):
 
     DIFF_FILE_HEADER_START_RGX = re.compile(r'diff --git a/.* b/.*')
     DIFF_HUNK_HEADER_RGX = re.compile(
-        r'(?:@@ -[0-9,]+ \+[0-9,]+ @@)|' r'(?:@@@ (?:-[0-9,]+ ){2}\+[0-9,]+ @@@)'
+        r'(?:@@ -[0-9,]+ \+[0-9,]+ @@)|(?:@@@ (?:-[0-9,]+ ){2}\+[0-9,]+ @@@)'
     )
     BAD_WHITESPACE_RGX = re.compile(r'\s+$')
 
@@ -64,102 +65,129 @@ class DiffSyntaxHighlighter(QtGui.QSyntaxHighlighter):
 
         dark = palette.color(QPalette.Base).lightnessF() < 0.5
 
-        self.color_text = qtutils.RGB(cfg.color('text', '030303'))
-        self.color_add = qtutils.RGB(cfg.color('add', '77aa77' if dark else 'd2ffe4'))
-        self.color_remove = qtutils.RGB(
+        self.color_text = qtutils.rgb_triple(cfg.color('text', '030303'))
+        self.color_add = qtutils.rgb_triple(
+            cfg.color('add', '77aa77' if dark else 'd2ffe4')
+        )
+        self.color_remove = qtutils.rgb_triple(
             cfg.color('remove', 'aa7777' if dark else 'fee0e4')
         )
-        self.color_header = qtutils.RGB(cfg.color('header', header))
+        self.color_header = qtutils.rgb_triple(cfg.color('header', header))
 
-        self.diff_header_fmt = qtutils.make_format(fg=self.color_header)
-        self.bold_diff_header_fmt = qtutils.make_format(fg=self.color_header, bold=True)
-
-        self.diff_add_fmt = qtutils.make_format(fg=self.color_text, bg=self.color_add)
-        self.diff_remove_fmt = qtutils.make_format(
-            fg=self.color_text, bg=self.color_remove
+        self.diff_header_fmt = qtutils.make_format(foreground=self.color_header)
+        self.bold_diff_header_fmt = qtutils.make_format(
+            foreground=self.color_header, bold=True
         )
-        self.bad_whitespace_fmt = qtutils.make_format(bg=Qt.red)
+
+        self.diff_add_fmt = qtutils.make_format(
+            foreground=self.color_text, background=self.color_add
+        )
+        self.diff_remove_fmt = qtutils.make_format(
+            foreground=self.color_text, background=self.color_remove
+        )
+        self.bad_whitespace_fmt = qtutils.make_format(background=Qt.red)
         self.setCurrentBlockState(self.INITIAL_STATE)
 
     def set_enabled(self, enabled):
         self.enabled = enabled
 
     def highlightBlock(self, text):
+        """Highlight the current text block"""
         if not self.enabled or not text:
             return
-        # Aliases for quick local access
-        initial_state = self.INITIAL_STATE
-        default_state = self.DEFAULT_STATE
-        diff_state = self.DIFF_STATE
-        diffstat_state = self.DIFFSTAT_STATE
-        diff_file_header_state = self.DIFF_FILE_HEADER_STATE
-        submodule_state = self.SUBMODULE_STATE
-        end_state = self.END_STATE
+        formats = []
+        state = self.get_next_state(text)
+        if state == self.DIFFSTAT_STATE:
+            state, formats = self.get_formats_for_diffstat(state, text)
+        elif state == self.DIFF_FILE_HEADER_STATE:
+            state, formats = self.get_formats_for_diff_header(state, text)
+        elif state == self.DIFF_STATE:
+            state, formats = self.get_formats_for_diff_text(state, text)
 
-        diff_file_header_start_rgx = self.DIFF_FILE_HEADER_START_RGX
-        diff_hunk_header_rgx = self.DIFF_HUNK_HEADER_RGX
-        bad_whitespace_rgx = self.BAD_WHITESPACE_RGX
-
-        diff_header_fmt = self.diff_header_fmt
-        bold_diff_header_fmt = self.bold_diff_header_fmt
-        diff_add_fmt = self.diff_add_fmt
-        diff_remove_fmt = self.diff_remove_fmt
-        bad_whitespace_fmt = self.bad_whitespace_fmt
-
-        state = self.previousBlockState()
-        if state == initial_state:
-            if text.startswith('Submodule '):
-                state = submodule_state
-            elif text.startswith('diff --git '):
-                state = diffstat_state
-            elif self.is_commit:
-                state = default_state
-            else:
-                state = diffstat_state
-
-        if state == diffstat_state:
-            if diff_file_header_start_rgx.match(text):
-                state = diff_file_header_state
-                self.setFormat(0, len(text), diff_header_fmt)
-            elif diff_hunk_header_rgx.match(text):
-                state = diff_state
-                self.setFormat(0, len(text), bold_diff_header_fmt)
-            elif '|' in text:
-                i = text.index('|')
-                self.setFormat(0, i, bold_diff_header_fmt)
-                self.setFormat(i, len(text) - i, diff_header_fmt)
-            else:
-                self.setFormat(0, len(text), diff_header_fmt)
-        elif state == diff_file_header_state:
-            if diff_hunk_header_rgx.match(text):
-                state = diff_state
-                self.setFormat(0, len(text), bold_diff_header_fmt)
-            else:
-                self.setFormat(0, len(text), diff_header_fmt)
-        elif state == diff_state:
-            if diff_file_header_start_rgx.match(text):
-                state = diff_file_header_state
-                self.setFormat(0, len(text), diff_header_fmt)
-            elif diff_hunk_header_rgx.match(text):
-                self.setFormat(0, len(text), bold_diff_header_fmt)
-            elif text.startswith('-'):
-                if text == '-- ':
-                    state = end_state
-                else:
-                    self.setFormat(0, len(text), diff_remove_fmt)
-            elif text.startswith('+'):
-                self.setFormat(0, len(text), diff_add_fmt)
-                if self.whitespace:
-                    m = bad_whitespace_rgx.search(text)
-                    if m is not None:
-                        i = m.start()
-                        self.setFormat(i, len(text) - i, bad_whitespace_fmt)
+        for start, end, fmt in formats:
+            self.setFormat(start, end, fmt)
 
         self.setCurrentBlockState(state)
 
+    def get_next_state(self, text):
+        """Transition to the next state based on the input text"""
+        state = self.previousBlockState()
+        if state == DiffSyntaxHighlighter.INITIAL_STATE:
+            if text.startswith('Submodule '):
+                state = DiffSyntaxHighlighter.SUBMODULE_STATE
+            elif text.startswith('diff --git '):
+                state = DiffSyntaxHighlighter.DIFFSTAT_STATE
+            elif self.is_commit:
+                state = DiffSyntaxHighlighter.DEFAULT_STATE
+            else:
+                state = DiffSyntaxHighlighter.DIFFSTAT_STATE
 
-# pylint: disable=too-many-ancestors
+        return state
+
+    def get_formats_for_diffstat(self, state, text):
+        """Returns (state, [(start, end, fmt), ...]) for highlighting diffstat text"""
+        formats = []
+        if self.DIFF_FILE_HEADER_START_RGX.match(text):
+            state = self.DIFF_FILE_HEADER_STATE
+            end = len(text)
+            fmt = self.diff_header_fmt
+            formats.append((0, end, fmt))
+        elif self.DIFF_HUNK_HEADER_RGX.match(text):
+            state = self.DIFF_STATE
+            end = len(text)
+            fmt = self.bold_diff_header_fmt
+            formats.append((0, end, fmt))
+        elif '|' in text:
+            offset = text.index('|')
+            formats.append((0, offset, self.bold_diff_header_fmt))
+            formats.append((offset, len(text) - offset, self.diff_header_fmt))
+        else:
+            formats.append((0, len(text), self.diff_header_fmt))
+
+        return state, formats
+
+    def get_formats_for_diff_header(self, state, text):
+        """Returns (state, [(start, end, fmt), ...]) for highlighting diff headers"""
+        formats = []
+        if self.DIFF_HUNK_HEADER_RGX.match(text):
+            state = self.DIFF_STATE
+            formats.append((0, len(text), self.bold_diff_header_fmt))
+        else:
+            formats.append((0, len(text), self.diff_header_fmt))
+
+        return state, formats
+
+    def get_formats_for_diff_text(self, state, text):
+        """Return (state, [(start, end fmt), ...]) for highlighting diff text"""
+        formats = []
+
+        if self.DIFF_FILE_HEADER_START_RGX.match(text):
+            state = self.DIFF_FILE_HEADER_STATE
+            formats.append((0, len(text), self.diff_header_fmt))
+
+        elif self.DIFF_HUNK_HEADER_RGX.match(text):
+            formats.append((0, len(text), self.bold_diff_header_fmt))
+
+        elif text.startswith('-'):
+            if text == '-- ':
+                state = self.END_STATE
+            else:
+                formats.append((0, len(text), self.diff_remove_fmt))
+
+        elif text.startswith('+'):
+            formats.append((0, len(text), self.diff_add_fmt))
+            if self.whitespace:
+                match = self.BAD_WHITESPACE_RGX.search(text)
+                if match is not None:
+                    start = match.start()
+                    formats.append((start, len(text) - start, self.bad_whitespace_fmt))
+
+        return state, formats
+
+
 class DiffTextEdit(VimHintedPlainTextEdit):
+    """A textedit for interacting with diff text"""
+
     def __init__(
         self, context, parent, is_commit=False, whitespace=True, numbers=False
     ):
@@ -174,17 +202,39 @@ class DiffTextEdit(VimHintedPlainTextEdit):
         else:
             self.numbers = None
         self.scrollvalue = None
-        # pylint: disable=no-member
+
+        self.copy_diff_action = qtutils.add_action_with_icon(
+            self,
+            icons.copy(),
+            N_('Copy Diff'),
+            self.copy_diff,
+            hotkeys.COPY_DIFF,
+        )
+        self.copy_diff_action.setEnabled(False)
+        self.menu_actions.append(self.copy_diff_action)
         self.cursorPositionChanged.connect(self._cursor_changed)
+        self.selectionChanged.connect(self._selection_changed)
+
+    def setFont(self, font):
+        """Override setFont() so that we can use a custom "block" cursor"""
+        super().setFont(font)
+        if prefs.block_cursor(self.context):
+            width = qtutils.text_width(font, 'M')
+            self.setCursorWidth(width)
 
     def _cursor_changed(self):
         """Update the line number display when the cursor changes"""
         line_number = max(0, self.textCursor().blockNumber())
-        if self.numbers:
+        if self.numbers is not None:
             self.numbers.set_highlighted(line_number)
 
+    def _selection_changed(self):
+        """Respond to selection changes"""
+        selected = bool(self.selected_text())
+        self.copy_diff_action.setEnabled(selected)
+
     def resizeEvent(self, event):
-        super(DiffTextEdit, self).resizeEvent(event)
+        super().resizeEvent(event)
         if self.numbers:
             self.numbers.refresh_size()
 
@@ -207,6 +257,7 @@ class DiffTextEdit(VimHintedPlainTextEdit):
         self.scrollvalue = None
 
     def set_loading_message(self):
+        """Add a pending loading message in the diff view"""
         self.hint.set_value('+++ ' + N_('Loading...'))
         self.set_value('')
 
@@ -222,6 +273,71 @@ class DiffTextEdit(VimHintedPlainTextEdit):
 
         self.restore_scrollbar()
 
+    def selected_diff_stripped(self):
+        """Return the selected diff stripped of any diff characters"""
+        sep, selection = self.selected_text_lines()
+        return sep.join(_strip_diff(line) for line in selection)
+
+    def copy_diff(self):
+        """Copy the selected diff text stripped of any diff prefix characters"""
+        text = self.selected_diff_stripped()
+        qtutils.set_clipboard(text)
+
+    def selected_lines(self):
+        """Return selected lines"""
+        cursor = self.textCursor()
+        selection_start = cursor.selectionStart()
+        selection_end = max(selection_start, cursor.selectionEnd() - 1)
+
+        first_line_idx = -1
+        last_line_idx = -1
+        line_idx = 0
+        line_start = 0
+
+        for line_idx, line in enumerate(get(self, default='').splitlines()):
+            line_end = line_start + len(line)
+            if line_start <= selection_start <= line_end:
+                first_line_idx = line_idx
+            if line_start <= selection_end <= line_end:
+                last_line_idx = line_idx
+                break
+            line_start = line_end + 1
+
+        if first_line_idx == -1:
+            first_line_idx = line_idx
+
+        if last_line_idx == -1:
+            last_line_idx = line_idx
+
+        return first_line_idx, last_line_idx
+
+    def selected_text_lines(self):
+        """Return selected lines and the CRLF / LF separator"""
+        first_line_idx, last_line_idx = self.selected_lines()
+        text = get(self, default='')
+        sep = _get_sep(text)
+        lines = []
+        for line_idx, line in enumerate(text.split(sep)):
+            if first_line_idx <= line_idx <= last_line_idx:
+                lines.append(line)
+        return sep, lines
+
+
+def _get_sep(text):
+    """Return either CRLF or LF based on the content"""
+    if '\r\n' in text:
+        sep = '\r\n'
+    else:
+        sep = '\n'
+    return sep
+
+
+def _strip_diff(value):
+    """Remove +/-/<space> from a selection"""
+    if value.startswith(('+', '-', ' ')):
+        return value[1:]
+    return value
+
 
 class DiffLineNumbers(TextDecorator):
     def __init__(self, context, parent):
@@ -231,28 +347,22 @@ class DiffLineNumbers(TextDecorator):
         self.parser = diffparse.DiffLines()
         self.formatter = diffparse.FormatDigits()
 
-        self.setFont(qtutils.diff_font(context))
-        self._char_width = self.fontMetrics().width('0')
+        font = qtutils.diff_font(context)
+        self.setFont(font)
+        self._char_width = qtutils.text_width(font, 'M')
 
         QPalette = QtGui.QPalette
         self._palette = palette = self.palette()
         self._base = palette.color(QtGui.QPalette.Base)
         self._highlight = palette.color(QPalette.Highlight)
+        self._highlight.setAlphaF(0.3)
         self._highlight_text = palette.color(QPalette.HighlightedText)
         self._window = palette.color(QPalette.Window)
         self._disabled = palette.color(QPalette.Disabled, QPalette.Text)
 
     def set_diff(self, diff):
-        parser = self.parser
-        lines = parser.parse(diff)
-        if parser.valid:
-            self.lines = lines
-            self.formatter.set_digits(self.parser.digits())
-        else:
-            self.lines = None
-
-    def set_lines(self, lines):
-        self.lines = lines
+        self.lines = self.parser.parse(diff)
+        self.formatter.set_digits(self.parser.digits())
 
     def width_hint(self):
         if not self.isVisible():
@@ -266,10 +376,7 @@ class DiffLineNumbers(TextDecorator):
             columns = 2
             extra = 2  # one space in-between, one space after
 
-        if parser.valid:
-            digits = parser.digits() * columns
-        else:
-            digits = 4
+        digits = parser.digits() * columns
 
         return defs.margin + (self._char_width * (digits + extra))
 
@@ -278,20 +385,22 @@ class DiffLineNumbers(TextDecorator):
         self.highlight_line = line_number
 
     def current_line(self):
-        if self.lines and self.highlight_line >= 0:
+        lines = self.lines
+        if lines and self.highlight_line >= 0:
             # Find the next valid line
-            for line in self.lines[self.highlight_line :]:
+            for i in range(self.highlight_line, len(lines)):
                 # take the "new" line number: last value in tuple
-                line_number = line[-1]
+                line_number = lines[i][-1]
                 if line_number > 0:
                     return line_number
 
             # Find the previous valid line
-            for line in self.lines[self.highlight_line - 1 :: -1]:
+            for i in range(self.highlight_line - 1, -1, -1):
                 # take the "new" line number: last value in tuple
-                line_number = line[-1]
-                if line_number > 0:
-                    return line_number
+                if i < len(lines):
+                    line_number = lines[i][-1]
+                    if line_number > 0:
+                        return line_number
         return None
 
     def paintEvent(self, event):
@@ -306,30 +415,29 @@ class DiffLineNumbers(TextDecorator):
         content_offset = editor.contentOffset()
         block = editor.firstVisibleBlock()
         width = self.width()
+        text_width = width - (defs.margin * 2)
+        text_flags = Qt.AlignRight | Qt.AlignVCenter
         event_rect_bottom = event.rect().bottom()
 
+        highlight_line = self.highlight_line
         highlight = self._highlight
-        highlight.setAlphaF(0.3)
         highlight_text = self._highlight_text
         disabled = self._disabled
 
         fmt = self.formatter
         lines = self.lines
-        num_lines = len(self.lines)
-        painter.setPen(disabled)
-        text = ''
+        num_lines = len(lines)
 
         while block.isValid():
             block_number = block.blockNumber()
             if block_number >= num_lines:
                 break
             block_geom = editor.blockBoundingGeometry(block)
-            block_top = block_geom.translated(content_offset).top()
-            if not block.isVisible() or block_top >= event_rect_bottom:
+            rect = block_geom.translated(content_offset).toRect()
+            if not block.isVisible() or rect.top() >= event_rect_bottom:
                 break
 
-            rect = block_geom.translated(content_offset).toRect()
-            if block_number == self.highlight_line:
+            if block_number == highlight_line:
                 painter.fillRect(rect.x(), rect.y(), width, rect.height(), highlight)
                 painter.setPen(highlight_text)
             else:
@@ -346,65 +454,121 @@ class DiffLineNumbers(TextDecorator):
             painter.drawText(
                 rect.x(),
                 rect.y(),
-                self.width() - (defs.margin * 2),
+                text_width,
                 rect.height(),
-                Qt.AlignRight | Qt.AlignVCenter,
+                text_flags,
                 text,
             )
 
-            block = block.next()  # pylint: disable=next-method-called
+            block = block.next()
 
 
 class Viewer(QtWidgets.QFrame):
     """Text and image diff viewers"""
 
-    images_changed = Signal(object)
-    diff_type_changed = Signal(object)
-    file_type_changed = Signal(object)
+    INDEX_TEXT = 0
+    INDEX_IMAGE = 1
 
     def __init__(self, context, parent=None):
-        super(Viewer, self).__init__(parent)
+        super().__init__(parent)
 
         self.context = context
         self.model = model = context.model
         self.images = []
         self.pixmaps = []
         self.options = options = Options(self)
+        self.filename = PlainTextLabel(parent=self)
+        self.filename.setAlignment(Qt.AlignVCenter | Qt.AlignLeft)
+        font = self.font()
+        font.setItalic(True)
+        self.filename.setFont(font)
+        self.filename.elide()
         self.text = DiffEditor(context, options, self)
         self.image = imageview.ImageView(parent=self)
         self.image.setFocusPolicy(Qt.NoFocus)
+        self.search_widget = TextSearchWidget(self.text, self)
+        self.search_widget.hide()
+        self._drag_has_patches = False
+
+        self.setAcceptDrops(True)
+        self.setFocusProxy(self.text)
 
         stack = self.stack = QtWidgets.QStackedWidget(self)
         stack.addWidget(self.text)
         stack.addWidget(self.image)
 
-        self.main_layout = qtutils.vbox(defs.no_margin, defs.no_spacing, self.stack)
+        self.main_layout = qtutils.vbox(
+            defs.no_margin,
+            defs.no_spacing,
+            self.stack,
+            self.search_widget,
+        )
         self.setLayout(self.main_layout)
 
         # Observe images
-        images_msg = model.message_images_changed
-        model.add_observer(images_msg, self.images_changed.emit)
-        # pylint: disable=no-member
-        self.images_changed.connect(self.set_images, type=Qt.QueuedConnection)
+        model.images_changed.connect(self.set_images, type=Qt.QueuedConnection)
 
         # Observe the diff type
-        diff_type_msg = model.message_diff_type_changed
-        model.add_observer(diff_type_msg, self.diff_type_changed.emit)
-        self.diff_type_changed.connect(self.set_diff_type, type=Qt.QueuedConnection)
+        model.diff_type_changed.connect(self.set_diff_type, type=Qt.QueuedConnection)
 
         # Observe the file type
-        file_type_msg = model.message_file_type_changed
-        model.add_observer(file_type_msg, self.file_type_changed.emit)
-        self.file_type_changed.connect(self.set_file_type, type=Qt.QueuedConnection)
+        model.file_type_changed.connect(self.set_file_type, type=Qt.QueuedConnection)
 
         # Observe the image mode combo box
         options.image_mode.currentIndexChanged.connect(lambda _: self.render())
         options.zoom_mode.currentIndexChanged.connect(lambda _: self.render())
 
-        self.setFocusProxy(self.text)
+        self.search_action = qtutils.add_action(
+            self,
+            N_('Search in Diff'),
+            self.show_search_diff,
+            hotkeys.SEARCH,
+        )
+
+    def dragEnterEvent(self, event):
+        """Accepts drops if the mimedata contains patches"""
+        super().dragEnterEvent(event)
+        patches = get_patches_from_mimedata(event.mimeData())
+        if patches:
+            event.acceptProposedAction()
+            self._drag_has_patches = True
+
+    def dragLeaveEvent(self, event):
+        """End the drag+drop interaction"""
+        super().dragLeaveEvent(event)
+        if self._drag_has_patches:
+            event.accept()
+        else:
+            event.ignore()
+        self._drag_has_patches = False
+
+    def dropEvent(self, event):
+        """Apply patches when dropped onto the widget"""
+        if not self._drag_has_patches:
+            event.ignore()
+            return
+        event.setDropAction(Qt.CopyAction)
+        super().dropEvent(event)
+        self._drag_has_patches = False
+
+        patches = get_patches_from_mimedata(event.mimeData())
+        if patches:
+            apply_patches(self.context, patches=patches)
+
+        event.accept()  # must be called after dropEvent()
+
+    def show_search_diff(self):
+        """Show a dialog for searching diffs"""
+        # The diff search is only active in text mode.
+        if self.stack.currentIndex() != self.INDEX_TEXT:
+            return
+        if not self.search_widget.isVisible():
+            self.search_widget.show()
+        self.search_widget.setFocus()
 
     def export_state(self, state):
         state['show_diff_line_numbers'] = self.options.show_line_numbers.isChecked()
+        state['show_diff_filenames'] = self.options.show_filenames.isChecked()
         state['image_diff_mode'] = self.options.image_mode.currentIndex()
         state['image_zoom_mode'] = self.options.zoom_mode.currentIndex()
         state['word_wrap'] = self.options.enable_word_wrapping.isChecked()
@@ -413,6 +577,9 @@ class Viewer(QtWidgets.QFrame):
     def apply_state(self, state):
         diff_numbers = bool(state.get('show_diff_line_numbers', False))
         self.set_line_numbers(diff_numbers, update=True)
+
+        show_filenames = bool(state.get('show_diff_filenames', True))
+        self.set_show_filenames(show_filenames, update=True)
 
         image_mode = utils.asint(state.get('image_diff_mode', 0))
         self.options.image_mode.set_index(image_mode)
@@ -430,6 +597,7 @@ class Viewer(QtWidgets.QFrame):
         self.options.set_diff_type(diff_type)
         if diff_type == main.Types.IMAGE:
             self.stack.setCurrentWidget(self.image)
+            self.search_widget.hide()
             self.render()
         else:
             self.stack.setCurrentWidget(self.text)
@@ -439,9 +607,29 @@ class Viewer(QtWidgets.QFrame):
         # The "file type" is whether the file itself is an image.
         self.options.set_file_type(file_type)
 
-    def set_options(self):
+    def enable_filename_tracking(self):
+        """Enable displaying the currently selected filename"""
+        self.context.selection.selection_changed.connect(
+            self.update_filename, type=Qt.QueuedConnection
+        )
+
+    def update_filename(self):
+        """Update the filename display when the selection changes"""
+        filename = self.context.selection.filename()
+        self.filename.set_text(filename or '')
+
+    def update_options(self):
         """Emit a signal indicating that options have changed"""
-        self.text.set_options()
+        self.text.update_options()
+        show_filenames = get(self.options.show_filenames)
+        self.set_show_filenames(show_filenames)
+
+    def set_show_filenames(self, enabled, update=False):
+        """Enable/disable displaying the selected filename"""
+        self.filename.setVisible(enabled)
+        if update:
+            with qtutils.BlockSignals(self.options.show_filenames):
+                self.options.show_filenames.setChecked(enabled)
 
     def set_line_numbers(self, enabled, update=False):
         """Enable/disable line numbers in the text widget"""
@@ -456,7 +644,7 @@ class Viewer(QtWidgets.QFrame):
         self.cleanup()
 
     def cleanup(self):
-        for (image, unlink) in self.images:
+        for image, unlink in self.images:
             if unlink and core.exists(image):
                 os.unlink(image)
         self.images = []
@@ -510,8 +698,8 @@ class Viewer(QtWidgets.QFrame):
     def render_side_by_side(self):
         # Side-by-side lineup comp
         pixmaps = self.pixmaps
-        width = sum([pixmap.width() for pixmap in pixmaps])
-        height = max([pixmap.height() for pixmap in pixmaps])
+        width = sum(pixmap.width() for pixmap in pixmaps)
+        height = max(pixmap.height() for pixmap in pixmaps)
         image = create_image(width, height)
 
         # Paint each pixmap
@@ -530,8 +718,8 @@ class Viewer(QtWidgets.QFrame):
         if len(pixmaps) == 1:
             return pixmaps[0]
 
-        width = max([pixmap.width() for pixmap in pixmaps])
-        height = max([pixmap.height() for pixmap in pixmaps])
+        width = max(pixmap.width() for pixmap in pixmaps)
+        height = max(pixmap.height() for pixmap in pixmaps)
         image = create_image(width, height)
 
         painter = create_painter(image)
@@ -584,26 +772,23 @@ class Options(QtWidgets.QWidget):
     PIXEL_XOR = 3
 
     def __init__(self, parent):
-        super(Options, self).__init__(parent)
+        super().__init__(parent)
         # Create widgets
         self.widget = parent
         self.ignore_space_at_eol = self.add_option(
             N_('Ignore changes in whitespace at EOL')
         )
-
         self.ignore_space_change = self.add_option(
             N_('Ignore changes in amount of whitespace')
         )
-
         self.ignore_all_space = self.add_option(N_('Ignore all whitespace'))
-
         self.function_context = self.add_option(
             N_('Show whole surrounding functions of changes')
         )
-
         self.show_line_numbers = qtutils.add_action_bool(
             self, N_('Show line numbers'), self.set_line_numbers, True
         )
+        self.show_filenames = self.add_option(N_('Show filenames'))
         self.enable_word_wrapping = qtutils.add_action_bool(
             self, N_('Enable word wrapping'), self.set_word_wrapping, True
         )
@@ -641,6 +826,7 @@ class Options(QtWidgets.QWidget):
         menu.addSeparator()
         menu.addAction(self.function_context)
         menu.addAction(self.show_line_numbers)
+        menu.addAction(self.show_filenames)
         menu.addSeparator()
         menu.addAction(self.enable_word_wrapping)
 
@@ -680,12 +866,12 @@ class Options(QtWidgets.QWidget):
             self.toggle_image_diff.setIcon(icons.visualize())
 
     def add_option(self, title):
-        """Add a diff option which calls set_options() on change"""
-        action = qtutils.add_action(self, title, self.set_options)
+        """Add a diff option which calls update_options() on change"""
+        action = qtutils.add_action(self, title, self.update_options)
         action.setCheckable(True)
         return action
 
-    def set_options(self):
+    def update_options(self):
         """Update diff options in response to UI events"""
         space_at_eol = get(self.ignore_space_at_eol)
         space_change = get(self.ignore_space_change)
@@ -694,24 +880,30 @@ class Options(QtWidgets.QWidget):
         gitcmds.update_diff_overrides(
             space_at_eol, space_change, all_space, function_context
         )
-        self.widget.set_options()
+        self.widget.update_options()
 
     def set_line_numbers(self, value):
+        """Enable / disable line numbers"""
         self.widget.set_line_numbers(value, update=False)
 
     def set_word_wrapping(self, value):
         """Respond to Qt action callbacks"""
         self.widget.set_word_wrapping(value, update=False)
 
+    def hide_advanced_options(self):
+        """Hide advanced options that are not applicable to the DiffWidget"""
+        self.show_filenames.setVisible(False)
+        self.show_line_numbers.setVisible(False)
+        self.ignore_space_at_eol.setVisible(False)
+        self.ignore_space_change.setVisible(False)
+        self.ignore_all_space.setVisible(False)
+        self.function_context.setVisible(False)
 
-# pylint: disable=too-many-ancestors
+
 class DiffEditor(DiffTextEdit):
-
     up = Signal()
     down = Signal()
     options_changed = Signal()
-    updated = Signal()
-    diff_text_updated = Signal(object)
 
     def __init__(self, context, options, parent):
         DiffTextEdit.__init__(self, context, parent, numbers=True)
@@ -723,14 +915,32 @@ class DiffEditor(DiffTextEdit):
         self.options = options
 
         self.action_apply_selection = qtutils.add_action(
-            self, 'Apply', self.apply_selection, hotkeys.STAGE_DIFF
+            self,
+            'Apply',
+            self.apply_selection,
+            hotkeys.STAGE_DIFF,
+            hotkeys.STAGE_DIFF_ALT,
         )
 
         self.action_revert_selection = qtutils.add_action(
-            self, 'Revert', self.revert_selection, hotkeys.REVERT
+            self, 'Revert', self.revert_selection, hotkeys.REVERT, hotkeys.REVERT_ALT
         )
         self.action_revert_selection.setIcon(icons.undo())
 
+        self.action_edit_and_apply_selection = qtutils.add_action(
+            self,
+            'Edit and Apply',
+            partial(self.apply_selection, edit=True),
+            hotkeys.EDIT_AND_STAGE_DIFF,
+        )
+
+        self.action_edit_and_revert_selection = qtutils.add_action(
+            self,
+            'Edit and Revert',
+            partial(self.revert_selection, edit=True),
+            hotkeys.EDIT_AND_REVERT,
+        )
+        self.action_edit_and_revert_selection.setIcon(icons.undo())
         self.launch_editor = actions.launch_editor_at_line(
             context, self, hotkeys.EDIT_SHORT, *hotkeys.ACCEPT
         )
@@ -741,15 +951,11 @@ class DiffEditor(DiffTextEdit):
         self.move_up = actions.move_up(self)
         self.move_down = actions.move_down(self)
 
-        diff_text_updated = model.message_diff_text_updated
-        model.add_observer(diff_text_updated, self.diff_text_updated.emit)
-        self.diff_text_updated.connect(self.set_diff, type=Qt.QueuedConnection)
+        model.diff_text_updated.connect(self.set_diff, type=Qt.QueuedConnection)
 
-        selection_model.add_observer(
-            selection_model.message_selection_changed, self.updated.emit
+        selection_model.selection_changed.connect(
+            self.refresh, type=Qt.QueuedConnection
         )
-        # pylint: disable=no-member
-        self.updated.connect(self.refresh, type=Qt.QueuedConnection)
         # Update the selection model when the cursor changes
         self.cursorPositionChanged.connect(self._update_line_number)
 
@@ -762,10 +968,11 @@ class DiffEditor(DiffTextEdit):
         enabled = False
         s = self.selection_model.selection()
         model = self.model
-        if s.modified and model.stageable():
-            if s.modified[0] in model.submodules:
+        if model.is_partially_stageable():
+            item = s.modified[0] if s.modified else None
+            if item in model.submodules:
                 pass
-            elif s.modified[0] not in model.unstaged_deleted:
+            elif item not in model.unstaged_deleted:
                 enabled = True
         self.action_revert_selection.setEnabled(enabled)
 
@@ -773,124 +980,192 @@ class DiffEditor(DiffTextEdit):
         """Enable/disable the diff line number display"""
         self.numbers.setVisible(enabled)
         if update:
-            signals = self.options.show_line_numbers.blockSignals(True)
-            self.options.show_line_numbers.setChecked(enabled)
-            self.options.show_line_numbers.blockSignals(signals)
+            with qtutils.BlockSignals(self.options.show_line_numbers):
+                self.options.show_line_numbers.setChecked(enabled)
         # Refresh the display. Not doing this results in the display not
         # correctly displaying the line numbers widget until the text scrolls.
         self.set_value(self.value())
 
-    def set_word_wrapping(self, enabled, update=False):
-        """Enable/disable word wrapping"""
-        if update:
-            signals = self.options.enable_word_wrapping.blockSignals(True)
-            self.options.enable_word_wrapping.setChecked(enabled)
-            self.options.enable_word_wrapping.blockSignals(signals)
-        if enabled:
-            self.setWordWrapMode(QtGui.QTextOption.WordWrap)
-            self.setLineWrapMode(QtWidgets.QPlainTextEdit.WidgetWidth)
-        else:
-            self.setWordWrapMode(QtGui.QTextOption.NoWrap)
-            self.setLineWrapMode(QtWidgets.QPlainTextEdit.NoWrap)
-
-    def set_options(self):
+    def update_options(self):
         self.options_changed.emit()
 
-    # Qt overrides
-    def contextMenuEvent(self, event):
-        """Create the context menu for the diff display."""
-        menu = qtutils.create_menu(N_('Actions'), self)
+    def create_context_menu(self, event_pos):
+        """Override create_context_menu() to display a completely custom menu"""
+        menu = super().create_context_menu(event_pos)
         context = self.context
         model = self.model
         s = self.selection_model.selection()
         filename = self.selection_model.filename()
 
-        if model.stageable() or model.unstageable():
-            if model.stageable():
-                self.stage_or_unstage.setText(N_('Stage'))
-            else:
-                self.stage_or_unstage.setText(N_('Unstage'))
-            menu.addAction(self.stage_or_unstage)
+        # These menu actions will be inserted at the start of the widget.
+        current_actions = menu.actions()
+        menu_actions = []
+        add_action = menu_actions.append
+        edit_actions_added = False
+        stage_action_added = False
 
-        if s.modified and model.stageable():
-            item = s.modified[0]
-            if item in model.submodules:
-                path = core.abspath(item)
-                action = menu.addAction(
-                    icons.add(),
-                    cmds.Stage.name(),
-                    cmds.run(cmds.Stage, context, s.modified),
-                )
-                action.setShortcut(hotkeys.STAGE_SELECTION)
-                menu.addAction(
-                    icons.cola(),
-                    N_('Launch git-cola'),
-                    cmds.run(cmds.OpenRepo, context, path),
-                )
-            elif item not in model.unstaged_deleted:
-                if self.has_selection():
-                    apply_text = N_('Stage Selected Lines')
-                    revert_text = N_('Revert Selected Lines...')
-                else:
-                    apply_text = N_('Stage Diff Hunk')
-                    revert_text = N_('Revert Diff Hunk...')
-
-                self.action_apply_selection.setText(apply_text)
-                self.action_apply_selection.setIcon(icons.add())
-
-                self.action_revert_selection.setText(revert_text)
-
-                menu.addAction(self.action_apply_selection)
-                menu.addAction(self.action_revert_selection)
-
-        if s.staged and model.unstageable():
+        if s.staged and model.is_unstageable():
             item = s.staged[0]
-            if item in model.submodules:
-                path = core.abspath(item)
-                action = menu.addAction(
-                    icons.remove(),
-                    cmds.Unstage.name(),
-                    cmds.run(cmds.Unstage, context, s.staged),
-                )
-                action.setShortcut(hotkeys.STAGE_SELECTION)
-                menu.addAction(
-                    icons.cola(),
-                    N_('Launch git-cola'),
-                    cmds.run(cmds.OpenRepo, context, path),
-                )
-            elif item not in model.staged_deleted:
+            if item not in model.submodules and item not in model.staged_deleted:
                 if self.has_selection():
                     apply_text = N_('Unstage Selected Lines')
                 else:
                     apply_text = N_('Unstage Diff Hunk')
-
                 self.action_apply_selection.setText(apply_text)
                 self.action_apply_selection.setIcon(icons.remove())
-                menu.addAction(self.action_apply_selection)
+                add_action(self.action_apply_selection)
+                stage_action_added = self._add_stage_or_unstage_action(
+                    menu, add_action, stage_action_added
+                )
 
-        if model.stageable() or model.unstageable():
+        if model.is_partially_stageable():
+            item = s.modified[0] if s.modified else None
+            if item in model.submodules:
+                path = core.abspath(item)
+                action = qtutils.add_action_with_icon(
+                    menu,
+                    icons.add(),
+                    cmds.Stage.name(),
+                    cmds.run(cmds.Stage, context, s.modified),
+                    hotkeys.STAGE_SELECTION,
+                )
+                add_action(action)
+                stage_action_added = self._add_stage_or_unstage_action(
+                    menu, add_action, stage_action_added
+                )
+
+                action = qtutils.add_action_with_icon(
+                    menu,
+                    icons.cola(),
+                    N_('Launch git-cola'),
+                    cmds.run(cmds.OpenRepo, context, path),
+                )
+                add_action(action)
+            elif item and item not in model.unstaged_deleted:
+                if self.has_selection():
+                    apply_text = N_('Stage Selected Lines')
+                    edit_and_apply_text = N_('Edit Selected Lines to Stage...')
+                    revert_text = N_('Revert Selected Lines...')
+                    edit_and_revert_text = N_('Edit Selected Lines to Revert...')
+                else:
+                    apply_text = N_('Stage Diff Hunk')
+                    edit_and_apply_text = N_('Edit Diff Hunk to Stage...')
+                    revert_text = N_('Revert Diff Hunk...')
+                    edit_and_revert_text = N_('Edit Diff Hunk to Revert...')
+
+                self.action_apply_selection.setText(apply_text)
+                self.action_apply_selection.setIcon(icons.add())
+                add_action(self.action_apply_selection)
+
+                self.action_revert_selection.setText(revert_text)
+                add_action(self.action_revert_selection)
+
+                stage_action_added = self._add_stage_or_unstage_action(
+                    menu, add_action, stage_action_added
+                )
+                # Do not show the "edit" action when the file does not exist.
+                add_action(qtutils.menu_separator(menu))
+                if filename and core.exists(filename):
+                    add_action(self.launch_editor)
+                # Removed files can still be diffed.
+                add_action(self.launch_difftool)
+                edit_actions_added = True
+
+                add_action(qtutils.menu_separator(menu))
+                self.action_edit_and_apply_selection.setText(edit_and_apply_text)
+                self.action_edit_and_apply_selection.setIcon(icons.add())
+                add_action(self.action_edit_and_apply_selection)
+
+                self.action_edit_and_revert_selection.setText(edit_and_revert_text)
+                add_action(self.action_edit_and_revert_selection)
+
+        if s.staged and model.is_unstageable():
+            item = s.staged[0]
+            if item in model.submodules:
+                path = core.abspath(item)
+                action = qtutils.add_action_with_icon(
+                    menu,
+                    icons.remove(),
+                    cmds.Unstage.name(),
+                    cmds.run(cmds.Unstage, context, s.staged),
+                    hotkeys.STAGE_SELECTION,
+                )
+                add_action(action)
+
+                stage_action_added = self._add_stage_or_unstage_action(
+                    menu, add_action, stage_action_added
+                )
+
+                qtutils.add_action_with_icon(
+                    menu,
+                    icons.cola(),
+                    N_('Launch git-cola'),
+                    cmds.run(cmds.OpenRepo, context, path),
+                )
+                add_action(action)
+
+            elif item not in model.staged_deleted:
+                # Do not show the "edit" action when the file does not exist.
+                add_action(qtutils.menu_separator(menu))
+                if filename and core.exists(filename):
+                    add_action(self.launch_editor)
+                # Removed files can still be diffed.
+                add_action(self.launch_difftool)
+                add_action(qtutils.menu_separator(menu))
+                edit_actions_added = True
+
+                if self.has_selection():
+                    edit_and_apply_text = N_('Edit Selected Lines to Unstage...')
+                else:
+                    edit_and_apply_text = N_('Edit Diff Hunk to Unstage...')
+                self.action_edit_and_apply_selection.setText(edit_and_apply_text)
+                self.action_edit_and_apply_selection.setIcon(icons.remove())
+                add_action(self.action_edit_and_apply_selection)
+
+        if not edit_actions_added and (model.is_stageable() or model.is_unstageable()):
+            add_action(qtutils.menu_separator(menu))
             # Do not show the "edit" action when the file does not exist.
             # Untracked files exist by definition.
             if filename and core.exists(filename):
-                menu.addSeparator()
-                menu.addAction(self.launch_editor)
+                add_action(self.launch_editor)
 
             # Removed files can still be diffed.
-            menu.addAction(self.launch_difftool)
+            add_action(self.launch_difftool)
+
+        add_action(qtutils.menu_separator(menu))
+        _add_patch_actions(self, self.context, menu)
 
         # Add the Previous/Next File actions, which improves discoverability
         # of their associated shortcuts
-        menu.addSeparator()
-        menu.addAction(self.move_up)
-        menu.addAction(self.move_down)
+        add_action(qtutils.menu_separator(menu))
+        add_action(self.move_up)
+        add_action(self.move_down)
+        add_action(qtutils.menu_separator(menu))
 
-        menu.addSeparator()
-        action = menu.addAction(icons.copy(), N_('Copy'), self.copy)
-        action.setShortcut(QtGui.QKeySequence.Copy)
+        if current_actions:
+            first_action = current_actions[0]
+        else:
+            first_action = None
+        menu.insertActions(first_action, menu_actions)
 
-        action = menu.addAction(icons.select_all(), N_('Select All'), self.selectAll)
-        action.setShortcut(QtGui.QKeySequence.SelectAll)
-        menu.exec_(self.mapToGlobal(event.pos()))
+        return menu
+
+    def _add_stage_or_unstage_action(self, menu, add_action, already_added):
+        """Add the Stage / Unstage menu action"""
+        if already_added:
+            return True
+        model = self.context.model
+        s = self.selection_model.selection()
+        if model.is_stageable() or model.is_unstageable():
+            if (model.is_amend_mode() and s.staged) or not self.model.is_stageable():
+                self.stage_or_unstage.setText(N_('Unstage'))
+                self.stage_or_unstage.setIcon(icons.remove())
+            else:
+                self.stage_or_unstage.setText(N_('Stage'))
+                self.stage_or_unstage.setIcon(icons.add())
+            add_action(qtutils.menu_separator(menu))
+            add_action(self.stage_or_unstage)
+        return True
 
     def mousePressEvent(self, event):
         if event.button() == Qt.RightButton:
@@ -901,13 +1176,17 @@ class DiffEditor(DiffTextEdit):
                 cursor = self.cursorForPosition(event.pos())
                 self.setTextCursor(cursor)
 
-        return super(DiffEditor, self).mousePressEvent(event)
+        return super().mousePressEvent(event)
 
     def setPlainText(self, text):
         """setPlainText(str) while retaining scrollbar positions"""
         model = self.model
         mode = model.mode
-        highlight = mode not in (model.mode_none, model.mode_untracked)
+        highlight = mode not in (
+            model.mode_none,
+            model.mode_display,
+            model.mode_untracked,
+        )
         self.highlighter.set_enabled(highlight)
 
         scrollbar = self.verticalScrollBar()
@@ -924,78 +1203,79 @@ class DiffEditor(DiffTextEdit):
         if scrollbar and scrollvalue is not None:
             scrollbar.setValue(scrollvalue)
 
-    def selected_lines(self):
-        cursor = self.textCursor()
-        selection_start = cursor.selectionStart()
-        selection_end = max(selection_start, cursor.selectionEnd() - 1)
-
-        first_line_idx = -1
-        last_line_idx = -1
-        line_idx = 0
-        line_start = 0
-
-        for line_idx, line in enumerate(get(self).splitlines()):
-            line_end = line_start + len(line)
-            if line_start <= selection_start <= line_end:
-                first_line_idx = line_idx
-            if line_start <= selection_end <= line_end:
-                last_line_idx = line_idx
-                break
-            line_start = line_end + 1
-
-        if first_line_idx == -1:
-            first_line_idx = line_idx
-
-        if last_line_idx == -1:
-            last_line_idx = line_idx
-
-        return first_line_idx, last_line_idx
-
-    def apply_selection(self):
+    def apply_selection(self, *, edit=False):
         model = self.model
         s = self.selection_model.single_selection()
-        if model.stageable() and s.modified:
-            self.process_diff_selection()
-        elif model.unstageable():
-            self.process_diff_selection(reverse=True)
+        if model.is_partially_stageable() and (s.modified or s.untracked):
+            self.process_diff_selection(edit=edit)
+        elif model.is_unstageable():
+            self.process_diff_selection(reverse=True, edit=edit)
 
-    def revert_selection(self):
+    def revert_selection(self, *, edit=False):
         """Destructively revert selected lines or hunk from a worktree file."""
 
+        if not edit:
+            if self.has_selection():
+                title = N_('Revert Selected Lines?')
+                ok_text = N_('Revert Selected Lines')
+            else:
+                title = N_('Revert Diff Hunk?')
+                ok_text = N_('Revert Diff Hunk')
+
+            if not Interaction.confirm(
+                title,
+                N_(
+                    'This operation drops uncommitted changes.\n'
+                    'These changes cannot be recovered.'
+                ),
+                N_('Revert the uncommitted changes?'),
+                ok_text,
+                default=True,
+                icon=icons.undo(),
+            ):
+                return
+        self.process_diff_selection(reverse=True, apply_to_worktree=True, edit=edit)
+
+    def extract_patch(self, reverse=False):
+        first_line_idx, last_line_idx = self.selected_lines()
+        patch = diffparse.Patch.parse(self.model.filename, self.model.diff_text)
         if self.has_selection():
-            title = N_('Revert Selected Lines?')
-            ok_text = N_('Revert Selected Lines')
-        else:
-            title = N_('Revert Diff Hunk?')
-            ok_text = N_('Revert Diff Hunk')
+            return patch.extract_subset(first_line_idx, last_line_idx, reverse=reverse)
+        return patch.extract_hunk(first_line_idx, reverse=reverse)
 
-        if not Interaction.confirm(
-            title,
-            N_(
-                'This operation drops uncommitted changes.\n'
-                'These changes cannot be recovered.'
-            ),
-            N_('Revert the uncommitted changes?'),
-            ok_text,
-            default=True,
-            icon=icons.undo(),
-        ):
-            return
-        self.process_diff_selection(reverse=True, apply_to_worktree=True)
+    def patch_encoding(self):
+        if isinstance(self.model.diff_text, core.UStr):
+            # original encoding must prevail
+            return self.model.diff_text.encoding
+        return self.context.cfg.file_encoding(self.model.filename)
 
-    def process_diff_selection(self, reverse=False, apply_to_worktree=False):
+    def process_diff_selection(
+        self, reverse=False, apply_to_worktree=False, edit=False
+    ):
         """Implement un/staging of the selected line(s) or hunk."""
         if self.selection_model.is_empty():
             return
-        context = self.context
-        first_line_idx, last_line_idx = self.selected_lines()
+        patch = self.extract_patch(reverse)
+        if not patch.has_changes():
+            return
+        patch_encoding = self.patch_encoding()
+
+        if edit:
+            patch = edit_patch(
+                patch,
+                patch_encoding,
+                self.context,
+                reverse=reverse,
+                apply_to_worktree=apply_to_worktree,
+            )
+            if not patch.has_changes():
+                return
+
         cmds.do(
-            cmds.ApplyDiffSelection,
-            context,
-            first_line_idx,
-            last_line_idx,
-            self.has_selection(),
-            reverse,
+            cmds.ApplyPatch,
+            self.context,
+            patch,
+            patch_encoding,
             apply_to_worktree,
         )
 
@@ -1004,12 +1284,213 @@ class DiffEditor(DiffTextEdit):
         self.selection_model.line_number = self.numbers.current_line()
 
 
+def _add_patch_actions(widget, context, menu):
+    """Add actions for manipulating patch files"""
+    patches_menu = menu.addMenu(N_('Patches'))
+    patches_menu.setIcon(icons.diff())
+    export_action = qtutils.add_action(
+        patches_menu,
+        N_('Export Patch'),
+        lambda: _export_patch(widget, context),
+    )
+    export_action.setIcon(icons.save())
+    patches_menu.addAction(export_action)
+
+    # Build the "Append Patch" menu dynamically.
+    append_menu = patches_menu.addMenu(N_('Append Patch'))
+    append_menu.setIcon(icons.add())
+    append_menu.aboutToShow.connect(
+        lambda: _build_patch_append_menu(widget, context, append_menu)
+    )
+
+
+def _build_patch_append_menu(widget, context, menu):
+    """Build the "Append Patch" sub-menu"""
+    # Build the menu when first displayed only. This initial check avoids
+    # re-populating the menu with duplicate actions.
+    menu_actions = menu.actions()
+    if menu_actions:
+        return
+
+    choose_patch_action = qtutils.add_action(
+        menu,
+        N_('Choose Patch...'),
+        lambda: _export_patch(widget, context, append=True),
+    )
+    choose_patch_action.setIcon(icons.diff())
+    menu.addAction(choose_patch_action)
+
+    subdir_menus = {}
+    path = prefs.patches_directory(context)
+    patches = get_patches_from_dir(path)
+    for patch in patches:
+        relpath = os.path.relpath(patch, start=path)
+        sub_menu = _add_patch_subdirs(menu, subdir_menus, relpath)
+        patch_basename = os.path.basename(relpath)
+        append_action = qtutils.add_action(
+            sub_menu,
+            patch_basename,
+            lambda patch_file=patch: _append_patch(widget, patch_file),
+        )
+        append_action.setIcon(icons.save())
+        sub_menu.addAction(append_action)
+
+
+def _add_patch_subdirs(menu, subdir_menus, relpath):
+    """Build menu leading up to the patch"""
+    # If the path contains no directory separators then add it to the
+    # root of the menu.
+    if os.sep not in relpath:
+        return menu
+
+    # Loop over each directory component and build a menu if it doesn't already exist.
+    components = []
+    for dirname in os.path.dirname(relpath).split(os.sep):
+        components.append(dirname)
+        current_dir = os.sep.join(components)
+        try:
+            menu = subdir_menus[current_dir]
+        except KeyError:
+            menu = subdir_menus[current_dir] = menu.addMenu(dirname)
+            menu.setIcon(icons.folder())
+
+    return menu
+
+
+def _export_patch(diff_editor, context, append=False):
+    """Export the selected diff to a patch file"""
+    if diff_editor.selection_model.is_empty():
+        return
+    patch = diff_editor.extract_patch(reverse=False)
+    if not patch.has_changes():
+        return
+    directory = prefs.patches_directory(context)
+    if append:
+        filename = qtutils.existing_file(directory, title=N_('Append Patch...'))
+    else:
+        default_filename = os.path.join(directory, 'diff.patch')
+        filename = qtutils.save_as(default_filename)
+    if not filename:
+        return
+    _write_patch_to_file(diff_editor, patch, filename, append=append)
+
+
+def _append_patch(diff_editor, filename):
+    """Append diffs to the specified patch file"""
+    if diff_editor.selection_model.is_empty():
+        return
+    patch = diff_editor.extract_patch(reverse=False)
+    if not patch.has_changes():
+        return
+    _write_patch_to_file(diff_editor, patch, filename, append=True)
+
+
+def _write_patch_to_file(diff_editor, patch, filename, append=False):
+    """Write diffs from the Diff Editor to the specified patch file"""
+    encoding = diff_editor.patch_encoding()
+    content = patch.as_text()
+    try:
+        core.write(filename, content, encoding=encoding, append=append)
+    except OSError as exc:
+        _, details = utils.format_exception(exc)
+        title = N_('Error writing patch')
+        msg = N_('Unable to write patch to "%s". Check permissions?' % filename)
+        Interaction.critical(title, message=msg, details=details)
+        return
+    Interaction.log('Patch written to "%s"' % filename)
+
+
+class ObjectIdLabel(PlainTextLabel):
+    """Interactive object IDs"""
+
+    def __init__(self, context, oid='', parent=None):
+        super().__init__(parent=parent)
+        self.context = context
+        self.oid = oid
+        self.setCursor(Qt.PointingHandCursor)
+        self.setContextMenuPolicy(Qt.CustomContextMenu)
+        self.setFocusPolicy(Qt.NoFocus)
+        self.setToolTip(N_('Click to Copy'))
+        self.customContextMenuRequested.connect(self._context_menu)
+        self._copy_short_action = qtutils.add_action_with_icon(
+            self,
+            icons.copy(),
+            N_('Copy Commit (Short)'),
+            self._copy_short,
+            hotkeys.COPY,
+        )
+        self._copy_long_action = qtutils.add_action_with_icon(
+            self,
+            icons.copy(),
+            N_('Copy Commit'),
+            self._copy_long,
+            hotkeys.COPY_COMMIT_ID,
+        )
+        self._select_all_action = qtutils.add_action(
+            self, N_('Select All'), self._select_all, hotkeys.SELECT_ALL
+        )
+        self.timer = QtCore.QTimer(self)
+        self.timer.setInterval(200)
+        self.timer.setSingleShot(True)
+        self.timer.timeout.connect(self._timeout)
+
+    def _timeout(self):
+        """Clear the selection"""
+        self.setSelection(0, 0)
+
+    def set_oid(self, oid):
+        """Record the object ID and update the display"""
+        self.oid = oid
+        self.set_text(oid)
+
+    def _copy_short(self, clicked=False):
+        """Copy the abbreviated commit ID"""
+        abbrev = prefs.abbrev(self.context)
+        qtutils.set_clipboard(self.oid[:abbrev])
+        self._select_all()
+        if not self.timer.isActive():
+            self.timer.start()
+
+    def _copy_long(self):
+        """Copy the full commit ID"""
+        qtutils.set_clipboard(self.oid)
+        self._select_all()
+        if not self.timer.isActive():
+            self.timer.start()
+
+    def _select_all(self):
+        """Select the text"""
+        length = len(self.get())
+        self.setSelection(0, length)
+
+    def mousePressEvent(self, event):
+        """Copy the commit ID when clicked"""
+        if event.button() == Qt.LeftButton:
+            # This behavior makes it impossible to select text by clicking and dragging,
+            # but it's okay because this also makes copying text a single-click affair.
+            self._copy_short(clicked=True)
+        return super().mousePressEvent(event)
+
+    def _context_menu(self, pos):
+        """Display a custom context menu"""
+        menu = QtWidgets.QMenu(self)
+        menu.addAction(self._copy_short_action)
+        menu.addAction(self._copy_long_action)
+        menu.addAction(self._select_all_action)
+        menu.exec_(self.mapToGlobal(pos))
+
+
 class DiffWidget(QtWidgets.QWidget):
-    def __init__(self, context, notifier, parent, is_commit=False):
+    """Display commit metadata and text diffs"""
+
+    def __init__(self, context, parent, is_commit=False, options=None):
         QtWidgets.QWidget.__init__(self, parent)
 
         self.context = context
         self.oid = 'HEAD'
+        self.oid_start = None
+        self.oid_end = None
+        self.options = options
 
         author_font = QtGui.QFont(self.font())
         author_font.setPointSize(int(author_font.pointSize() * 1.1))
@@ -1017,47 +1498,36 @@ class DiffWidget(QtWidgets.QWidget):
         summary_font = QtGui.QFont(author_font)
         summary_font.setWeight(QtGui.QFont.Bold)
 
-        policy = QtWidgets.QSizePolicy(
-            QtWidgets.QSizePolicy.MinimumExpanding, QtWidgets.QSizePolicy.Minimum
-        )
+        self.gravatar_label = gravatar.GravatarLabel(self.context, parent=self)
 
-        self.gravatar_label = gravatar.GravatarLabel()
+        self.oid_label = ObjectIdLabel(context, parent=self)
+        self.oid_label.setAlignment(Qt.AlignBottom)
+        self.oid_label.elide()
 
-        self.author_label = TextLabel()
-        self.author_label.setTextFormat(Qt.RichText)
+        self.author_label = RichTextLabel(selectable=False, parent=self)
         self.author_label.setFont(author_font)
-        self.author_label.setSizePolicy(policy)
-        self.author_label.setAlignment(Qt.AlignBottom)
+        self.author_label.setAlignment(Qt.AlignTop)
         self.author_label.elide()
 
-        self.date_label = TextLabel()
-        self.date_label.setTextFormat(Qt.PlainText)
-        self.date_label.setSizePolicy(policy)
+        self.date_label = PlainTextLabel(parent=self)
         self.date_label.setAlignment(Qt.AlignTop)
-        self.date_label.hide()
+        self.date_label.elide()
 
-        self.summary_label = TextLabel()
-        self.summary_label.setTextFormat(Qt.PlainText)
+        self.summary_label = PlainTextLabel(parent=self)
         self.summary_label.setFont(summary_font)
-        self.summary_label.setSizePolicy(policy)
         self.summary_label.setAlignment(Qt.AlignTop)
         self.summary_label.elide()
 
-        self.oid_label = TextLabel()
-        self.oid_label.setTextFormat(Qt.PlainText)
-        self.oid_label.setSizePolicy(policy)
-        self.oid_label.setAlignment(Qt.AlignTop)
-        self.oid_label.elide()
-
         self.diff = DiffTextEdit(context, self, is_commit=is_commit, whitespace=False)
+        self.setFocusProxy(self.diff)
 
         self.info_layout = qtutils.vbox(
             defs.no_margin,
             defs.no_spacing,
+            self.oid_label,
             self.author_label,
             self.date_label,
             self.summary_label,
-            self.oid_label,
         )
 
         self.logo_layout = qtutils.hbox(
@@ -1070,33 +1540,61 @@ class DiffWidget(QtWidgets.QWidget):
         )
         self.setLayout(self.main_layout)
 
-        notifier.add_observer(COMMITS_SELECTED, self.commits_selected)
-        notifier.add_observer(FILES_SELECTED, self.files_selected)
         self.set_tabwidth(prefs.tabwidth(context))
 
     def set_tabwidth(self, width):
         self.diff.set_tabwidth(width)
 
-    def set_diff_oid(self, oid, filename=None):
-        context = self.context
+    def set_word_wrapping(self, enabled, update=False):
+        """Enable and disable word wrapping"""
+        self.diff.set_word_wrapping(enabled, update=update)
+
+    def set_options(self, options):
+        """Register an options widget"""
+        self.options = options
+        self.diff.set_options(options)
+
+    def start_diff_task(self, task):
+        """Clear the display and start a diff-gathering task"""
         self.diff.save_scrollbar()
         self.diff.set_loading_message()
-        task = DiffInfoTask(context, oid, filename, self)
         self.context.runtask.start(task, result=self.set_diff)
 
-    def commits_selected(self, commits):
-        if len(commits) != 1:
-            return
-        commit = commits[0]
-        oid = self.oid = commit.oid
-        email = commit.email or ''
-        summary = commit.summary or ''
-        author = commit.author or ''
+    def set_diff_oid(self, oid, filename=None):
+        """Set the diff from a single commit object ID"""
+        task = DiffInfoTask(self.context, oid, filename)
+        self.start_diff_task(task)
 
-        self.set_details(oid, author, email, '', summary)
-        self.set_diff_oid(oid)
+    def set_diff_range(self, start, end, filename=None):
+        task = DiffRangeTask(self.context, start + '~', end, filename)
+        self.start_diff_task(task)
+
+    def commits_selected(self, commits):
+        """Display an appropriate diff when commits are selected"""
+        if not commits:
+            self.clear()
+            return
+        commit = commits[-1]
+        oid = commit.oid
+        author = commit.author or ''
+        email = commit.email or ''
+        date = commit.authdate or ''
+        summary = commit.summary or ''
+        self.set_details(oid, author, email, date, summary)
+        self.oid = oid
+
+        if len(commits) > 1:
+            start, end = commits[0], commits[-1]
+            self.set_diff_range(start.oid, end.oid)
+            self.oid_start = start
+            self.oid_end = end
+        else:
+            self.set_diff_oid(oid)
+            self.oid_start = None
+            self.oid_end = None
 
     def set_diff(self, diff):
+        """Set the diff text"""
         self.diff.set_diff(diff)
 
     def set_details(self, oid, author, email, date, summary):
@@ -1110,68 +1608,66 @@ class DiffWidget(QtWidgets.QWidget):
 
         self.date_label.set_text(date)
         self.date_label.setVisible(bool(date))
-        self.oid_label.set_text(oid)
+        self.oid_label.set_oid(oid)
         self.author_label.set_template(author_text, author_template)
         self.summary_label.set_text(summary)
         self.gravatar_label.set_email(email)
 
+    def clear(self):
+        self.date_label.set_text('')
+        self.oid_label.set_oid('')
+        self.author_label.set_text('')
+        self.summary_label.set_text('')
+        self.gravatar_label.clear()
+        self.diff.clear()
+
     def files_selected(self, filenames):
-        if not filenames:
-            return
-        self.set_diff_oid(self.oid, filenames[0])
+        """Update the view when a filename is selected"""
+        oid_start = self.oid_start
+        oid_end = self.oid_end
+        extra_args = {}
+        if filenames:
+            extra_args['filename'] = filenames[0]
+        if oid_start and oid_end:
+            self.set_diff_range(oid_start.oid, oid_end.oid, **extra_args)
+        else:
+            self.set_diff_oid(self.oid, **extra_args)
 
 
-class TextLabel(QtWidgets.QLabel):
-    def __init__(self, parent=None):
-        QtWidgets.QLabel.__init__(self, parent)
-        self.setTextInteractionFlags(
-            Qt.TextSelectableByMouse | Qt.LinksAccessibleByMouse
+class DiffPanel(QtWidgets.QWidget):
+    """A combined diff + search panel"""
+
+    def __init__(self, diff_widget, text_widget, parent):
+        super().__init__(parent)
+        self.diff_widget = diff_widget
+        self.search_widget = TextSearchWidget(text_widget, self)
+        self.search_widget.hide()
+        layout = qtutils.vbox(
+            defs.no_margin, defs.spacing, self.diff_widget, self.search_widget
         )
-        self._display = ''
-        self._template = ''
-        self._text = ''
-        self._elide = False
-        self._metrics = QtGui.QFontMetrics(self.font())
-        self.setOpenExternalLinks(True)
+        self.setLayout(layout)
+        self.setFocusProxy(self.diff_widget)
 
-    def elide(self):
-        self._elide = True
+        self.search_action = qtutils.add_action(
+            self,
+            N_('Search in Diff'),
+            self.show_search,
+            hotkeys.SEARCH,
+        )
 
-    def set_text(self, text):
-        self.set_template(text, text)
-
-    def set_template(self, text, template):
-        self._display = text
-        self._text = text
-        self._template = template
-        self.update_text(self.width())
-        self.setText(self._display)
-
-    def update_text(self, width):
-        self._display = self._text
-        if not self._elide:
-            return
-        text = self._metrics.elidedText(self._template, Qt.ElideRight, width - 2)
-        if text != self._template:
-            self._display = text
-
-    # Qt overrides
-    def setFont(self, font):
-        self._metrics = QtGui.QFontMetrics(font)
-        QtWidgets.QLabel.setFont(self, font)
-
-    def resizeEvent(self, event):
-        if self._elide:
-            self.update_text(event.size().width())
-            block = self.blockSignals(True)
-            self.setText(self._display)
-            self.blockSignals(block)
-        QtWidgets.QLabel.resizeEvent(self, event)
+    def show_search(self):
+        """Show a dialog for searching diffs"""
+        # The diff search is only active in text mode.
+        if not self.search_widget.isVisible():
+            self.search_widget.show()
+        self.search_widget.setFocus()
 
 
 class DiffInfoTask(qtutils.Task):
-    def __init__(self, context, oid, filename, parent):
-        qtutils.Task.__init__(self, parent)
+    """Gather diffs for a single commit"""
+
+    def __init__(self, context, oid, filename):
+        qtutils.Task.__init__(self)
         self.context = context
         self.oid = oid
         self.filename = filename
@@ -1180,3 +1676,303 @@ class DiffInfoTask(qtutils.Task):
         context = self.context
         oid = self.oid
         return gitcmds.diff_info(context, oid, filename=self.filename)
+
+
+class DiffRangeTask(qtutils.Task):
+    """Gather diffs for a range of commits"""
+
+    def __init__(self, context, start, end, filename):
+        qtutils.Task.__init__(self)
+        self.context = context
+        self.start = start
+        self.end = end
+        self.filename = filename
+
+    def task(self):
+        context = self.context
+        return gitcmds.diff_range(context, self.start, self.end, filename=self.filename)
+
+
+def apply_patches(context, patches=None):
+    """Open the ApplyPatches dialog"""
+    parent = qtutils.active_window()
+    dlg = new_apply_patches(context, patches=patches, parent=parent)
+    dlg.show()
+    dlg.raise_()
+    return dlg
+
+
+def new_apply_patches(context, patches=None, parent=None):
+    """Create a new instances of the ApplyPatches dialog"""
+    dlg = ApplyPatches(context, parent=parent)
+    if patches:
+        dlg.add_paths(patches)
+    return dlg
+
+
+def get_patches_from_paths(paths):
+    """Returns all patches beneath a given path"""
+    paths = [core.decode(p) for p in paths]
+    patches = [p for p in paths if core.isfile(p) and p.endswith(('.patch', '.mbox'))]
+    dirs = [p for p in paths if core.isdir(p)]
+    dirs.sort()
+    for d in dirs:
+        patches.extend(get_patches_from_dir(d))
+    return patches
+
+
+def get_patches_from_mimedata(mimedata):
+    """Extract path files from a QMimeData payload"""
+    urls = mimedata.urls()
+    if not urls:
+        return []
+    paths = [x.path() for x in urls]
+    return get_patches_from_paths(paths)
+
+
+def get_patches_from_dir(path):
+    """Find patches in a subdirectory"""
+    patches = []
+    for root, _, files in core.walk(path):
+        for name in [f for f in files if f.endswith(('.patch', '.mbox'))]:
+            patches.append(core.decode(os.path.join(root, name)))
+    return patches
+
+
+class ApplyPatches(standard.Dialog):
+    def __init__(self, context, parent=None):
+        super().__init__(parent=parent)
+        self.context = context
+        self.setWindowTitle(N_('Apply Patches'))
+        self.setAcceptDrops(True)
+        if parent is not None:
+            self.setWindowModality(Qt.WindowModal)
+
+        self.curdir = core.getcwd()
+        self.inner_drag = False
+
+        self.usage = QtWidgets.QLabel()
+        self.usage.setText(
+            N_(
+                """
+            <p>
+                Drag and drop or use the <strong>Add</strong> button to add
+                patches to the list
+            </p>
+            """
+            )
+        )
+
+        self.tree = PatchTreeWidget(parent=self)
+        self.tree.setHeaderHidden(True)
+        self.tree.itemSelectionChanged.connect(self._tree_selection_changed)
+
+        self.diffwidget = DiffWidget(context, self, is_commit=True)
+
+        self.add_button = qtutils.create_toolbutton(
+            text=N_('Add'), icon=icons.add(), tooltip=N_('Add patches (+)')
+        )
+
+        self.remove_button = qtutils.create_toolbutton(
+            text=N_('Remove'),
+            icon=icons.remove(),
+            tooltip=N_('Remove selected (Delete)'),
+        )
+
+        self.apply_button = qtutils.create_button(text=N_('Apply'), icon=icons.ok())
+
+        self.close_button = qtutils.close_button()
+
+        self.add_action = qtutils.add_action(
+            self, N_('Add'), self.add_files, hotkeys.ADD_ITEM
+        )
+
+        self.remove_action = qtutils.add_action(
+            self,
+            N_('Remove'),
+            self.tree.remove_selected,
+            hotkeys.DELETE,
+            hotkeys.BACKSPACE,
+            hotkeys.REMOVE_ITEM,
+        )
+
+        self.top_layout = qtutils.hbox(
+            defs.no_margin,
+            defs.button_spacing,
+            self.add_button,
+            self.remove_button,
+            qtutils.STRETCH,
+            self.usage,
+        )
+
+        self.bottom_layout = qtutils.hbox(
+            defs.no_margin,
+            defs.button_spacing,
+            qtutils.STRETCH,
+            self.close_button,
+            self.apply_button,
+        )
+
+        self.splitter = qtutils.splitter(Qt.Vertical, self.tree, self.diffwidget)
+
+        self.main_layout = qtutils.vbox(
+            defs.margin,
+            defs.spacing,
+            self.top_layout,
+            self.splitter,
+            self.bottom_layout,
+        )
+        self.setLayout(self.main_layout)
+
+        qtutils.connect_button(self.add_button, self.add_files)
+        qtutils.connect_button(self.remove_button, self.tree.remove_selected)
+        qtutils.connect_button(self.apply_button, self.apply_patches)
+        qtutils.connect_button(self.close_button, self.close)
+
+        self.init_state(None, self.resize, 720, 480)
+
+    def apply_patches(self):
+        items = self.tree.items()
+        if not items:
+            return
+        context = self.context
+        patches = [i.data(0, Qt.UserRole) for i in items]
+        cmds.do(cmds.ApplyPatches, context, patches)
+        self.accept()
+
+    def add_files(self):
+        files = qtutils.open_files(
+            N_('Select patch file(s)...'),
+            directory=self.curdir,
+            filters='Patches (*.patch *.mbox)',
+        )
+        if not files:
+            return
+        self.curdir = os.path.dirname(files[0])
+        self.add_paths([core.relpath(f) for f in files])
+
+    def dragEnterEvent(self, event):
+        """Accepts drops if the mimedata contains patches"""
+        super().dragEnterEvent(event)
+        patches = get_patches_from_mimedata(event.mimeData())
+        if patches:
+            event.acceptProposedAction()
+
+    def dropEvent(self, event):
+        """Add dropped patches"""
+        event.accept()
+        patches = get_patches_from_mimedata(event.mimeData())
+        if not patches:
+            return
+        self.add_paths(patches)
+
+    def add_paths(self, paths):
+        self.tree.add_paths(paths)
+
+    def _tree_selection_changed(self):
+        items = self.tree.selected_items()
+        if not items:
+            return
+        item = items[-1]  # take the last item
+        path = item.data(0, Qt.UserRole)
+        if not core.exists(path):
+            return
+        commit = parse_patch(path)
+        self.diffwidget.set_details(
+            commit.oid, commit.author, commit.email, commit.date, commit.summary
+        )
+        self.diffwidget.set_diff(commit.diff)
+
+    def export_state(self):
+        """Export persistent settings"""
+        state = super().export_state()
+        state['sizes'] = get(self.splitter)
+        return state
+
+    def apply_state(self, state):
+        """Apply persistent settings"""
+        result = super().apply_state(state)
+        try:
+            self.splitter.setSizes(state['sizes'])
+        except (AttributeError, KeyError, ValueError, TypeError):
+            pass
+        return result
+
+
+class PatchTreeWidget(standard.DraggableTreeWidget):
+    def add_paths(self, paths):
+        patches = get_patches_from_paths(paths)
+        if not patches:
+            return
+        items = []
+        icon = icons.file_text()
+        for patch in patches:
+            item = QtWidgets.QTreeWidgetItem()
+            flags = item.flags() & ~Qt.ItemIsDropEnabled
+            item.setFlags(flags)
+            item.setIcon(0, icon)
+            item.setText(0, os.path.basename(patch))
+            item.setData(0, Qt.UserRole, patch)
+            item.setToolTip(0, patch)
+            items.append(item)
+        self.addTopLevelItems(items)
+
+    def remove_selected(self):
+        idxs = self.selectedIndexes()
+        rows = [idx.row() for idx in idxs]
+        for row in reversed(sorted(rows)):
+            self.invisibleRootItem().takeChild(row)
+
+
+class Commit:
+    """Container for commit details"""
+
+    def __init__(self):
+        self.content = ''
+        self.author = ''
+        self.email = ''
+        self.oid = ''
+        self.summary = ''
+        self.diff = ''
+        self.date = ''
+
+
+def parse_patch(path):
+    content = core.read(path)
+    commit = Commit()
+    parse(content, commit)
+    return commit
+
+
+def parse(content, commit):
+    """Parse commit details from a patch"""
+    from_rgx = re.compile(r'^From (?P<oid>[a-f0-9]{40}) .*$')
+    author_rgx = re.compile(r'^From: (?P<author>[^<]+) <(?P<email>[^>]+)>$')
+    date_rgx = re.compile(r'^Date: (?P<date>.*)$')
+    subject_rgx = re.compile(r'^Subject: (?P<summary>.*)$')
+
+    commit.content = content
+
+    lines = content.splitlines()
+    for idx, line in enumerate(lines):
+        match = from_rgx.match(line)
+        if match:
+            commit.oid = match.group('oid')
+            continue
+
+        match = author_rgx.match(line)
+        if match:
+            commit.author = match.group('author')
+            commit.email = match.group('email')
+            continue
+
+        match = date_rgx.match(line)
+        if match:
+            commit.date = match.group('date')
+            continue
+
+        match = subject_rgx.match(line)
+        if match:
+            commit.summary = match.group('summary')
+            commit.diff = '\n'.join(lines[idx + 1 :])
+            break
