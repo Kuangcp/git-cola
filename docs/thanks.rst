@@ -94,7 +94,6 @@ Thanks
 * Filip Danilović
 * Floris Lambrechts
 * Frank Weber
-* fu7mu4
 * Garoe Dorta
 * Geoffrey van Wyk
 * Georg Limbach
@@ -267,10 +266,12 @@ Thanks
 * Szymon Judasz
 * Taylor Braun-Jones
 * Thiemo van Engelen
+* Thomas McKay
 * Thomas Kiley
 * Thomas Kluyver
 * Thomas Thorne
 * Tom Dobbelaere
+* Tomo Dote
 * Tim Brown
 * Tim Gates
 * Tim Schumacher
@@ -289,6 +290,7 @@ Thanks
 * Victorhck
 * Ville Skyttä
 * Virgil Dupras
+* Vishnu Sanal
 * Vitor Lobo
 * v.paritskiy
 * waterzch

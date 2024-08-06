@@ -1,3 +1,63 @@
+Upcoming
+========
+
+Translations
+------------
+* Updated Japanese translation.
+  (`#1411 <https://github.com/git-cola/git-cola/pull/1411>`_)
+
+
+.. _v4.8.1:
+
+v4.8.1
+======
+
+Usability, bells and whistles
+-----------------------------
+* The clone dialog now defaults to cloning into the parent directory by default.
+  (`#1402 <https://github.com/git-cola/git-cola/issues/1402>`_)
+
+Fixes
+-----
+* Qt6 support was improved for the right-click context menus.
+  (`#1409 <https://github.com/git-cola/git-cola/issues/1409>`_)
+  (`#1410 <https://github.com/git-cola/git-cola/pull/1410>`_)
+
+
+.. _v4.8.0:
+
+v4.8.0
+======
+
+Usability, bells and whistles
+-----------------------------
+* The Rebase editor is now aware of the ``drop``, ``break``, ``label``, ``merge`` and ``reset``
+  commands that were added in recent versions of Git.
+
+* Desktop notifications can now be enabled when pushing remotes by enabling the
+  "Notify on Push" option in the preferences.
+  (`#1404 <https://github.com/git-cola/git-cola/pull/1404>`_)
+  (`#350 <https://github.com/git-cola/git-cola/issues/350>`_)
+
+* Faster and easier commit hash copying in DAG. Left-clicking on the Commit ID will
+  now copy it directly into the clipboard without any further action.
+  (`#1401 <https://github.com/git-cola/git-cola/issues/1401>`_)
+
+* "Grab File from Parent Commit" actions have been added to the DAG.
+  (`#1401 <https://github.com/git-cola/git-cola/issues/1401>`_)
+
+* The `Unstage Selected` action was added to the context menu for unmerged files.
+  (`#1397 <https://github.com/git-cola/git-cola/pull/1397>`_)
+
+* ``git cola rebase`` now provides  a ``--rebase-merges`` option and passes the
+  same option to ``git rebase`` when `Git v1.18.0` or newer is detected.
+
+Development
+-----------
+* Pre-commits hooks were updated.
+  (`#1396 <https://github.com/git-cola/git-cola/pull/1396>`_)
+
+
 .. _v4.7.1:
 
 v4.7.1
